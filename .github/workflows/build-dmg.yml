@@ -1,0 +1,86 @@
+name: Build & Release macOS DMG and Windows EXE
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  # -------------------------------------------------------------
+  # Job 1: Build macOS Application Bundle & DMG Disk Image
+  # -------------------------------------------------------------
+  build-macos:
+    name: Build macOS DMG
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install customtkinter pillow pyobjc-framework-Cocoa pyinstaller
+
+    - name: Build macOS App Bundle with PyInstaller
+      run: |
+        pyinstaller --name "SoulsLights" \
+                    --windowed \
+                    --noconsole \
+                    --clean \
+                    main.py
+
+    - name: Package into SoulsLights.dmg
+      run: |
+        mkdir -p dmg_staging
+        cp -r dist/SoulsLights.app dmg_staging/
+        ln -s /Applications dmg_staging/Applications
+        hdiutil create -volname "SoulsLights" \
+                       -srcfolder dmg_staging \
+                       -ov -format UDZO \
+                       dist/SoulsLights.dmg
+
+    - name: Upload DMG Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SoulsLights-macOS-DMG
+        path: dist/SoulsLights.dmg
+
+  # -------------------------------------------------------------
+  # Job 2: Build Windows Standalone Executable
+  # -------------------------------------------------------------
+  build-windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install Windows Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Compile Standalone Executable
+      run: |
+        python build_exe.py
+
+    - name: Upload Windows EXE Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SoulsLights-Windows-EXE
+        path: dist/SoulsLights.exe

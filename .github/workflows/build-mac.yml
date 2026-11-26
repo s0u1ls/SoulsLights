@@ -1,0 +1,38 @@
+name: Build SoulsLights macOS App & DMG
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12 with Tk
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python-Tk via Homebrew (if needed) & dependencies
+        run: |
+          brew install python-tk@3.12 || true
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements-mac.txt
+
+      - name: Generate macOS ICNS & build SoulsLights.app + DMG
+        run: |
+          python3 macos/make_icons.py
+          python3 build_mac.py
+
+      - name: Upload macOS DMG & App artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SoulsLights-macOS-arm64
+          path: |
+            dist/SoulsLights-macOS.dmg
+            dist/SoulsLights.app
