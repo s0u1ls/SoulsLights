@@ -56,9 +56,9 @@
 - **Compatible Players:** Spotify, Apple Music, YouTube Music, Tidal, Chrome, Edge, Brave, VLC, and other SMTC-enabled media apps
 
 ### Quick Run
-1. Open the [Releases](https://github.com/YOUR_USERNAME/SoulsLights/releases/latest) page.
-2. Download **`SoulsLights.exe`**.
-3. Run `SoulsLights.exe` and start playing music on your PC.
+1. Open the [Releases](https://github.com/s0u1ls/SoulsLights/releases/latest) page.
+3. Download **`SoulsLights.exe`**.
+4. Run `SoulsLights.exe` and start playing music on your PC.
 
 > [!TIP]
 > Toggle **`🔒 Unlock / Lock`** in the top bar or hero banner to switch click-through mode when interacting with apps behind the overlay.
