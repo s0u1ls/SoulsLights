@@ -7,7 +7,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com)
 [![Python](https://img.shields.io/badge/Python-3.13-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
-[![Release](https://img.shields.io/badge/Download-Portable%20EXE-blueviolet?style=for-the-badge&logo=windows-terminal&logoColor=white)](https://github.com/YOUR_USERNAME/SoulsLights/releases/latest)
+[![Release](https://img.shields.io/badge/Download-Portable%20EXE-blueviolet?style=for-the-badge&logo=windows-terminal&logoColor=white)](https://github.com/s0u1ls/SoulsLights/releases/latest)
 
 <br/>
 
@@ -15,7 +15,7 @@
 
 <br/>
 
-[⬇️ Download Latest Release](https://github.com/YOUR_USERNAME/SoulsLights/releases/latest) • [✨ Highlights](#-highlights) • [🎨 Lyrics Styles](#-lyrics-styles) • [🚀 Getting Started](#-getting-started) • [🛠️ Build from Source](#️-build-from-source)
+[⬇️ Download Latest Release](https://github.com/s0u1ls/SoulsLights/releases/latest) • [✨ Highlights](#-highlights) • [🎨 Lyrics Styles](#-lyrics-styles) • [🚀 Getting Started](#-getting-started) • [🛠️ Build from Source](#️-build-from-source)
 
 </div>
 
@@ -57,8 +57,8 @@
 
 ### Quick Run
 1. Open the [Releases](https://github.com/s0u1ls/SoulsLights/releases/latest) page.
-3. Download **`SoulsLights.exe`**.
-4. Run `SoulsLights.exe` and start playing music on your PC.
+2. Download **`SoulsLights.exe`**.
+3. Run `SoulsLights.exe` and start playing music on your PC.
 
 > [!TIP]
 > Toggle **`🔒 Unlock / Lock`** in the top bar or hero banner to switch click-through mode when interacting with apps behind the overlay.
@@ -69,7 +69,7 @@
 
 ### 1. Clone the repository
 ```bash
-git clone [https://github.com/YOUR_USERNAME/SoulsLights.git](https://github.com/YOUR_USERNAME/SoulsLights.git)
+git clone [https://github.com/s0u1ls/SoulsLights.git](https://github.com/s0u1ls/SoulsLights.git)
 cd SoulsLights
 ```
 
