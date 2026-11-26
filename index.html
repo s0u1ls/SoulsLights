@@ -32,7 +32,19 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Cinematic Animated Ambient Lighting (Real Verci Gradient Mesh) */
+    /* Interactive Fluid Ripple Waterdrop Canvas */
+    #water-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.85;
+      mix-blend-mode: screen;
+    }
+
+    /* Ambient Lighting */
     .ambient-canvas {
       position: fixed;
       inset: 0;
@@ -49,6 +61,7 @@
       background: radial-gradient(circle, rgba(14, 62, 102, 0.55) 0%, rgba(0, 0, 0, 0) 70%);
       filter: blur(100px);
       animation: driftLeft 16s ease-in-out infinite alternate;
+      transition: background 1.2s ease;
     }
     .blob-2 {
       position: absolute;
@@ -59,6 +72,7 @@
       background: radial-gradient(circle, rgba(175, 80, 35, 0.45) 0%, rgba(0, 0, 0, 0) 70%);
       filter: blur(100px);
       animation: driftRight 18s ease-in-out infinite alternate;
+      transition: background 1.2s ease;
     }
     @keyframes driftLeft {
       0% { transform: translate(0, 0) scale(1); }
@@ -69,13 +83,13 @@
       100% { transform: translate(-6%, 10%) scale(1.12); }
     }
 
-    /* Film Grain Layer */
+    /* Subtle Film Grain */
     .noise {
       position: fixed;
       inset: 0;
-      opacity: 0.045;
+      opacity: 0.04;
       pointer-events: none;
-      z-index: 1;
+      z-index: 2;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
     }
 
@@ -84,7 +98,7 @@
       margin: 0 auto;
       padding: 0 24px;
       position: relative;
-      z-index: 2;
+      z-index: 3;
     }
 
     /* Top Floating Glass Header */
@@ -105,8 +119,8 @@
       text-decoration: none;
     }
     .brand-icon {
-      width: 30px;
-      height: 30px;
+      width: 32px;
+      height: 32px;
       border-radius: 9px;
       background: linear-gradient(135deg, #2563EB, #EA580C);
       display: grid;
@@ -136,7 +150,7 @@
     /* Hero Text */
     .hero {
       text-align: center;
-      padding: 60px 0 30px;
+      padding: 60px 0 24px;
     }
     .badge-pill {
       display: inline-flex;
@@ -214,9 +228,9 @@
       transform: translateY(-2px);
     }
 
-    /* Picture 1 Replica: Exact Studio Window Stage */
+    /* Picture 1 Replica: Interactive Studio Stage */
     .studio-window {
-      margin: 46px auto 90px;
+      margin: 44px auto 90px;
       background: #000000;
       border-radius: 24px;
       border: 1px solid rgba(255, 255, 255, 0.12);
@@ -225,7 +239,6 @@
       position: relative;
     }
     
-    /* Studio Window Header Bar */
     .window-header {
       padding: 14px 22px;
       display: flex;
@@ -235,16 +248,8 @@
       background: rgba(12, 15, 22, 0.7);
       backdrop-filter: blur(14px);
     }
-    .window-dots {
-      display: flex;
-      gap: 7px;
-    }
-    .window-dot {
-      width: 11px;
-      height: 11px;
-      border-radius: 50%;
-      background: #334155;
-    }
+    .window-dots { display: flex; gap: 7px; }
+    .window-dot { width: 11px; height: 11px; border-radius: 50%; background: #334155; }
     .window-dot.close { background: #EF4444; }
     .window-dot.min { background: #F59E0B; }
     .window-dot.max { background: #10B981; }
@@ -261,7 +266,7 @@
       color: #94A3B8;
     }
     .window-nav-pills span { cursor: pointer; transition: color 0.2s; }
-    .window-nav-pills span:hover { color: #fff; }
+    .window-nav-pills span:hover, .window-nav-pills span.active-pill { color: #fff; font-weight: 600; }
 
     .window-status-pill {
       background: rgba(24, 29, 41, 0.85);
@@ -274,6 +279,7 @@
       font-size: 12px;
       color: #E2E8F0;
       font-weight: 600;
+      cursor: pointer;
     }
     .status-dot {
       width: 8px;
@@ -294,9 +300,9 @@
       justify-content: space-between;
       padding: 36px 44px;
       overflow: hidden;
+      transition: background 0.8s ease;
     }
 
-    /* Hero Arrows */
     .hero-arrow {
       position: absolute;
       top: 50%;
@@ -305,13 +311,23 @@
       color: rgba(255, 255, 255, 0.35);
       user-select: none;
       cursor: pointer;
-      transition: color 0.2s;
+      transition: all 0.2s;
+      z-index: 10;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
     }
-    .hero-arrow:hover { color: #fff; }
+    .hero-arrow:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.1);
+      transform: translateY(-50%) scale(1.1);
+    }
     .hero-arrow.left { left: 24px; }
     .hero-arrow.right { right: 24px; }
 
-    /* Picture 1 Exact 3D Floating Word */
+    /* Interactive 3D Floating Word Kinetic Container */
     .kinetic-floating-box {
       position: absolute;
       top: 42%;
@@ -321,12 +337,14 @@
       align-items: center;
       gap: 16px;
       user-select: none;
+      transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .word-dim {
       font-size: 26px;
       font-weight: 500;
       color: rgba(215, 230, 245, 0.45);
       letter-spacing: -0.3px;
+      transition: all 0.4s ease;
     }
     .word-active {
       font-size: 46px;
@@ -337,6 +355,7 @@
       border-radius: 12px;
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
       letter-spacing: -0.5px;
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
     /* Picture 1 Bottom Info & Unlock Pill */
@@ -364,6 +383,7 @@
       font-size: 13px;
       color: #CBD5E1;
       margin-bottom: 18px;
+      max-width: 480px;
     }
     .hero-cta-pill {
       display: inline-flex;
@@ -376,6 +396,13 @@
       padding: 10px 22px;
       border-radius: 25px;
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .hero-cta-pill:hover {
+      transform: scale(1.04);
+      background: #F3F4F6;
     }
     
     /* Pagination Dots (Picture 1) */
@@ -386,16 +413,21 @@
       transform: translateX(-50%);
       display: flex;
       gap: 8px;
+      z-index: 10;
     }
     .dot-item {
       width: 6px;
       height: 6px;
       border-radius: 50%;
       background: rgba(255, 255, 255, 0.3);
+      cursor: pointer;
+      transition: all 0.25s;
     }
+    .dot-item:hover { background: rgba(255, 255, 255, 0.6); }
     .dot-item.active {
       background: #FFFFFF;
       box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+      transform: scale(1.3);
     }
 
     /* Picture 2 Exact All Styles Grid */
@@ -433,6 +465,7 @@
       background: transparent;
       text-decoration: none;
       color: inherit;
+      cursor: pointer;
     }
     .card-canvas {
       aspect-ratio: 16 / 9.5;
@@ -445,13 +478,13 @@
       transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .style-card:hover .card-canvas {
-      transform: translateY(-4px);
-      border-color: rgba(255, 255, 255, 0.35);
-      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6);
+      transform: translateY(-5px);
+      border-color: rgba(255, 255, 255, 0.4);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65);
     }
     .style-card.selected .card-canvas {
       border: 2px solid #FFFFFF;
-      box-shadow: 0 0 25px rgba(255, 255, 255, 0.2);
+      box-shadow: 0 0 28px rgba(255, 255, 255, 0.25);
     }
 
     .selected-badge {
@@ -464,9 +497,13 @@
       font-weight: 700;
       padding: 3px 8px;
       border-radius: 12px;
-      display: flex;
+      display: none;
       align-items: center;
       gap: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .style-card.selected .selected-badge {
+      display: flex;
     }
 
     .card-meta {
@@ -533,10 +570,13 @@
 </head>
 <body>
 
+  <!-- Fluid Interactive Water Ripple Canvas -->
+  <canvas id="water-canvas"></canvas>
+
   <!-- Ambient Background Blobs -->
   <div class="ambient-canvas">
-    <div class="blob-1"></div>
-    <div class="blob-2"></div>
+    <div class="blob-1" id="amb-blob-1"></div>
+    <div class="blob-2" id="amb-blob-2"></div>
   </div>
   <div class="noise"></div>
 
@@ -587,53 +627,44 @@
         </div>
 
         <div class="window-nav-pills">
-          <span>Size</span>
+          <span class="active-pill">Size</span>
           <span>Font</span>
           <span>Screen</span>
           <span>Aesthetics</span>
         </div>
 
-        <div class="window-status-pill">
+        <div class="window-status-pill" id="track-status" title="Click to play demo track">
           <span class="status-dot"></span>
-          <span>♫ Billie Eilish — BIRDS OF A FEATHER</span>
+          <span id="track-name">♫ Billie Eilish — BIRDS OF A FEATHER</span>
         </div>
       </div>
 
       <!-- Hero Visualizer Stage (Picture 1) -->
-      <div class="hero-stage">
-        <div class="hero-arrow left">‹</div>
-        <div class="hero-arrow right">›</div>
+      <div class="hero-stage" id="hero-stage">
+        <div class="hero-arrow left" id="arrow-prev">‹</div>
+        <div class="hero-arrow right" id="arrow-next">›</div>
 
         <!-- Word Highlight -->
-        <div class="kinetic-floating-box">
-          <span class="word-dim">clock</span>
-          <span class="word-active">Every</span>
+        <div class="kinetic-floating-box" id="kinetic-box">
+          <span class="word-dim" id="hero-prev-word">clock</span>
+          <span class="word-active" id="hero-active-word">Every</span>
         </div>
 
         <!-- Bottom Controls -->
         <div class="hero-bottom-bar">
           <div class="hero-details">
-            <div class="cat">Kinetic type</div>
-            <h3>Ship</h3>
-            <p>Words land one by one on a wall that drifts in 3D.</p>
-            <div class="hero-cta-pill">
-              <span>🔒 Unlock</span>
+            <div class="cat" id="hero-cat">Kinetic type</div>
+            <h3 id="hero-title">Ship</h3>
+            <p id="hero-desc">Words land one by one on a wall that drifts in 3D.</p>
+            <div class="hero-cta-pill" id="btn-lock">
+              <span id="lock-icon">🔒</span> <span id="lock-text">Unlock</span>
             </div>
           </div>
         </div>
 
         <!-- Centered Pagination Dots (Picture 1) -->
-        <div class="pagination-dots">
-          <div class="dot-item active"></div>
-          <div class="dot-item"></div>
-          <div class="dot-item"></div>
-          <div class="dot-item"></div>
-          <div class="dot-item"></div>
-          <div class="dot-item"></div>
-          <div class="dot-item"></div>
-          <div class="dot-item"></div>
-          <div class="dot-item"></div>
-          <div class="dot-item"></div>
+        <div class="pagination-dots" id="dots-container">
+          <!-- Populated dynamically -->
         </div>
       </div>
     </div>
@@ -642,156 +673,11 @@
     <section id="styles" class="styles-section">
       <div class="section-header">
         <h2 class="section-title">All styles</h2>
-        <div class="section-sub">10 fluid motion scenes engineered for every genre.</div>
+        <div class="section-sub">10 fluid motion scenes engineered for every genre. Click any card to preview.</div>
       </div>
 
-      <div class="styles-grid">
-        
-        <!-- 1. Ship (Selected) -->
-        <div class="style-card selected">
-          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #9A4E24 0%, #0C3652 70%);">
-            <div class="selected-badge">✓ Selected</div>
-            <div style="text-align: center; font-size: 13px; line-height: 1.4; color: rgba(255,255,255,0.7);">
-              clock<br>in<br>the<br>
-              <span style="display:inline-block; background: #fff; color: #000; font-weight:800; font-size:16px; padding: 2px 10px; border-radius: 5px;">city</span><br>
-              slows down
-            </div>
-          </div>
-          <div class="card-meta">
-            <div class="meta-title">Ship</div>
-            <div class="meta-cat">Kinetic type</div>
-          </div>
-        </div>
-
-        <!-- 2. Fisheye -->
-        <div class="style-card">
-          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #B2562E 0%, #421054 70%);">
-            <div style="text-align: center; font-weight: 800; color: #fff;">
-              <div style="font-size: 13px; opacity: 0.6;">till</div>
-              <div style="font-size: 22px; transform: scaleY(1.3); letter-spacing: -0.5px;">the</div>
-              <div style="font-size: 24px; font-style: italic; transform: scaleY(1.2);">morning</div>
-            </div>
-          </div>
-          <div class="card-meta">
-            <div class="meta-title">Fisheye</div>
-            <div class="meta-cat">Kinetic type</div>
-          </div>
-        </div>
-
-        <!-- 3. Visual -->
-        <div class="style-card">
-          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #A8802A 0%, #0C4C42 70%);">
-            <div style="text-align: center; font-size: 14px; font-weight: 600; color: #fff;">
-              🌊 water,<br>🔥 fire<br>in<br>the
-            </div>
-          </div>
-          <div class="card-meta">
-            <div class="meta-title">Visual</div>
-            <div class="meta-cat">Kinetic type</div>
-          </div>
-        </div>
-
-        <!-- 4. Fisheye Visual -->
-        <div class="style-card">
-          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #A66238 0%, #40163A 70%);">
-            <div style="text-align: center; font-weight: 700; color: #fff;">
-              <div style="font-size: 11px; opacity: 0.7;">the</div>
-              <div style="font-size: 18px;">moon 🌙</div>
-              <div style="font-size: 20px; font-style: italic; opacity: 0.85;">can</div>
-            </div>
-          </div>
-          <div class="card-meta">
-            <div class="meta-title">Fisheye Visual</div>
-            <div class="meta-cat">Kinetic type</div>
-          </div>
-        </div>
-
-        <!-- 5. Codestyle -->
-        <div class="style-card">
-          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #762C22 0%, #0E2A44 70%);">
-            <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #E2E8F0;">
-              till.the(road)<br>
-              <span style="color: #fff; font-weight: 700;">run</span><span style="background: #EF4444; color: transparent; margin-left: 2px;">|</span>
-            </div>
-          </div>
-          <div class="card-meta">
-            <div class="meta-title">Codestyle</div>
-            <div class="meta-cat">Motion scenes</div>
-          </div>
-        </div>
-
-        <!-- 6. Codestyle Visual -->
-        <div class="style-card">
-          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #923856 0%, #181840 70%);">
-            <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #CBD5E1;">
-              till(the)<br>
-              <span style="color: #F8FAFC;">☀️ // morning</span><span style="background: #EF4444; color: transparent; margin-left: 3px;">|</span>
-            </div>
-          </div>
-          <div class="card-meta">
-            <div class="meta-title">Codestyle Visual</div>
-            <div class="meta-cat">Motion scenes</div>
-          </div>
-        </div>
-
-        <!-- 7. Branches -->
-        <div class="style-card">
-          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #308658 0%, #0E3A2A 70%);">
-            <svg width="160" height="40" viewBox="0 0 160 40">
-              <path d="M 10 20 Q 45 5, 80 20 T 150 20" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
-              <line x1="45" y1="12" x2="45" y2="28" stroke="rgba(255,255,255,0.7)" stroke-width="1"/>
-              <circle cx="45" cy="12" r="3" fill="#fff"/>
-              <line x1="115" y1="12" x2="115" y2="28" stroke="rgba(255,255,255,0.7)" stroke-width="1"/>
-              <circle cx="115" cy="28" r="3" fill="#fff"/>
-            </svg>
-          </div>
-          <div class="card-meta">
-            <div class="meta-title">Branches</div>
-            <div class="meta-cat">Motion scenes</div>
-          </div>
-        </div>
-
-        <!-- 8. Web -->
-        <div class="style-card">
-          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #B06024 0%, #301E12 70%);">
-            <div style="font-size: 32px; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));">🕸️</div>
-          </div>
-          <div class="card-meta">
-            <div class="meta-title">Web</div>
-            <div class="meta-cat">Motion scenes</div>
-          </div>
-        </div>
-
-        <!-- 9. Constellation -->
-        <div class="style-card">
-          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #5C4892 0%, #1A1642 70%);">
-            <svg width="140" height="50" viewBox="0 0 140 50">
-              <line x1="20" y1="35" x2="70" y2="15" stroke="rgba(255,255,255,0.4)" stroke-width="1.2"/>
-              <line x1="70" y1="15" x2="120" y2="30" stroke="rgba(255,255,255,0.4)" stroke-width="1.2"/>
-              <circle cx="20" cy="35" r="3" fill="rgba(255,255,255,0.7)"/>
-              <circle cx="70" cy="15" r="5" fill="#FFE885" style="filter: drop-shadow(0 0 6px #FFE885);"/>
-              <circle cx="120" cy="30" r="3" fill="rgba(255,255,255,0.7)"/>
-            </svg>
-          </div>
-          <div class="card-meta">
-            <div class="meta-title">Constellation</div>
-            <div class="meta-cat">Motion scenes</div>
-          </div>
-        </div>
-
-        <!-- 10. Native Design -->
-        <div class="style-card">
-          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #3076B0 0%, #0E3056 70%);">
-            <div style="background: #007AFF; color: #fff; padding: 6px 14px; border-radius: 14px; font-size: 11px; max-width: 150px; line-height: 1.3; box-shadow: 0 4px 14px rgba(0,0,0,0.4);">
-              dance with me till the morning
-            </div>
-          </div>
-          <div class="card-meta">
-            <div class="meta-title">Native Design</div>
-            <div class="meta-cat">Phone screens</div>
-          </div>
-        </div>
-
+      <div class="styles-grid" id="styles-grid">
+        <!-- Rendered dynamically with live interactive switching -->
       </div>
     </section>
 
@@ -824,10 +710,311 @@
     <!-- Footer -->
     <footer>
       <div>© 2026 SoulsLights Studio • Open source under the <a href="https://github.com/s0u1ls/SoulsLights/blob/main/LICENSE">MIT License</a></div>
-      <div>Designed with 1:1 liquid-glass precision.</div>
+      <div>Interactive Liquid Glass & Waterdrop Experience.</div>
     </footer>
 
   </div>
+
+  <!-- Interactive Logic & Waterdrop Ripple Engine -->
+  <script>
+    // -------------------------------------------------------------
+    // 1. Interactive Fluid Waterdrop Canvas
+    // -------------------------------------------------------------
+    const canvas = document.getElementById('water-canvas');
+    const ctx = canvas.getContext('2d');
+    let width, height;
+    const ripples = [];
+
+    function resizeCanvas() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    class WaterRipple {
+      constructor(x, y, maxRadius = 140, speed = 2.4, stroke = 'rgba(78, 224, 245, ') {
+        this.x = x;
+        this.y = y;
+        this.radius = 2;
+        this.maxRadius = maxRadius;
+        this.speed = speed;
+        this.stroke = stroke;
+        this.alpha = 0.65;
+      }
+      update() {
+        this.radius += this.speed;
+        this.alpha = Math.max(0, 0.65 * (1 - this.radius / this.maxRadius));
+      }
+      draw(c) {
+        if (this.alpha <= 0) return;
+        c.save();
+        c.beginPath();
+        c.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        c.strokeStyle = this.stroke + this.alpha + ')';
+        c.lineWidth = 1.8;
+        c.shadowColor = this.stroke + '0.5)';
+        c.shadowBlur = 8;
+        c.stroke();
+
+        // Secondary subtle inner echo ring
+        if (this.radius > 16) {
+          c.beginPath();
+          c.arc(this.x, this.y, this.radius * 0.72, 0, Math.PI * 2);
+          c.strokeStyle = this.stroke + (this.alpha * 0.4) + ')';
+          c.lineWidth = 1.0;
+          c.stroke();
+        }
+        c.restore();
+      }
+    }
+
+    function createDrop(x, y, radius = 150) {
+      const colors = [
+        'rgba(78, 224, 245, ',
+        'rgba(255, 255, 255, ',
+        'rgba(255, 123, 84, '
+      ];
+      const stroke = colors[Math.floor(Math.random() * colors.length)];
+      ripples.push(new WaterRipple(x, y, radius, 2.6, stroke));
+    }
+
+    window.addEventListener('pointerdown', (e) => {
+      createDrop(e.clientX, e.clientY, 170);
+    });
+
+    let lastMoveTime = 0;
+    window.addEventListener('pointermove', (e) => {
+      const now = performance.now();
+      if (now - lastMoveTime > 90) {
+        createDrop(e.clientX, e.clientY, 75);
+        lastMoveTime = now;
+      }
+    });
+
+    // Ambient periodic gentle raindrops
+    setInterval(() => {
+      const rx = Math.random() * width;
+      const ry = Math.random() * height * 0.85;
+      createDrop(rx, ry, 130 + Math.random() * 50);
+    }, 2800);
+
+    function animateWater() {
+      ctx.clearRect(0, 0, width, height);
+      for (let i = ripples.length - 1; i >= 0; i--) {
+        const r = ripples[i];
+        r.update();
+        r.draw(ctx);
+        if (r.alpha <= 0) ripples.splice(i, 1);
+      }
+      requestAnimationFrame(animateWater);
+    }
+    animateWater();
+
+    // -------------------------------------------------------------
+    // 2. All 10 Styles Catalog & Interactive Switcher
+    // -------------------------------------------------------------
+    const STYLES = [
+      {
+        id: "Ship",
+        cat: "Kinetic type",
+        desc: "Words land one by one on a wall that drifts in 3D.",
+        prev: "clock",
+        active: "Every",
+        grad: "radial-gradient(circle at 75% 30%, rgba(185, 88, 38, 0.75) 0%, rgba(14, 58, 92, 0.95) 55%, #050811 100%)",
+        c1: "rgba(14, 62, 102, 0.6)",
+        c2: "rgba(175, 80, 35, 0.5)",
+        cardContent: `<div style="text-align: center; font-size: 13px; line-height: 1.4; color: rgba(255,255,255,0.7);">clock<br>in<br>the<br><span style="display:inline-block; background: #fff; color: #000; font-weight:800; font-size:16px; padding: 2px 10px; border-radius: 5px;">city</span><br>slows down</div>`
+      },
+      {
+        id: "Fisheye",
+        cat: "Kinetic type",
+        desc: "Spherical barrel-warped typography with smooth beat-bouncing kinetic scale.",
+        prev: "the",
+        active: "morning",
+        grad: "radial-gradient(circle at 75% 30%, rgba(178, 86, 46, 0.75) 0%, rgba(66, 16, 84, 0.95) 55%, #050811 100%)",
+        c1: "rgba(66, 16, 84, 0.6)",
+        c2: "rgba(178, 86, 46, 0.5)",
+        cardContent: `<div style="text-align: center; font-weight: 800; color: #fff;"><div style="font-size: 13px; opacity: 0.6;">till</div><div style="font-size: 22px; transform: scaleY(1.3); letter-spacing: -0.5px;">the</div><div style="font-size: 24px; font-style: italic; transform: scaleY(1.2);">morning</div></div>`
+      },
+      {
+        id: "Visual",
+        cat: "Kinetic type",
+        desc: "Centered kinetic wave paired with expressive contextual icons.",
+        prev: "water,",
+        active: "🔥 fire",
+        grad: "radial-gradient(circle at 75% 30%, rgba(168, 128, 42, 0.75) 0%, rgba(12, 76, 66, 0.95) 55%, #050811 100%)",
+        c1: "rgba(12, 76, 66, 0.6)",
+        c2: "rgba(168, 128, 42, 0.5)",
+        cardContent: `<div style="text-align: center; font-size: 14px; font-weight: 600; color: #fff;">🌊 water,<br>🔥 fire<br>in<br>the</div>`
+      },
+      {
+        id: "Fisheye Visual",
+        cat: "Kinetic type",
+        desc: "Chromatic fisheye dome paired with animated floating icon accents.",
+        prev: "the",
+        active: "moon 🌙",
+        grad: "radial-gradient(circle at 75% 30%, rgba(166, 98, 56, 0.75) 0%, rgba(64, 22, 58, 0.95) 55%, #050811 100%)",
+        c1: "rgba(64, 22, 58, 0.6)",
+        c2: "rgba(166, 98, 56, 0.5)",
+        cardContent: `<div style="text-align: center; font-weight: 700; color: #fff;"><div style="font-size: 11px; opacity: 0.7;">the</div><div style="font-size: 18px;">moon 🌙</div><div style="font-size: 20px; font-style: italic; opacity: 0.85;">can</div></div>`
+      },
+      {
+        id: "Codestyle",
+        cat: "Motion scenes",
+        desc: "Minimal monospace typing character-by-character with blinking cursor.",
+        prev: "till.the(road)",
+        active: "run |",
+        grad: "radial-gradient(circle at 75% 30%, rgba(118, 44, 34, 0.75) 0%, rgba(14, 42, 68, 0.95) 55%, #050811 100%)",
+        c1: "rgba(14, 42, 68, 0.6)",
+        c2: "rgba(118, 44, 34, 0.5)",
+        cardContent: `<div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #E2E8F0;">till.the(road)<br><span style="color: #fff; font-weight: 700;">run</span><span style="background: #EF4444; color: transparent; margin-left: 2px;">|</span></div>`
+      },
+      {
+        id: "Codestyle Visual",
+        cat: "Motion scenes",
+        desc: "Live-typing code terminal paired with inline glyphs and emojis.",
+        prev: "till(the)",
+        active: "☀️ // morning",
+        grad: "radial-gradient(circle at 75% 30%, rgba(146, 56, 86, 0.75) 0%, rgba(24, 24, 64, 0.95) 55%, #050811 100%)",
+        c1: "rgba(24, 24, 64, 0.6)",
+        c2: "rgba(146, 56, 86, 0.5)",
+        cardContent: `<div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #CBD5E1;">till(the)<br><span style="color: #F8FAFC;">☀️ // morning</span><span style="background: #EF4444; color: transparent; margin-left: 3px;">|</span></div>`
+      },
+      {
+        id: "Branches",
+        cat: "Motion scenes",
+        desc: "Organic swaying harmonic wave with word nodes blooming in sequence.",
+        prev: "harmonic",
+        active: "Branches 🌿",
+        grad: "radial-gradient(circle at 75% 30%, rgba(48, 134, 88, 0.75) 0%, rgba(14, 58, 42, 0.95) 55%, #050811 100%)",
+        c1: "rgba(14, 58, 42, 0.6)",
+        c2: "rgba(48, 134, 88, 0.5)",
+        cardContent: `<svg width="160" height="40" viewBox="0 0 160 40"><path d="M 10 20 Q 45 5, 80 20 T 150 20" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/><line x1="45" y1="12" x2="45" y2="28" stroke="rgba(255,255,255,0.7)" stroke-width="1"/><circle cx="45" cy="12" r="3" fill="#fff"/><line x1="115" y1="12" x2="115" y2="28" stroke="rgba(255,255,255,0.7)" stroke-width="1"/><circle cx="115" cy="28" r="3" fill="#fff"/></svg>`
+      },
+      {
+        id: "Web",
+        cat: "Motion scenes",
+        desc: "Words hang like dew across a spinning silver spiderweb.",
+        prev: "dew",
+        active: "Web 🕸️",
+        grad: "radial-gradient(circle at 75% 30%, rgba(176, 96, 36, 0.75) 0%, rgba(48, 30, 18, 0.95) 55%, #050811 100%)",
+        c1: "rgba(48, 30, 18, 0.6)",
+        c2: "rgba(176, 96, 36, 0.5)",
+        cardContent: `<div style="font-size: 32px; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));">🕸️</div>`
+      },
+      {
+        id: "Constellation",
+        cat: "Motion scenes",
+        desc: "Full-line starfield with glowing shooting-star legato transitions.",
+        prev: "starlight",
+        active: "Constellation ✨",
+        grad: "radial-gradient(circle at 75% 30%, rgba(92, 72, 146, 0.75) 0%, rgba(26, 22, 66, 0.95) 55%, #050811 100%)",
+        c1: "rgba(26, 22, 66, 0.6)",
+        c2: "rgba(92, 72, 146, 0.5)",
+        cardContent: `<svg width="140" height="50" viewBox="0 0 140 50"><line x1="20" y1="35" x2="70" y2="15" stroke="rgba(255,255,255,0.4)" stroke-width="1.2"/><line x1="70" y1="15" x2="120" y2="30" stroke="rgba(255,255,255,0.4)" stroke-width="1.2"/><circle cx="20" cy="35" r="3" fill="rgba(255,255,255,0.7)"/><circle cx="70" cy="15" r="5" fill="#FFE885" style="filter: drop-shadow(0 0 6px #FFE885);"/><circle cx="120" cy="30" r="3" fill="rgba(255,255,255,0.7)"/></svg>`
+      },
+      {
+        id: "Native Design",
+        cat: "Phone screens",
+        desc: "Lyrics arrive as live iMessage-style chat bubbles with spring physics.",
+        prev: "incoming",
+        active: "Message 💬",
+        grad: "radial-gradient(circle at 75% 30%, rgba(48, 118, 176, 0.75) 0%, rgba(14, 48, 86, 0.95) 55%, #050811 100%)",
+        c1: "rgba(14, 48, 86, 0.6)",
+        c2: "rgba(48, 118, 176, 0.5)",
+        cardContent: `<div style="background: #007AFF; color: #fff; padding: 6px 14px; border-radius: 14px; font-size: 11px; max-width: 150px; line-height: 1.3; box-shadow: 0 4px 14px rgba(0,0,0,0.4);">dance with me till the morning</div>`
+      }
+    ];
+
+    let currentStyleIdx = 0;
+    const heroStage = document.getElementById('hero-stage');
+    const heroTitle = document.getElementById('hero-title');
+    const heroCat = document.getElementById('hero-cat');
+    const heroDesc = document.getElementById('hero-desc');
+    const heroPrev = document.getElementById('hero-prev-word');
+    const heroActive = document.getElementById('hero-active-word');
+    const dotsContainer = document.getElementById('dots-container');
+    const stylesGrid = document.getElementById('styles-grid');
+    const ambBlob1 = document.getElementById('amb-blob-1');
+    const ambBlob2 = document.getElementById('amb-blob-2');
+
+    // Build Cards
+    function buildStyleCards() {
+      stylesGrid.innerHTML = '';
+      dotsContainer.innerHTML = '';
+
+      STYLES.forEach((s, idx) => {
+        // Build card
+        const card = document.createElement('div');
+        card.className = `style-card ${idx === currentStyleIdx ? 'selected' : ''}`;
+        card.innerHTML = `
+          <div class="card-canvas" style="background: ${s.grad};">
+            <div class="selected-badge">✓ Selected</div>
+            ${s.cardContent}
+          </div>
+          <div class="card-meta">
+            <div class="meta-title">${s.id}</div>
+            <div class="meta-cat">${s.cat}</div>
+          </div>
+        `;
+        card.addEventListener('click', () => selectStyle(idx));
+        stylesGrid.appendChild(card);
+
+        // Build pagination dot
+        const dot = document.createElement('div');
+        dot.className = `dot-item ${idx === currentStyleIdx ? 'active' : ''}`;
+        dot.addEventListener('click', () => selectStyle(idx));
+        dotsContainer.appendChild(dot);
+      });
+    }
+
+    function selectStyle(idx) {
+      currentStyleIdx = (idx + STYLES.length) % STYLES.length;
+      const s = STYLES[currentStyleIdx];
+
+      // Update Hero with smooth transition
+      heroStage.style.background = s.grad;
+      heroTitle.textContent = s.id;
+      heroCat.textContent = s.cat;
+      heroDesc.textContent = s.desc;
+      heroPrev.textContent = s.prev;
+      heroActive.textContent = s.active;
+
+      // Update Ambient Backdrops
+      ambBlob1.style.background = `radial-gradient(circle, ${s.c1} 0%, rgba(0, 0, 0, 0) 70%)`;
+      ambBlob2.style.background = `radial-gradient(circle, ${s.c2} 0%, rgba(0, 0, 0, 0) 70%)`;
+
+      // Update Selected Cards
+      document.querySelectorAll('.style-card').forEach((c, i) => {
+        c.classList.toggle('selected', i === currentStyleIdx);
+      });
+      document.querySelectorAll('.dot-item').forEach((d, i) => {
+        d.classList.toggle('active', i === currentStyleIdx);
+      });
+
+      // Spawn a celebratory water ripple
+      const rect = heroStage.getBoundingClientRect();
+      createDrop(rect.left + rect.width / 2, rect.top + rect.height / 2, 220);
+    }
+
+    document.getElementById('arrow-prev').addEventListener('click', () => selectStyle(currentStyleIdx - 1));
+    document.getElementById('arrow-next').addEventListener('click', () => selectStyle(currentStyleIdx + 1));
+
+    // Interactive Lock Toggle
+    const btnLock = document.getElementById('btn-lock');
+    const lockIcon = document.getElementById('lock-icon');
+    const lockText = document.getElementById('lock-text');
+    let isLocked = true;
+    btnLock.addEventListener('click', () => {
+      isLocked = !isLocked;
+      lockIcon.textContent = isLocked ? '🔒' : '🔓';
+      lockText.textContent = isLocked ? 'Unlock' : 'Lock';
+      createDrop(window.innerWidth / 2, window.innerHeight * 0.45, 180);
+    });
+
+    buildStyleCards();
+  </script>
 
 </body>
 </html>
