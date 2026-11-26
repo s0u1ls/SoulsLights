@@ -42,16 +42,16 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Fluid Waterdrop Physics Canvas */
-    #water-canvas {
+    /* SoulsLights Border Glow Engine Canvas */
+    #border-glow-canvas {
       position: fixed;
       inset: 0;
       width: 100vw;
       height: 100vh;
       pointer-events: none;
-      z-index: 40;
+      z-index: 45;
       mix-blend-mode: screen;
-      transition: opacity 0.45s ease;
+      transition: opacity 0.4s ease;
     }
 
     /* Dual-Blob Ambient Lighting (Always Separated Across Opposite Sides) */
@@ -198,7 +198,7 @@
       align-items: center;
       gap: 10px;
     }
-    .ripple-toggle {
+    .glow-mode-pill {
       background: var(--pill-bg);
       backdrop-filter: blur(18px);
       border: 1px solid var(--pill-border);
@@ -213,7 +213,7 @@
       gap: 6px;
       transition: all 0.2s ease;
     }
-    .ripple-toggle:hover {
+    .glow-mode-pill:hover {
       border-color: rgba(255, 255, 255, 0.3);
       color: #fff;
       transform: translateY(-1px);
@@ -1019,8 +1019,8 @@
 </head>
 <body>
 
-  <!-- Interactive Fluid Waterdrop & Caustic Canvas -->
-  <canvas id="water-canvas"></canvas>
+  <!-- SoulsLights Perimeter Border Glow (Water Drop Mode) -->
+  <canvas id="border-glow-canvas"></canvas>
 
   <!-- Separated Dual-Blob Ambient Backdrop -->
   <div class="ambient-canvas" id="ambient-canvas">
@@ -1048,8 +1048,8 @@
       </nav>
 
       <div class="header-actions">
-        <button class="ripple-toggle glass-hover" id="btn-splash" title="Trigger waterdrop ripple mode">
-          💧 <span>Waterdrop On</span>
+        <button class="glow-mode-pill glass-hover" id="btn-glow-mode" title="Cycle SoulsLights Border Glow Animation Mode">
+          ✨ <span>Glow: Water Drop</span>
         </button>
       </div>
     </header>
@@ -1234,173 +1234,243 @@
 
   <script>
     // =========================================================================
-    // 1. FLUID WATERDROP & CAUSTIC SPLASH ENGINE
+    // 1. SOULSLIGHTS PERIMETER BORDER GLOW ENGINE (1:1 WATER DROP MODE)
     // =========================================================================
-    const waterCanvas = document.getElementById('water-canvas');
-    const wctx = waterCanvas.getContext('2d');
-    let ww = 0, wh = 0;
-    const ripples = [];
-    const droplets = [];
-    let waterEnabled = true;
-    let trailEnabled = true;
+    const borderGlowCanvas = document.getElementById('border-glow-canvas');
+    const bctx = borderGlowCanvas.getContext('2d');
+    const maskCanvas = document.createElement('canvas');
+    const mctx = maskCanvas.getContext('2d');
+    const texCanvas = document.createElement('canvas');
+    const tctx = texCanvas.getContext('2d');
 
-    function resizeWaterCanvas() {
+    const TEX_W = 192;
+    const TEX_H = 108;
+    texCanvas.width = TEX_W;
+    texCanvas.height = TEX_H;
+    const texImg = tctx.createImageData(TEX_W, TEX_H);
+
+    // Precompute normalized angular perimeter LUT around center (matches _build_theta_lut)
+    const thetaIdx = new Uint8Array(TEX_W * TEX_H);
+    const perimeterMask = new Uint8Array(TEX_W * TEX_H);
+    (() => {
+      const cx = TEX_W * 0.5;
+      const cy = TEX_H * 0.5;
+      const twoPi = Math.PI * 2;
+      for (let y = 0; y < TEX_H; y++) {
+        const dy = (y + 0.5 - cy) / cy;
+        for (let x = 0; x < TEX_W; x++) {
+          const dx = (x + 0.5 - cx) / cx;
+          const idx = y * TEX_W + x;
+          const ang = Math.atan2(dy, dx);
+          thetaIdx[idx] = Math.floor(((ang + Math.PI) / twoPi) * 255.999) % 256;
+          // Skip deep interior center pixels to save work while covering all inward rim pixels
+          const edgeDistX = Math.min(x, TEX_W - 1 - x) / TEX_W;
+          const edgeDistY = Math.min(y, TEX_H - 1 - y) / TEX_H;
+          perimeterMask[idx] = (edgeDistX < 0.14 || edgeDistY < 0.22) ? 1 : 0;
+        }
+      }
+    })();
+
+    let vw = 0, vh = 0;
+    const GLOW_MODES = ['Water Drop', 'Liquid Flow', 'Beat Pulse', 'Breathing', 'Off'];
+    const glowState = {
+      mode: 'Water Drop',
+      phaseRad: 0.75,
+      animTime: 0,
+      currC1: [12, 54, 82],
+      currC2: [154, 78, 36],
+      tgtC1: [12, 54, 82],
+      tgtC2: [154, 78, 36]
+    };
+
+    function buildInwardRimMask() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      ww = window.innerWidth;
-      wh = window.innerHeight;
-      waterCanvas.width = ww * dpr;
-      waterCanvas.height = wh * dpr;
-      wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
-    window.addEventListener('resize', resizeWaterCanvas);
-    resizeWaterCanvas();
+      vw = window.innerWidth;
+      vh = window.innerHeight;
+      borderGlowCanvas.width = vw * dpr;
+      borderGlowCanvas.height = vh * dpr;
+      bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    class WaterDrop {
-      constructor(x, y, maxR = 160, hueRgb = '125, 226, 255', power = 1.0) {
-        this.x = x;
-        this.y = y;
-        this.maxR = maxR;
-        this.hue = hueRgb;
-        this.age = 0;
-        this.life = 0.85 + Math.random() * 0.45;
-        this.power = power;
-      }
-      update(dt) {
-        this.age += dt;
-        return this.age < this.life;
-      }
-      draw(c) {
-        const p = Math.min(1, this.age / this.life);
-        const ease = 1 - Math.pow(1 - p, 3); // Natural fluid deceleration
-        const r = 4 + (this.maxR - 4) * ease;
-        const alpha = (1 - p) * (1 - p) * 0.62 * this.power;
-        if (alpha <= 0.008) return;
+      maskCanvas.width = vw * dpr;
+      maskCanvas.height = vh * dpr;
+      mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      mctx.clearRect(0, 0, vw, vh);
 
-        c.save();
+      const rad = Math.min(20, vw * 0.025);
+      mctx.save();
+      roundedRectPath(mctx, 0, 0, vw, vh, rad);
+      mctx.clip();
 
-        // Outer bright specular crest
-        c.beginPath();
-        c.arc(this.x, this.y, r, 0, Math.PI * 2);
-        c.strokeStyle = `rgba(${this.hue}, ${alpha})`;
-        c.lineWidth = Math.max(0.7, (1 - p) * 2.4 * this.power);
-        c.shadowColor = `rgba(${this.hue}, ${alpha * 0.65})`;
-        c.shadowBlur = 10;
-        c.stroke();
+      // Inverted even-odd path casts analytical Gaussian glow strictly inward around all 4 edges
+      mctx.beginPath();
+      mctx.rect(-120, -120, vw + 240, vh + 240);
+      mctx.moveTo(rad, 0);
+      mctx.lineTo(vw - rad, 0);
+      mctx.arcTo(vw, 0, vw, rad, rad);
+      mctx.lineTo(vw, vh - rad);
+      mctx.arcTo(vw, vh, vw - rad, vh, rad);
+      mctx.lineTo(rad, vh);
+      mctx.arcTo(0, vh, 0, vh - rad, rad);
+      mctx.lineTo(0, rad);
+      mctx.arcTo(0, 0, rad, 0, rad);
+      mctx.closePath();
 
-        // Top-left water-surface glint arc
-        c.beginPath();
-        c.arc(this.x, this.y, r, Math.PI * 1.05, Math.PI * 1.65);
-        c.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.85})`;
-        c.lineWidth = Math.max(0.5, (1 - p) * 1.9);
-        c.stroke();
+      // Tight electric inner collar + wide soft bloom halo (matches _build_alpha_masks)
+      mctx.fillStyle = '#FFFFFF';
+      mctx.shadowColor = 'rgba(255, 255, 255, 0.92)';
+      mctx.shadowBlur = 12;
+      mctx.fill('evenodd');
 
-        // Harmonic inner capillary ripples
-        if (r > 18) {
-          c.shadowBlur = 0;
-          c.beginPath();
-          c.arc(this.x, this.y, r * 0.68, 0, Math.PI * 2);
-          c.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.36})`;
-          c.lineWidth = 0.9;
-          c.stroke();
-        }
-        if (r > 36) {
-          c.beginPath();
-          c.arc(this.x, this.y, r * 0.42, 0, Math.PI * 2);
-          c.strokeStyle = `rgba(${this.hue}, ${alpha * 0.28})`;
-          c.lineWidth = 0.7;
-          c.stroke();
-        }
+      mctx.shadowColor = 'rgba(255, 255, 255, 0.56)';
+      mctx.shadowBlur = 32;
+      mctx.fill('evenodd');
 
-        // Fresh central caustic pearl flash
-        if (p < 0.28) {
-          const glowA = (1 - p / 0.28) * 0.5 * this.power;
-          const g = c.createRadialGradient(this.x, this.y, 0, this.x, this.y, 16);
-          g.addColorStop(0, `rgba(255, 255, 255, ${glowA})`);
-          g.addColorStop(1, 'rgba(255, 255, 255, 0)');
-          c.fillStyle = g;
-          c.beginPath();
-          c.arc(this.x, this.y, 16, 0, Math.PI * 2);
-          c.fill();
-        }
+      mctx.shadowBlur = 0;
+      roundedRectPath(mctx, 1, 1, vw - 2, vh - 2, Math.max(2, rad - 1));
+      mctx.strokeStyle = 'rgba(255, 255, 255, 0.96)';
+      mctx.lineWidth = 2.6;
+      mctx.stroke();
 
-        c.restore();
-      }
+      mctx.restore();
     }
 
-    class SplashBead {
-      constructor(x, y, hueRgb) {
-        const ang = Math.random() * Math.PI * 2;
-        const spd = 45 + Math.random() * 85;
-        this.x = x;
-        this.y = y;
-        this.vx = Math.cos(ang) * spd;
-        this.vy = Math.sin(ang) * spd * 0.75 - 28;
-        this.hue = hueRgb;
-        this.age = 0;
-        this.life = 0.28 + Math.random() * 0.16;
-        this.size = 1.6 + Math.random() * 1.4;
-      }
-      update(dt) {
-        this.age += dt;
-        this.vy += 240 * dt;
-        this.x += this.vx * dt;
-        this.y += this.vy * dt;
-        if (this.age >= this.life) {
-          ripples.push(new WaterDrop(this.x, this.y, 55, this.hue, 0.55));
-          return false;
-        }
-        return true;
-      }
-      draw(c) {
-        const a = (1 - this.age / this.life) * 0.9;
-        c.beginPath();
-        c.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        c.fillStyle = `rgba(255, 255, 255, ${a})`;
-        c.fill();
-      }
+    function boostRgb(c) {
+      const r = c[0], g = c[1], b = c[2];
+      const maxC = Math.max(r, g, b, 1);
+      const targetPeak = Math.min(255, Math.max(220, maxC * 1.45));
+      const k = targetPeak / maxC;
+      return [r * k, g * k, b * k];
     }
 
-    const DROP_PALETTES = ['120, 225, 255', '255, 255, 255', '255, 168, 120'];
+    const lutR = new Uint8Array(256);
+    const lutG = new Uint8Array(256);
+    const lutB = new Uint8Array(256);
+    const lutA = new Uint8Array(256);
 
-    function spawnWaterdrop(x, y, radius = 155, withSplash = false, customHue = null) {
-      if (!waterEnabled) return;
-      const hue = customHue || DROP_PALETTES[Math.floor(Math.random() * DROP_PALETTES.length)];
-      ripples.push(new WaterDrop(x, y, radius, hue, 1.0));
-      if (withSplash) {
-        const count = 4;
-        for (let i = 0; i < count; i++) {
-          droplets.push(new SplashBead(x, y, hue));
-        }
+    function renderBorderGlow(dt) {
+      if (glowState.mode === 'Off' || vw <= 0 || vh <= 0) return;
+
+      // Smoothly lerp perimeter glow colors when switching styles
+      const lk = Math.min(1, dt * 4.5);
+      for (let k = 0; k < 3; k++) {
+        glowState.currC1[k] += (glowState.tgtC1[k] - glowState.currC1[k]) * lk;
+        glowState.currC2[k] += (glowState.tgtC2[k] - glowState.currC2[k]) * lk;
       }
-      if (ripples.length > 55) ripples.splice(0, ripples.length - 55);
+
+      glowState.animTime += dt;
+      const mode = glowState.mode;
+      const twoPi = Math.PI * 2;
+
+      if (mode === 'Water Drop') {
+        const speed = 0.88 + 0.24 * Math.sin(glowState.animTime * 1.4);
+        glowState.phaseRad = (glowState.phaseRad + dt * speed) % twoPi;
+      } else if (mode === 'Liquid Flow') {
+        glowState.phaseRad = (glowState.phaseRad + dt * 1.25) % twoPi;
+      } else if (mode === 'Beat Pulse') {
+        glowState.phaseRad = (glowState.phaseRad + dt * 0.55) % twoPi;
+      }
+
+      const ca = boostRgb(glowState.currC1);
+      const cb = boostRgb(glowState.currC2);
+      const aheadSpan = 0.052;
+      const tailSpan = 0.44;
+      const isDrop = mode === 'Water Drop';
+
+      let globalAlpha = 0.92;
+      if (mode === 'Breathing') {
+        globalAlpha = 0.50 + 0.46 * (0.5 + 0.5 * Math.sin(glowState.animTime * 1.8));
+      } else if (mode === 'Beat Pulse') {
+        globalAlpha = 0.48 + 0.52 * Math.pow(0.5 + 0.5 * Math.sin(glowState.animTime * 3.1), 3);
+      }
+
+      for (let i = 0; i < 256; i++) {
+        const ang = (i / 256) * twoPi;
+        let mixU = 0;
+        let dropVal = 1.0;
+        let energy = 1.0;
+
+        if (isDrop) {
+          const trail = (((glowState.phaseRad - ang) % twoPi) + twoPi) % twoPi / twoPi;
+          if (trail >= 1.0 - aheadSpan) {
+            const uHead = (trail - (1.0 - aheadSpan)) / aheadSpan;
+            dropVal = Math.pow(0.5 - 0.5 * Math.cos(Math.PI * uHead), 1.35);
+            mixU = 0.0;
+          } else if (trail <= tailSpan) {
+            const uTail = trail / tailSpan;
+            dropVal = Math.pow(1.0 - uTail, 2.35) * Math.pow(0.5 + 0.5 * Math.cos(Math.PI * uTail), 0.75);
+            mixU = Math.min(1.0, Math.pow(uTail, 0.78));
+          } else {
+            dropVal = 0.0;
+          }
+          energy = 1.0 + Math.pow(dropVal, 2.2) * 0.28;
+        } else {
+          const flowAng = (((ang - glowState.phaseRad) % twoPi) + twoPi) % twoPi;
+          mixU = 0.5 + 0.5 * Math.cos(flowAng);
+          if (mode === 'Liquid Flow' || mode === 'Beat Pulse') {
+            const wv = 0.55 * Math.sin(3 * ang + glowState.animTime * 2.2) + 0.30 * Math.sin(6 * ang - glowState.animTime * 1.6);
+            energy = Math.max(0.75, Math.min(1.32, 1.0 + 0.20 * wv));
+          }
+        }
+
+        let r = ca[0] * (1 - mixU) + cb[0] * mixU;
+        let g = ca[1] * (1 - mixU) + cb[1] * mixU;
+        let b = ca[2] * (1 - mixU) + cb[2] * mixU;
+
+        // Subtle glassy white crest gleam at brightest leading droplet head
+        if (isDrop && dropVal > 0.72) {
+          const crestK = ((dropVal - 0.72) / 0.28) * 0.26;
+          r += (255 - r) * crestK;
+          g += (255 - g) * crestK;
+          b += (255 - b) * crestK;
+        }
+
+        r *= energy; g *= energy; b *= energy;
+        const maxC = Math.max(r, g, b, 1);
+        if (maxC > 255) {
+          const k = 255 / maxC;
+          r *= k; g *= k; b *= k;
+        }
+
+        lutR[i] = r | 0;
+        lutG[i] = g | 0;
+        lutB[i] = b | 0;
+        lutA[i] = Math.max(0, Math.min(255, Math.round(dropVal * globalAlpha * 255)));
+      }
+
+      const d = texImg.data;
+      const nPx = TEX_W * TEX_H;
+      for (let p = 0; p < nPx; p++) {
+        const o = p * 4;
+        if (!perimeterMask[p]) {
+          d[o + 3] = 0;
+          continue;
+        }
+        const ti = thetaIdx[p];
+        d[o]     = lutR[ti];
+        d[o + 1] = lutG[ti];
+        d[o + 2] = lutB[ti];
+        d[o + 3] = lutA[ti];
+      }
+      tctx.putImageData(texImg, 0, 0);
+
+      bctx.globalCompositeOperation = 'source-over';
+      bctx.clearRect(0, 0, vw, vh);
+      bctx.drawImage(maskCanvas, 0, 0, vw, vh);
+      bctx.globalCompositeOperation = 'source-in';
+      bctx.imageSmoothingEnabled = true;
+      bctx.drawImage(texCanvas, 0, 0, vw, vh);
+      bctx.globalCompositeOperation = 'source-over';
     }
 
-    window.addEventListener('pointerdown', (e) => {
-      spawnWaterdrop(e.clientX, e.clientY, 175, true);
-    });
-
-    let lastTrailTs = 0;
+    // Specular edge sheen on glass surfaces only (no ripples)
     window.addEventListener('pointermove', (e) => {
-      // Update glass card specular coordinates
       const target = e.target.closest('.glass-hover');
       if (target) {
         const rect = target.getBoundingClientRect();
         target.style.setProperty('--mx', `${e.clientX - rect.left}px`);
         target.style.setProperty('--my', `${e.clientY - rect.top}px`);
       }
-
-      if (!waterEnabled || !trailEnabled) return;
-      const now = performance.now();
-      if (now - lastTrailTs > 85) {
-        spawnWaterdrop(e.clientX, e.clientY, 68, false);
-        lastTrailTs = now;
-      }
     });
-
-    setInterval(() => {
-      if (!waterEnabled || document.hidden) return;
-      spawnWaterdrop(Math.random() * ww, Math.random() * wh * 0.88, 125 + Math.random() * 60, false);
-    }, 2400);
 
     // =========================================================================
     // 2. CATALOG, TRACKS & LIVE CONFIG STATE
@@ -1411,80 +1481,70 @@
         cat: 'Kinetic type',
         desc: 'Words land one by one on a wall that drifts in 3D.',
         cLeft: [12, 54, 82], cRight: [154, 78, 36],
-        blob1: 'rgba(14, 74, 118, 0.62)', blob2: 'rgba(182, 86, 38, 0.50)',
-        dropHue: '125, 215, 255'
+        blob1: 'rgba(14, 74, 118, 0.62)', blob2: 'rgba(182, 86, 38, 0.50)'
       },
       {
         id: 'Fisheye',
         cat: 'Kinetic type',
         desc: 'Spherical barrel-warped hero typography with rhythmic bounce.',
         cLeft: [66, 16, 84], cRight: [178, 86, 46],
-        blob1: 'rgba(88, 22, 112, 0.60)', blob2: 'rgba(194, 92, 46, 0.52)',
-        dropHue: '245, 165, 215'
+        blob1: 'rgba(88, 22, 112, 0.60)', blob2: 'rgba(194, 92, 46, 0.52)'
       },
       {
         id: 'Visual',
         cat: 'Kinetic type',
         desc: 'Centered kinetic wave paired with expressive contextual icons.',
         cLeft: [12, 76, 66], cRight: [168, 128, 42],
-        blob1: 'rgba(16, 98, 84, 0.60)', blob2: 'rgba(182, 138, 42, 0.50)',
-        dropHue: '110, 240, 200'
+        blob1: 'rgba(16, 98, 84, 0.60)', blob2: 'rgba(182, 138, 42, 0.50)'
       },
       {
         id: 'Fisheye Visual',
         cat: 'Kinetic type',
         desc: 'Chromatic fisheye dome with floating symbolic icon accents.',
         cLeft: [64, 22, 58], cRight: [166, 98, 56],
-        blob1: 'rgba(84, 28, 76, 0.60)', blob2: 'rgba(184, 108, 58, 0.52)',
-        dropHue: '255, 195, 145'
+        blob1: 'rgba(84, 28, 76, 0.60)', blob2: 'rgba(184, 108, 58, 0.52)'
       },
       {
         id: 'Codestyle',
         cat: 'Motion scenes',
         desc: 'Minimal monospace typing character-by-character with blinking cursor.',
         cLeft: [14, 42, 68], cRight: [118, 44, 34],
-        blob1: 'rgba(16, 56, 92, 0.62)', blob2: 'rgba(148, 52, 38, 0.50)',
-        dropHue: '255, 120, 120'
+        blob1: 'rgba(16, 56, 92, 0.62)', blob2: 'rgba(148, 52, 38, 0.50)'
       },
       {
         id: 'Codestyle Visual',
         cat: 'Motion scenes',
         desc: 'Live-typing code terminal paired with inline expressive glyphs.',
         cLeft: [24, 24, 64], cRight: [146, 56, 86],
-        blob1: 'rgba(34, 34, 96, 0.62)', blob2: 'rgba(176, 66, 104, 0.50)',
-        dropHue: '240, 150, 255'
+        blob1: 'rgba(34, 34, 96, 0.62)', blob2: 'rgba(176, 66, 104, 0.50)'
       },
       {
         id: 'Branches',
         cat: 'Motion scenes',
         desc: 'Harmonic swaying wave with word nodes blooming in sequence.',
         cLeft: [14, 58, 42], cRight: [48, 134, 88],
-        blob1: 'rgba(16, 76, 54, 0.62)', blob2: 'rgba(54, 154, 100, 0.48)',
-        dropHue: '130, 250, 180'
+        blob1: 'rgba(16, 76, 54, 0.62)', blob2: 'rgba(54, 154, 100, 0.48)'
       },
       {
         id: 'Web',
         cat: 'Motion scenes',
         desc: 'Words hang like dew on a kinetic spinning silver spiderweb.',
         cLeft: [48, 30, 18], cRight: [176, 96, 36],
-        blob1: 'rgba(72, 42, 22, 0.62)', blob2: 'rgba(196, 106, 38, 0.52)',
-        dropHue: '255, 195, 120'
+        blob1: 'rgba(72, 42, 22, 0.62)', blob2: 'rgba(196, 106, 38, 0.52)'
       },
       {
         id: 'Constellation',
         cat: 'Motion scenes',
         desc: 'Non-overlapping starfield with glowing shooting-star transitions.',
         cLeft: [26, 22, 66], cRight: [92, 72, 146],
-        blob1: 'rgba(34, 28, 92, 0.64)', blob2: 'rgba(112, 86, 182, 0.52)',
-        dropHue: '255, 240, 175'
+        blob1: 'rgba(34, 28, 92, 0.64)', blob2: 'rgba(112, 86, 182, 0.52)'
       },
       {
         id: 'Native Design',
         cat: 'Phone screens',
         desc: 'Lyrics arrive in real time as animated iMessage chat bubbles.',
         cLeft: [14, 48, 86], cRight: [48, 118, 176],
-        blob1: 'rgba(14, 64, 116, 0.62)', blob2: 'rgba(54, 138, 206, 0.50)',
-        dropHue: '110, 190, 255'
+        blob1: 'rgba(14, 64, 116, 0.62)', blob2: 'rgba(54, 138, 206, 0.50)'
       }
     ];
 
@@ -2026,10 +2086,8 @@
           entry.phase = 0;
           drawStaticCard(entry);
         });
-        card.addEventListener('click', (e) => {
+        card.addEventListener('click', () => {
           selectStyle(idx, true);
-          const r = card.getBoundingClientRect();
-          spawnWaterdrop(r.left + r.width / 2, r.top + r.height / 2, 165, true, style.dropHue);
         });
 
         gridEl.appendChild(card);
@@ -2044,6 +2102,7 @@
 
       resizeAllCards();
       resizeHeroCanvas();
+      buildInwardRimMask();
     }
 
     function resizeAllCards() {
@@ -2076,6 +2135,8 @@
 
       blob1El.style.background = `radial-gradient(circle, ${st.blob1} 0%, rgba(0, 0, 0, 0) 72%)`;
       blob2El.style.background = `radial-gradient(circle, ${st.blob2} 0%, rgba(0, 0, 0, 0) 72%)`;
+      glowState.tgtC1 = [...st.cLeft];
+      glowState.tgtC2 = [...st.cRight];
 
       document.querySelectorAll('.style-card').forEach((c, i) => {
         c.classList.toggle('selected', i === studioState.styleIdx);
@@ -2083,9 +2144,6 @@
       document.querySelectorAll('.dot-item').forEach((d, i) => {
         d.classList.toggle('active', i === studioState.styleIdx);
       });
-
-      const rect = heroStageEl.getBoundingClientRect();
-      spawnWaterdrop(rect.left + rect.width * 0.5, rect.top + rect.height * 0.45, 220, true, st.dropHue);
 
       if (scrollToStudio) {
         document.getElementById('studio').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2132,9 +2190,7 @@
 
     document.getElementById('btn-resync').addEventListener('click', () => {
       studioState.tOffset = 0;
-      const st = STYLES[studioState.styleIdx];
-      const rect = heroStageEl.getBoundingClientRect();
-      spawnWaterdrop(rect.left + rect.width * 0.5, rect.top + rect.height * 0.45, 200, true, st.dropHue);
+      glowState.phaseRad = 0.75;
       showToast('↻', 'Lyrics clock re-synced');
     });
 
@@ -2213,14 +2269,21 @@
         `;
       } else if (name === 'Aesthetics') {
         popoverEl.innerHTML = `
-          <div class="popover-title">Liquid Glass &amp; Fluid FX</div>
+          <div class="popover-title">Perimeter Glow &amp; Aesthetics</div>
+          <div class="chip-row" style="margin-bottom:10px;">
+            ${GLOW_MODES.map(m => `<button class="chip-btn ${glowState.mode === m ? 'selected' : ''}" data-gmode="${m}">${m}</button>`).join('')}
+          </div>
           <div class="chip-row">
             <button class="chip-btn ${studioState.blobs ? 'selected' : ''}" id="tog-blobs">Ambient Blobs</button>
             <button class="chip-btn ${studioState.grain ? 'selected' : ''}" id="tog-grain">Film Grain</button>
-            <button class="chip-btn ${waterEnabled ? 'selected' : ''}" id="tog-water">Waterdrops</button>
-            <button class="chip-btn ${trailEnabled ? 'selected' : ''}" id="tog-trail">Cursor Trail</button>
           </div>
         `;
+        popoverEl.querySelectorAll('[data-gmode]').forEach(mb => {
+          mb.addEventListener('click', () => {
+            setGlowMode(mb.dataset.gmode);
+            openPopover('Aesthetics');
+          });
+        });
         document.getElementById('tog-blobs').onclick = () => {
           studioState.blobs = !studioState.blobs;
           document.getElementById('ambient-canvas').style.opacity = studioState.blobs ? '1' : '0';
@@ -2229,14 +2292,6 @@
         document.getElementById('tog-grain').onclick = () => {
           studioState.grain = !studioState.grain;
           document.getElementById('grain-layer').style.opacity = studioState.grain ? '0.042' : '0';
-          openPopover('Aesthetics');
-        };
-        document.getElementById('tog-water').onclick = () => {
-          toggleWaterMode();
-          openPopover('Aesthetics');
-        };
-        document.getElementById('tog-trail').onclick = () => {
-          trailEnabled = !trailEnabled;
           openPopover('Aesthetics');
         };
       }
@@ -2262,15 +2317,21 @@
       });
     });
 
-    // Top-right waterdrop toggle button
-    const btnSplash = document.getElementById('btn-splash');
-    function toggleWaterMode() {
-      waterEnabled = !waterEnabled;
-      waterCanvas.style.opacity = waterEnabled ? '1' : '0';
-      btnSplash.innerHTML = waterEnabled ? '💧 <span>Waterdrop On</span>' : '💧 <span>Waterdrop Off</span>';
-      if (waterEnabled) spawnWaterdrop(ww * 0.5, wh * 0.3, 210, true);
+    // Top-right SoulsLights Glow animation mode switcher
+    const btnGlowMode = document.getElementById('btn-glow-mode');
+    function setGlowMode(mode) {
+      glowState.mode = mode;
+      const isOff = mode === 'Off';
+      borderGlowCanvas.style.opacity = isOff ? '0' : '1';
+      if (isOff) bctx.clearRect(0, 0, vw, vh);
+      btnGlowMode.innerHTML = isOff ? '✨ <span>Glow: Off</span>' : `✨ <span>Glow: ${mode}</span>`;
     }
-    btnSplash.addEventListener('click', toggleWaterMode);
+    btnGlowMode.addEventListener('click', () => {
+      const nextIdx = (GLOW_MODES.indexOf(glowState.mode) + 1) % GLOW_MODES.length;
+      setGlowMode(GLOW_MODES[nextIdx]);
+      showToast('✨', `Border glow mode: ${glowState.mode}`);
+    });
+    window.addEventListener('resize', buildInwardRimMask);
 
     // OS recommendation detection & Toast for direct downloads
     function detectPlatform() {
@@ -2309,18 +2370,8 @@
       const dt = Math.min(0.05, (now - lastTime) / 1000);
       lastTime = now;
 
-      // Update & draw water ripples
-      if (waterEnabled) {
-        wctx.clearRect(0, 0, ww, wh);
-        for (let i = ripples.length - 1; i >= 0; i--) {
-          if (!ripples[i].update(dt)) ripples.splice(i, 1);
-          else ripples[i].draw(wctx);
-        }
-        for (let i = droplets.length - 1; i >= 0; i--) {
-          if (!droplets[i].update(dt)) droplets.splice(i, 1);
-          else droplets[i].draw(wctx);
-        }
-      }
+      // Render SoulsLights perimeter border glow (Water Drop / Liquid Flow / Beat Pulse / Breathing)
+      renderBorderGlow(dt);
 
       // Advance Hero phase & render Picture 1 stage
       if (studioState.playing) {
