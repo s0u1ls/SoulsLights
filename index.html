@@ -3,24 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SoulsLights — Synced Desktop Lyrics & Ambient Studio</title>
+  <title>SoulsLights — Synced Desktop Lyrics & Ambient Screen Lighting</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   
   <style>
     :root {
-      --bg: #030407;
-      --card-bg: rgba(18, 22, 31, 0.65);
-      --card-border: rgba(255, 255, 255, 0.09);
-      --card-border-hover: rgba(255, 255, 255, 0.28);
-      --pill-bg: rgba(25, 30, 42, 0.75);
+      --bg: #000000;
+      --card-bg: rgba(20, 24, 33, 0.45);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-border-hover: rgba(255, 255, 255, 0.35);
+      --pill-bg: rgba(28, 32, 44, 0.65);
       --pill-border: rgba(255, 255, 255, 0.12);
-      --text: #F3F5F9;
-      --text-muted: #8E97A8;
-      --accent-cyan: #4EE0F5;
-      --accent-coral: #FF7B54;
-      --accent-emerald: #30D158;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --accent-cyan: #38BDF8;
+      --accent-green: #30D158;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -29,10 +28,11 @@
       color: var(--text);
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       overflow-x: hidden;
-      line-height: 1.6;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* Ambient Dual Blob Canvas */
+    /* Cinematic Animated Ambient Lighting (Real Verci Gradient Mesh) */
     .ambient-canvas {
       position: fixed;
       inset: 0;
@@ -42,53 +42,52 @@
     }
     .blob-1 {
       position: absolute;
-      top: -15%;
-      left: -10%;
-      width: 55vw;
-      height: 55vw;
-      background: radial-gradient(circle, rgba(16, 75, 120, 0.45) 0%, rgba(3, 4, 7, 0) 70%);
-      filter: blur(80px);
+      top: -20%;
+      left: -15%;
+      width: 65vw;
+      height: 65vw;
+      background: radial-gradient(circle, rgba(14, 62, 102, 0.55) 0%, rgba(0, 0, 0, 0) 70%);
+      filter: blur(100px);
       animation: driftLeft 16s ease-in-out infinite alternate;
     }
     .blob-2 {
       position: absolute;
-      top: 5%;
-      right: -10%;
-      width: 50vw;
-      height: 50vw;
-      background: radial-gradient(circle, rgba(180, 85, 45, 0.35) 0%, rgba(3, 4, 7, 0) 70%);
-      filter: blur(80px);
+      top: 0%;
+      right: -15%;
+      width: 60vw;
+      height: 60vw;
+      background: radial-gradient(circle, rgba(175, 80, 35, 0.45) 0%, rgba(0, 0, 0, 0) 70%);
+      filter: blur(100px);
       animation: driftRight 18s ease-in-out infinite alternate;
     }
-
     @keyframes driftLeft {
       0% { transform: translate(0, 0) scale(1); }
-      100% { transform: translate(8%, 12%) scale(1.08); }
+      100% { transform: translate(6%, 8%) scale(1.08); }
     }
     @keyframes driftRight {
       0% { transform: translate(0, 0) scale(1); }
-      100% { transform: translate(-10%, 15%) scale(1.12); }
+      100% { transform: translate(-6%, 10%) scale(1.12); }
     }
 
-    /* Noise overlay */
+    /* Film Grain Layer */
     .noise {
       position: fixed;
       inset: 0;
-      opacity: 0.04;
+      opacity: 0.045;
       pointer-events: none;
       z-index: 1;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
     }
 
     .container {
-      max-width: 1200px;
+      max-width: 1220px;
       margin: 0 auto;
-      padding: 0 28px;
+      padding: 0 24px;
       position: relative;
       z-index: 2;
     }
 
-    /* Header Nav */
+    /* Top Floating Glass Header */
     header {
       padding: 24px 0;
       display: flex;
@@ -98,31 +97,32 @@
     .brand {
       display: flex;
       align-items: center;
-      gap: 12px;
-      font-size: 20px;
+      gap: 10px;
+      font-size: 19px;
       font-weight: 700;
-      letter-spacing: -0.5px;
+      letter-spacing: -0.4px;
       color: #fff;
       text-decoration: none;
     }
     .brand-icon {
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       border-radius: 9px;
-      background: linear-gradient(135deg, #2D82B7, #FF8360);
+      background: linear-gradient(135deg, #2563EB, #EA580C);
       display: grid;
       place-items: center;
-      box-shadow: 0 4px 18px rgba(45, 130, 183, 0.4);
+      box-shadow: 0 4px 18px rgba(37, 99, 235, 0.4);
+      font-size: 14px;
     }
     .nav-pill {
       background: var(--pill-bg);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--pill-border);
-      padding: 6px 14px;
-      border-radius: 24px;
+      padding: 6px 16px;
+      border-radius: 30px;
       display: flex;
-      gap: 18px;
+      gap: 20px;
       font-size: 13px;
       font-weight: 500;
     }
@@ -133,10 +133,10 @@
     }
     .nav-pill a:hover { color: #fff; }
 
-    /* Hero Section */
+    /* Hero Text */
     .hero {
       text-align: center;
-      padding: 70px 0 40px;
+      padding: 60px 0 30px;
     }
     .badge-pill {
       display: inline-flex;
@@ -144,41 +144,40 @@
       gap: 8px;
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid rgba(255, 255, 255, 0.12);
-      padding: 6px 16px;
+      padding: 5px 15px;
       border-radius: 30px;
       font-size: 13px;
-      color: #D3E0EC;
-      margin-bottom: 24px;
-      backdrop-filter: blur(10px);
+      color: #CBD5E1;
+      margin-bottom: 22px;
+      backdrop-filter: blur(12px);
     }
     .badge-pill span.dot {
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: var(--accent-emerald);
-      box-shadow: 0 0 10px var(--accent-emerald);
+      background: var(--accent-green);
+      box-shadow: 0 0 10px var(--accent-green);
     }
     .hero h1 {
-      font-size: clamp(42px, 6vw, 68px);
+      font-size: clamp(40px, 5.8vw, 66px);
       font-weight: 800;
       letter-spacing: -1.8px;
       line-height: 1.08;
-      margin-bottom: 20px;
-      background: linear-gradient(180deg, #FFFFFF 20%, #A4B3C6 100%);
+      margin-bottom: 18px;
+      background: linear-gradient(180deg, #FFFFFF 25%, #94A3B8 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
     .hero p {
-      font-size: clamp(16px, 2vw, 19px);
+      font-size: clamp(16px, 1.8vw, 19px);
       color: var(--text-muted);
-      max-width: 640px;
-      margin: 0 auto 36px;
-      font-weight: 400;
+      max-width: 620px;
+      margin: 0 auto 32px;
     }
     .cta-group {
       display: flex;
       justify-content: center;
-      gap: 16px;
+      gap: 14px;
       flex-wrap: wrap;
     }
     .btn {
@@ -195,17 +194,17 @@
     }
     .btn-primary {
       background: #FFFFFF;
-      color: #080A0F;
-      box-shadow: 0 6px 30px rgba(255, 255, 255, 0.25);
+      color: #0B0E14;
+      box-shadow: 0 6px 30px rgba(255, 255, 255, 0.22);
     }
     .btn-primary:hover {
       transform: translateY(-2px);
-      box-shadow: 0 10px 36px rgba(255, 255, 255, 0.35);
+      box-shadow: 0 10px 38px rgba(255, 255, 255, 0.34);
       background: #FAFAFC;
     }
     .btn-secondary {
       background: var(--pill-bg);
-      backdrop-filter: blur(16px);
+      backdrop-filter: blur(18px);
       border: 1px solid var(--pill-border);
       color: var(--text);
     }
@@ -215,175 +214,305 @@
       transform: translateY(-2px);
     }
 
-    /* Live Hero Mockup Stage (Picture 1 style) */
-    .stage-wrapper {
-      margin: 50px auto 90px;
-      background: linear-gradient(135deg, rgba(14, 58, 92, 0.85) 0%, rgba(145, 75, 42, 0.85) 100%);
-      border-radius: 28px;
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7);
-      position: relative;
+    /* Picture 1 Replica: Exact Studio Window Stage */
+    .studio-window {
+      margin: 46px auto 90px;
+      background: #000000;
+      border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.85);
       overflow: hidden;
-      aspect-ratio: 16 / 9.5;
+      position: relative;
+    }
+    
+    /* Studio Window Header Bar */
+    .window-header {
+      padding: 14px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(12, 15, 22, 0.7);
+      backdrop-filter: blur(14px);
+    }
+    .window-dots {
+      display: flex;
+      gap: 7px;
+    }
+    .window-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: #334155;
+    }
+    .window-dot.close { background: #EF4444; }
+    .window-dot.min { background: #F59E0B; }
+    .window-dot.max { background: #10B981; }
+
+    .window-nav-pills {
+      background: rgba(24, 29, 41, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 30px;
+      padding: 5px 12px;
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #94A3B8;
+    }
+    .window-nav-pills span { cursor: pointer; transition: color 0.2s; }
+    .window-nav-pills span:hover { color: #fff; }
+
+    .window-status-pill {
+      background: rgba(24, 29, 41, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 30px;
+      padding: 5px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #E2E8F0;
+      font-weight: 600;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+    }
+
+    /* Picture 1 Exact Hero Stage */
+    .hero-stage {
+      background: radial-gradient(circle at 75% 30%, rgba(185, 88, 38, 0.75) 0%, rgba(14, 58, 92, 0.95) 55%, #050811 100%);
+      aspect-ratio: 16 / 9;
       max-height: 520px;
+      position: relative;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: 32px;
+      padding: 36px 44px;
+      overflow: hidden;
     }
-    .stage-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .stage-pills {
-      background: rgba(18, 22, 32, 0.65);
-      backdrop-filter: blur(14px);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      padding: 6px 14px;
-      border-radius: 30px;
-      display: flex;
-      gap: 14px;
-      font-size: 13px;
-      font-weight: 500;
-      color: #CAD5E2;
-    }
-    .stage-center {
+
+    /* Hero Arrows */
+    .hero-arrow {
       position: absolute;
-      top: 48%;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 34px;
+      color: rgba(255, 255, 255, 0.35);
+      user-select: none;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .hero-arrow:hover { color: #fff; }
+    .hero-arrow.left { left: 24px; }
+    .hero-arrow.right { right: 24px; }
+
+    /* Picture 1 Exact 3D Floating Word */
+    .kinetic-floating-box {
+      position: absolute;
+      top: 42%;
       left: 50%;
       transform: translate(-50%, -50%);
-      text-align: center;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      user-select: none;
     }
-    .stage-center .prev-word {
+    .word-dim {
       font-size: 26px;
-      color: rgba(210, 226, 242, 0.55);
-      margin-right: 18px;
+      font-weight: 500;
+      color: rgba(215, 230, 245, 0.45);
+      letter-spacing: -0.3px;
     }
-    .stage-center .highlight-word {
-      display: inline-block;
-      font-size: 42px;
+    .word-active {
+      font-size: 46px;
       font-weight: 800;
+      color: #0E121C;
       background: #FFFFFF;
-      color: #0E121B;
-      padding: 2px 20px;
+      padding: 2px 22px;
       border-radius: 12px;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
       letter-spacing: -0.5px;
     }
-    .stage-bottom {
+
+    /* Picture 1 Bottom Info & Unlock Pill */
+    .hero-bottom-bar {
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
+      z-index: 2;
     }
-    .stage-info .sub-cat {
+    .hero-details .cat {
       font-size: 13px;
-      color: #CAD5E2;
+      color: #94A3B8;
+      font-weight: 500;
       margin-bottom: 2px;
     }
-    .stage-info h3 {
-      font-family: 'Instrument Serif', serif;
-      font-size: 44px;
+    .hero-details h3 {
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 52px;
       font-weight: 400;
-      line-height: 1.1;
+      line-height: 1;
       letter-spacing: -0.5px;
+      margin-bottom: 6px;
     }
-    .stage-info p {
+    .hero-details p {
       font-size: 13px;
-      color: #B2C0D2;
-      margin-top: 4px;
+      color: #CBD5E1;
+      margin-bottom: 18px;
+    }
+    .hero-cta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #FFFFFF;
+      color: #0F1219;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 10px 22px;
+      border-radius: 25px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    }
+    
+    /* Pagination Dots (Picture 1) */
+    .pagination-dots {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+    }
+    .dot-item {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+    }
+    .dot-item.active {
+      background: #FFFFFF;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
     }
 
-    /* Style Grid Section */
+    /* Picture 2 Exact All Styles Grid */
+    .styles-section {
+      padding: 20px 0 100px;
+    }
+    .section-header {
+      margin-bottom: 30px;
+    }
     .section-title {
       font-size: 28px;
-      font-weight: 700;
-      letter-spacing: -0.6px;
-      margin-bottom: 8px;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      margin-bottom: 4px;
     }
-    .section-subtitle {
+    .section-sub {
       color: var(--text-muted);
-      font-size: 15px;
-      margin-bottom: 36px;
+      font-size: 14px;
     }
-    .grid {
+
+    /* 4-Column Card Grid (Matching Picture 2) */
+    .styles-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 22px;
-      margin-bottom: 100px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
     }
+    @media (max-width: 1080px) {
+      .styles-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .styles-grid { grid-template-columns: 1fr; }
+    }
+
     .style-card {
-      background: var(--card-bg);
-      border-radius: 20px;
-      border: 1px solid var(--card-border);
-      overflow: hidden;
-      backdrop-filter: blur(14px);
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      position: relative;
+      background: transparent;
+      text-decoration: none;
+      color: inherit;
     }
-    .style-card:hover {
-      transform: translateY(-5px);
-      border-color: var(--card-border-hover);
-      box-shadow: 0 16px 38px rgba(0, 0, 0, 0.45);
-    }
-    .card-preview {
-      height: 150px;
+    .card-canvas {
+      aspect-ratio: 16 / 9.5;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
       position: relative;
       overflow: hidden;
       display: grid;
       place-items: center;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .card-info {
-      padding: 16px 18px 20px;
+    .style-card:hover .card-canvas {
+      transform: translateY(-4px);
+      border-color: rgba(255, 255, 255, 0.35);
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.6);
     }
-    .card-title {
-      font-size: 16px;
-      font-weight: 700;
-      margin-bottom: 3px;
+    .style-card.selected .card-canvas {
+      border: 2px solid #FFFFFF;
+      box-shadow: 0 0 25px rgba(255, 255, 255, 0.2);
     }
-    .card-cat {
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-    .card-badge {
+
+    .selected-badge {
       position: absolute;
-      top: 12px;
-      right: 12px;
-      background: rgba(255, 255, 255, 0.95);
+      top: 10px;
+      right: 10px;
+      background: #FFFFFF;
       color: #0E121B;
       font-size: 11px;
       font-weight: 700;
-      padding: 3px 9px;
+      padding: 3px 8px;
       border-radius: 12px;
       display: flex;
       align-items: center;
       gap: 4px;
     }
 
-    /* Features Section */
+    .card-meta {
+      padding: 12px 4px 0;
+    }
+    .meta-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #F8FAFC;
+    }
+    .meta-cat {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Features Grid */
+    .features-section {
+      padding: 20px 0 90px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
     .features-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 28px;
-      margin-bottom: 110px;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 36px;
     }
-    .feature-box {
+    @media (max-width: 900px) {
+      .features-grid { grid-template-columns: 1fr; }
+    }
+    .feat-card {
       background: rgba(18, 22, 31, 0.45);
-      border: 1px solid var(--card-border);
-      border-radius: 24px;
-      padding: 32px;
-      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 28px;
+      backdrop-filter: blur(14px);
     }
-    .feature-icon {
-      font-size: 30px;
-      margin-bottom: 16px;
+    .feat-icon {
+      font-size: 28px;
+      margin-bottom: 14px;
     }
-    .feature-box h4 {
-      font-size: 18px;
+    .feat-card h4 {
+      font-size: 17px;
       font-weight: 700;
       margin-bottom: 8px;
     }
-    .feature-box p {
+    .feat-card p {
       font-size: 14px;
       color: var(--text-muted);
       line-height: 1.6;
@@ -392,17 +521,19 @@
     /* Footer */
     footer {
       border-top: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 40px 0 60px;
-      text-align: center;
+      padding: 36px 0 50px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       color: var(--text-muted);
-      font-size: 14px;
+      font-size: 13px;
     }
     footer a { color: #fff; text-decoration: none; }
   </style>
 </head>
 <body>
 
-  <!-- Background Ambience -->
+  <!-- Ambient Background Blobs -->
   <div class="ambient-canvas">
     <div class="blob-1"></div>
     <div class="blob-2"></div>
@@ -418,19 +549,20 @@
         SoulsLights
       </a>
       <div class="nav-pill">
-        <a href="#styles">Styles</a>
+        <a href="#studio">Studio</a>
+        <a href="#styles">10 Styles</a>
         <a href="#features">Features</a>
         <a href="https://github.com/s0u1ls/SoulsLights" target="_blank">GitHub</a>
       </div>
     </header>
 
-    <!-- Hero -->
+    <!-- Hero Title -->
     <section class="hero">
       <div class="badge-pill">
-        <span class="dot"></span> 10 Synced Lyrics Motion Styles
+        <span class="dot"></span> Verci Studio Edition • 10 Motion Themes
       </div>
       <h1>Ultra-smooth desktop lyrics.<br>Ambient concert vibes.</h1>
-      <p>Transform your desktop into an audiovisual stage. Frame-accurate live lyrics sync paired with dual-blob audio-reactive screen glow.</p>
+      <p>Transform your workspace into an audiovisual stage. Frame-accurate live lyrics sync paired with dual-blob audio-reactive screen lighting.</p>
       
       <div class="cta-group">
         <a href="https://github.com/s0u1ls/SoulsLights/releases/latest" class="btn btn-primary">
@@ -444,196 +576,255 @@
       </div>
     </section>
 
-    <!-- Picture 1 Stage Mockup Preview -->
-    <div class="stage-wrapper">
-      <div class="stage-top">
-        <div class="stage-pills">
+    <!-- Picture 1 Exact Studio Interface Window -->
+    <div id="studio" class="studio-window">
+      <!-- Title Bar -->
+      <div class="window-header">
+        <div class="window-dots">
+          <div class="window-dot close"></div>
+          <div class="window-dot min"></div>
+          <div class="window-dot max"></div>
+        </div>
+
+        <div class="window-nav-pills">
           <span>Size</span>
           <span>Font</span>
           <span>Screen</span>
           <span>Aesthetics</span>
         </div>
-        <div class="stage-pills" style="color: #4EE0F5;">
+
+        <div class="window-status-pill">
+          <span class="status-dot"></span>
           <span>♫ Billie Eilish — BIRDS OF A FEATHER</span>
         </div>
       </div>
 
-      <div class="stage-center">
-        <span class="prev-word">clock</span>
-        <span class="highlight-word">Every</span>
-      </div>
+      <!-- Hero Visualizer Stage (Picture 1) -->
+      <div class="hero-stage">
+        <div class="hero-arrow left">‹</div>
+        <div class="hero-arrow right">›</div>
 
-      <div class="stage-bottom">
-        <div class="stage-info">
-          <div class="sub-cat">Kinetic type</div>
-          <h3>Ship</h3>
-          <p>Words land one by one on a wall that drifts in 3D.</p>
+        <!-- Word Highlight -->
+        <div class="kinetic-floating-box">
+          <span class="word-dim">clock</span>
+          <span class="word-active">Every</span>
         </div>
-        <div class="stage-pills">
-          <span>🔒 Locked (Click-through)</span>
+
+        <!-- Bottom Controls -->
+        <div class="hero-bottom-bar">
+          <div class="hero-details">
+            <div class="cat">Kinetic type</div>
+            <h3>Ship</h3>
+            <p>Words land one by one on a wall that drifts in 3D.</p>
+            <div class="hero-cta-pill">
+              <span>🔒 Unlock</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Centered Pagination Dots (Picture 1) -->
+        <div class="pagination-dots">
+          <div class="dot-item active"></div>
+          <div class="dot-item"></div>
+          <div class="dot-item"></div>
+          <div class="dot-item"></div>
+          <div class="dot-item"></div>
+          <div class="dot-item"></div>
+          <div class="dot-item"></div>
+          <div class="dot-item"></div>
+          <div class="dot-item"></div>
+          <div class="dot-item"></div>
         </div>
       </div>
     </div>
 
-    <!-- 10 Styles Grid -->
-    <div id="styles">
-      <h2 class="section-title">All 10 Lyrics Styles</h2>
-      <p class="section-subtitle">Tailored visual themes engineered for every genre and desktop mood.</p>
+    <!-- Picture 2 Exact All Styles 4-Column Grid -->
+    <section id="styles" class="styles-section">
+      <div class="section-header">
+        <h2 class="section-title">All styles</h2>
+        <div class="section-sub">10 fluid motion scenes engineered for every genre.</div>
+      </div>
 
-      <div class="grid">
+      <div class="styles-grid">
         
-        <!-- Ship -->
-        <div class="style-card">
-          <div class="card-preview" style="background: linear-gradient(135deg, #0C3652, #9A4E24);">
-            <div class="card-badge">✓ Selected</div>
-            <div style="font-size: 20px; font-weight: 700; color: #fff; background: rgba(255,255,255,0.9); color: #000; padding: 2px 12px; border-radius: 6px;">city</div>
+        <!-- 1. Ship (Selected) -->
+        <div class="style-card selected">
+          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #9A4E24 0%, #0C3652 70%);">
+            <div class="selected-badge">✓ Selected</div>
+            <div style="text-align: center; font-size: 13px; line-height: 1.4; color: rgba(255,255,255,0.7);">
+              clock<br>in<br>the<br>
+              <span style="display:inline-block; background: #fff; color: #000; font-weight:800; font-size:16px; padding: 2px 10px; border-radius: 5px;">city</span><br>
+              slows down
+            </div>
           </div>
-          <div class="card-info">
-            <div class="card-title">Ship</div>
-            <div class="card-cat">Kinetic type</div>
-          </div>
-        </div>
-
-        <!-- Fisheye -->
-        <div class="style-card">
-          <div class="card-preview" style="background: linear-gradient(135deg, #421054, #B2562E);">
-            <div style="font-size: 24px; font-weight: 800; transform: scaleY(1.3); letter-spacing: -1px;">morning</div>
-          </div>
-          <div class="card-info">
-            <div class="card-title">Fisheye</div>
-            <div class="card-cat">Kinetic type</div>
+          <div class="card-meta">
+            <div class="meta-title">Ship</div>
+            <div class="meta-cat">Kinetic type</div>
           </div>
         </div>
 
-        <!-- Visual -->
+        <!-- 2. Fisheye -->
         <div class="style-card">
-          <div class="card-preview" style="background: linear-gradient(135deg, #0C4C42, #A8802A);">
-            <div style="font-size: 16px; font-weight: 600;">🌊 water, 🔥 fire</div>
+          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #B2562E 0%, #421054 70%);">
+            <div style="text-align: center; font-weight: 800; color: #fff;">
+              <div style="font-size: 13px; opacity: 0.6;">till</div>
+              <div style="font-size: 22px; transform: scaleY(1.3); letter-spacing: -0.5px;">the</div>
+              <div style="font-size: 24px; font-style: italic; transform: scaleY(1.2);">morning</div>
+            </div>
           </div>
-          <div class="card-info">
-            <div class="card-title">Visual</div>
-            <div class="card-cat">Kinetic type</div>
+          <div class="card-meta">
+            <div class="meta-title">Fisheye</div>
+            <div class="meta-cat">Kinetic type</div>
           </div>
         </div>
 
-        <!-- Fisheye Visual -->
+        <!-- 3. Visual -->
         <div class="style-card">
-          <div class="card-preview" style="background: linear-gradient(135deg, #40163A, #A66238);">
-            <div style="font-size: 18px; font-weight: 700;">the moon 🌙</div>
+          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #A8802A 0%, #0C4C42 70%);">
+            <div style="text-align: center; font-size: 14px; font-weight: 600; color: #fff;">
+              🌊 water,<br>🔥 fire<br>in<br>the
+            </div>
           </div>
-          <div class="card-info">
-            <div class="card-title">Fisheye Visual</div>
-            <div class="card-cat">Kinetic type</div>
+          <div class="card-meta">
+            <div class="meta-title">Visual</div>
+            <div class="meta-cat">Kinetic type</div>
           </div>
         </div>
 
-        <!-- Codestyle -->
+        <!-- 4. Fisheye Visual -->
         <div class="style-card">
-          <div class="card-preview" style="background: linear-gradient(135deg, #0E2A44, #762C22);">
-            <div style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #E2E8F0;">till.the(road)<br><span style="color: #FF5A5A;">run |</span></div>
+          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #A66238 0%, #40163A 70%);">
+            <div style="text-align: center; font-weight: 700; color: #fff;">
+              <div style="font-size: 11px; opacity: 0.7;">the</div>
+              <div style="font-size: 18px;">moon 🌙</div>
+              <div style="font-size: 20px; font-style: italic; opacity: 0.85;">can</div>
+            </div>
           </div>
-          <div class="card-info">
-            <div class="card-title">Codestyle</div>
-            <div class="card-cat">Motion scenes</div>
+          <div class="card-meta">
+            <div class="meta-title">Fisheye Visual</div>
+            <div class="meta-cat">Kinetic type</div>
           </div>
         </div>
 
-        <!-- Codestyle Visual -->
+        <!-- 5. Codestyle -->
         <div class="style-card">
-          <div class="card-preview" style="background: linear-gradient(135deg, #181840, #923856);">
-            <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px;">☀️ // morning<span style="background: #FF4A4A; color: transparent; margin-left: 4px;">_</span></div>
+          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #762C22 0%, #0E2A44 70%);">
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #E2E8F0;">
+              till.the(road)<br>
+              <span style="color: #fff; font-weight: 700;">run</span><span style="background: #EF4444; color: transparent; margin-left: 2px;">|</span>
+            </div>
           </div>
-          <div class="card-info">
-            <div class="card-title">Codestyle Visual</div>
-            <div class="card-cat">Motion scenes</div>
+          <div class="card-meta">
+            <div class="meta-title">Codestyle</div>
+            <div class="meta-cat">Motion scenes</div>
           </div>
         </div>
 
-        <!-- Branches -->
+        <!-- 6. Codestyle Visual -->
         <div class="style-card">
-          <div class="card-preview" style="background: linear-gradient(135deg, #0E3A2A, #308658);">
-            <svg width="180" height="40" viewBox="0 0 180 40">
-              <path d="M 10 20 Q 50 5, 90 20 T 170 20" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2"/>
-              <circle cx="90" cy="20" r="4" fill="#fff"/>
+          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #923856 0%, #181840 70%);">
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #CBD5E1;">
+              till(the)<br>
+              <span style="color: #F8FAFC;">☀️ // morning</span><span style="background: #EF4444; color: transparent; margin-left: 3px;">|</span>
+            </div>
+          </div>
+          <div class="card-meta">
+            <div class="meta-title">Codestyle Visual</div>
+            <div class="meta-cat">Motion scenes</div>
+          </div>
+        </div>
+
+        <!-- 7. Branches -->
+        <div class="style-card">
+          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #308658 0%, #0E3A2A 70%);">
+            <svg width="160" height="40" viewBox="0 0 160 40">
+              <path d="M 10 20 Q 45 5, 80 20 T 150 20" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+              <line x1="45" y1="12" x2="45" y2="28" stroke="rgba(255,255,255,0.7)" stroke-width="1"/>
+              <circle cx="45" cy="12" r="3" fill="#fff"/>
+              <line x1="115" y1="12" x2="115" y2="28" stroke="rgba(255,255,255,0.7)" stroke-width="1"/>
+              <circle cx="115" cy="28" r="3" fill="#fff"/>
             </svg>
           </div>
-          <div class="card-info">
-            <div class="card-title">Branches</div>
-            <div class="card-cat">Motion scenes</div>
+          <div class="card-meta">
+            <div class="meta-title">Branches</div>
+            <div class="meta-cat">Motion scenes</div>
           </div>
         </div>
 
-        <!-- Web -->
+        <!-- 8. Web -->
         <div class="style-card">
-          <div class="card-preview" style="background: linear-gradient(135deg, #301E12, #B06024);">
-            <div style="font-size: 26px;">🕸️</div>
+          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #B06024 0%, #301E12 70%);">
+            <div style="font-size: 32px; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));">🕸️</div>
           </div>
-          <div class="card-info">
-            <div class="card-title">Web</div>
-            <div class="card-cat">Motion scenes</div>
+          <div class="card-meta">
+            <div class="meta-title">Web</div>
+            <div class="meta-cat">Motion scenes</div>
           </div>
         </div>
 
-        <!-- Constellation -->
+        <!-- 9. Constellation -->
         <div class="style-card">
-          <div class="card-preview" style="background: linear-gradient(135deg, #1A1642, #5C4892);">
+          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #5C4892 0%, #1A1642 70%);">
             <svg width="140" height="50" viewBox="0 0 140 50">
-              <line x1="20" y1="35" x2="70" y2="15" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
-              <line x1="70" y1="15" x2="120" y2="30" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
-              <circle cx="70" cy="15" r="5" fill="#FFE885"/>
+              <line x1="20" y1="35" x2="70" y2="15" stroke="rgba(255,255,255,0.4)" stroke-width="1.2"/>
+              <line x1="70" y1="15" x2="120" y2="30" stroke="rgba(255,255,255,0.4)" stroke-width="1.2"/>
+              <circle cx="20" cy="35" r="3" fill="rgba(255,255,255,0.7)"/>
+              <circle cx="70" cy="15" r="5" fill="#FFE885" style="filter: drop-shadow(0 0 6px #FFE885);"/>
+              <circle cx="120" cy="30" r="3" fill="rgba(255,255,255,0.7)"/>
             </svg>
           </div>
-          <div class="card-info">
-            <div class="card-title">Constellation</div>
-            <div class="card-cat">Motion scenes</div>
+          <div class="card-meta">
+            <div class="meta-title">Constellation</div>
+            <div class="meta-cat">Motion scenes</div>
           </div>
         </div>
 
-        <!-- Native Design -->
+        <!-- 10. Native Design -->
         <div class="style-card">
-          <div class="card-preview" style="background: linear-gradient(135deg, #0E3056, #3076B0);">
-            <div style="background: #007AFF; color: #fff; padding: 6px 14px; border-radius: 14px; font-size: 11px; max-width: 140px;">
+          <div class="card-canvas" style="background: radial-gradient(circle at 75% 25%, #3076B0 0%, #0E3056 70%);">
+            <div style="background: #007AFF; color: #fff; padding: 6px 14px; border-radius: 14px; font-size: 11px; max-width: 150px; line-height: 1.3; box-shadow: 0 4px 14px rgba(0,0,0,0.4);">
               dance with me till the morning
             </div>
           </div>
-          <div class="card-info">
-            <div class="card-title">Native Design</div>
-            <div class="card-cat">Phone screens</div>
+          <div class="card-meta">
+            <div class="meta-title">Native Design</div>
+            <div class="meta-cat">Phone screens</div>
           </div>
         </div>
 
       </div>
-    </div>
+    </section>
 
     <!-- Features -->
-    <div id="features">
+    <section id="features" class="features-section">
       <h2 class="section-title">Engineered for Perfection</h2>
-      <p class="section-subtitle">A native, lightweight visual experience that stays out of your way.</p>
+      <div class="section-sub">A native, lightweight visual experience that stays out of your way.</div>
 
       <div class="features-grid">
-        <div class="feature-box">
-          <div class="feature-icon">⚡</div>
-          <h4>Zero Setup Auto-Sync</h4>
-          <p>Listens directly to Windows SMTC & macOS media sessions. Works out-of-the-box with Spotify, Apple Music, YouTube Music, and browsers without API keys or sign-ins.</p>
+        <div class="feat-card">
+          <div class="feat-icon">⚡</div>
+          <h4>Zero-Setup Auto-Sync</h4>
+          <p>Listens directly to Windows SMTC & macOS media sessions. Works out-of-the-box with Spotify, Apple Music, YouTube Music, and browsers without API keys or accounts.</p>
         </div>
 
-        <div class="feature-box">
-          <div class="feature-icon">🖱️</div>
+        <div class="feat-card">
+          <div class="feat-icon">🖱️</div>
           <h4>Transparent Click-Through</h4>
           <p>Hit the lock icon to pass all mouse clicks straight through to windows behind. Keep writing code, gaming, or studying while lyrics drift across your desktop.</p>
         </div>
 
-        <div class="feature-box">
-          <div class="feature-icon">🌈</div>
+        <div class="feat-card">
+          <div class="feat-icon">🌈</div>
           <h4>Dual-Blob Color Extraction</h4>
           <p>Dynamically samples dominant and secondary hues from your playing track’s album artwork, projecting gentle, organic light gradients across your screen.</p>
         </div>
       </div>
-    </div>
+    </section>
 
     <!-- Footer -->
     <footer>
-      <p>© 2026 SoulsLights Studio • Open source under the <a href="https://github.com/s0u1ls/SoulsLights/blob/main/LICENSE">MIT License</a></p>
+      <div>© 2026 SoulsLights Studio • Open source under the <a href="https://github.com/s0u1ls/SoulsLights/blob/main/LICENSE">MIT License</a></div>
+      <div>Designed with 1:1 liquid-glass precision.</div>
     </footer>
 
   </div>
