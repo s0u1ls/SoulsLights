@@ -1,5 +1,6 @@
 """Builds SoulsLights.app and SoulsLights-macOS.dmg cleanly on macOS."""
 import os
+import plistlib
 import shutil
 import subprocess
 import sys
@@ -38,8 +39,27 @@ def main():
         print("Error: dist/SoulsLights.app was not created.")
         sys.exit(1)
 
-    # Ad-hoc codesign so macOS Gatekeeper / local launch runs smoothly
-    subprocess.run(["codesign", "--force", "--deep", "--sign", "-", app_path], check=False)
+    # Ensure Info.plist metadata is complete before codesign
+    plist_path = os.path.join(app_path, "Contents", "Info.plist")
+    if os.path.exists(plist_path):
+        with open(plist_path, "rb") as pf:
+            plist_data = plistlib.load(pf)
+        plist_data.update({
+            "CFBundleName": "SoulsLights",
+            "CFBundleDisplayName": "SoulsLights",
+            "CFBundleExecutable": "SoulsLights",
+            "CFBundlePackageType": "APPL",
+            "CFBundleIdentifier": "com.soulslights.app",
+            "CFBundleVersion": "2.2.0",
+            "CFBundleShortVersionString": "2.2.0",
+            "NSHighResolutionCapable": True,
+            "NSRequiresAquaSystemAppearance": False,
+        })
+        with open(plist_path, "wb") as pf:
+            plistlib.dump(plist_data, pf)
+
+    # Ad-hoc codesign with explicit bundle identifier so macOS LaunchServices indexes cleanly
+    subprocess.run(["codesign", "--force", "--deep", "--sign", "-", "--identifier", "com.soulslights.app", app_path], check=False)
 
     dmg_staging = os.path.join(dist_dir, "_dmg_stage")
     os.makedirs(dmg_staging, exist_ok=True)

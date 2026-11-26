@@ -628,22 +628,33 @@ class UnifiedDashboard(ctk.CTk):
         self.after(30 if IS_MAC else 60, self._poll_ui_queue)
 
     def _apply_frameless_liquid_glass(self):
-        """Applies clean borderless rounded styling on Windows (DWM) and macOS (AppKit FullSizeContentView)."""
+        """Applies clean borderless rounded styling on Windows (DWM) and Dark Aqua titlebar on macOS."""
         if IS_MAC:
+            # Never call synchronous AppKit NSWindow mutations inside Tk PythonCmd:
+            # defer lightweight appearance/titlebar polish onto NSOperationQueue.mainQueue()
+            # so Cocoa runs safely outside _tkinter's non-reentrant PythonCmd frame.
             try:
+                import Foundation
                 import AppKit
-                for win in AppKit.NSApp.windows():
-                    if str(win.title() or "") == "SoulsLights":
-                        mask = win.styleMask() | getattr(AppKit, "NSWindowStyleMaskFullSizeContentView", 1 << 15)
-                        win.setStyleMask_(mask)
-                        win.setTitlebarAppearsTransparent_(True)
-                        win.setTitleVisibility_(getattr(AppKit, "NSWindowTitleHidden", 1))
-                        win.setMovable_(True)
-                        for btn_id in (0, 1, 2):  # close, miniaturize, zoom buttons
-                            b = win.standardWindowButton_(btn_id)
-                            if b:
-                                b.setHidden_(True)
-                        break
+
+                def _style_mac():
+                    try:
+                        dark_name = getattr(AppKit, "NSAppearanceNameDarkAqua", "NSAppearanceNameDarkAqua")
+                        dark_app = AppKit.NSAppearance.appearanceNamed_(dark_name)
+                        if dark_app is not None:
+                            AppKit.NSApp.setAppearance_(dark_app)
+                        for win in AppKit.NSApp.windows():
+                            if str(win.title() or "") == "SoulsLights":
+                                if dark_app is not None:
+                                    win.setAppearance_(dark_app)
+                                win.setTitlebarAppearsTransparent_(True)
+                                win.setTitleVisibility_(getattr(AppKit, "NSWindowTitleHidden", 1))
+                                win.setBackgroundColor_(AppKit.NSColor.blackColor())
+                                break
+                    except Exception:
+                        pass
+
+                Foundation.NSOperationQueue.mainQueue().addOperationWithBlock_(_style_mac)
             except Exception:
                 pass
             return
@@ -913,9 +924,14 @@ class UnifiedDashboard(ctk.CTk):
             d.text((sx0 + (slot_w - tw) / 2, ny0 + 10), label, font=f_u, fill=(255, 255, 255, 252 if (is_act or is_hov) else 215))
             nav_hits.append((f"nav:{label}", (sx0, ny0, sx1, ny1)))
 
-        # Right Liquid-Glass Pill 1: Authentic Spotify Emblem + Double Eighth Music Note (4x smooth!)
-        mp_x1 = w - 198
+        # Right Liquid-Glass Pills (shift right on macOS since native titlebar holds traffic lights)
+        right_edge = w - 20 if IS_MAC else w - 102
+        ap_x1 = right_edge
+        ap_x0 = ap_x1 - 88
+        mp_x1 = ap_x0 - 8
         mp_x0 = mp_x1 - 76
+
+        # Right Liquid-Glass Pill 1: Authentic Spotify Emblem + Double Eighth Music Note (4x smooth!)
         _draw_frosted_pill(base, (mp_x0, 10, mp_x1, 46), radius=18, tint=(20, 18, 30, 152), border_col=(255, 255, 255, 76))
         is_play = (self.current_media.get("status") == "Playing")
         base.alpha_composite(_get_hi_icon("spotify", 24), (mp_x0 + 8, 16))
@@ -927,8 +943,6 @@ class UnifiedDashboard(ctk.CTk):
         nav_hits.append(("media_toggle", (mp_x0, 10, mp_x1, 46)))
 
         # Right Liquid-Glass Pill 2: Lock + Refresh + Power (all 4x supersampled!)
-        ap_x1 = w - 102
-        ap_x0 = ap_x1 - 88
         _draw_frosted_pill(base, (ap_x0, 10, ap_x1, 46), radius=18, tint=(20, 18, 30, 152), border_col=(255, 255, 255, 76))
         is_lk = self.click_through_var.get()
         is_pwr = self.master_switch_var.get()
@@ -939,13 +953,14 @@ class UnifiedDashboard(ctk.CTk):
         nav_hits.append(("refresh_lyrics", (ap_x0 + 33, 10, ap_x0 + 58, 46)))
         nav_hits.append(("toggle_power", (ap_x0 + 59, 10, ap_x1, 46)))
 
-        # Minimal 4x antialiased top-right window controls (— □ ×)
-        base.alpha_composite(_get_hi_icon("win_min", 18), (w - 86, 19))
-        base.alpha_composite(_get_hi_icon("win_max", 18), (w - 58, 19))
-        base.alpha_composite(_get_hi_icon("win_close", 18), (w - 31, 19))
-        nav_hits.append(("win_min", (w - 92, 6, w - 66, 42)))
-        nav_hits.append(("win_max", (w - 65, 6, w - 38, 42)))
-        nav_hits.append(("win_close", (w - 37, 6, w - 8, 42)))
+        if IS_WIN:
+            # Minimal 4x antialiased top-right window controls (— □ ×) on frameless Windows window
+            base.alpha_composite(_get_hi_icon("win_min", 18), (w - 86, 19))
+            base.alpha_composite(_get_hi_icon("win_max", 18), (w - 58, 19))
+            base.alpha_composite(_get_hi_icon("win_close", 18), (w - 31, 19))
+            nav_hits.append(("win_min", (w - 92, 6, w - 66, 42)))
+            nav_hits.append(("win_max", (w - 65, 6, w - 38, 42)))
+            nav_hits.append(("win_close", (w - 37, 6, w - 8, 42)))
 
         tk_hdr = ImageTk.PhotoImage(base)
         self._tk_photos["header"] = tk_hdr
@@ -1920,7 +1935,7 @@ class UnifiedDashboard(ctk.CTk):
             if IS_MAC:
                 try:
                     import AppKit
-                    AppKit.NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+                    AppKit.NSRunningApplication.currentApplication().activateWithOptions_(2)
                 except Exception:
                     pass
             self.attributes("-topmost", True)

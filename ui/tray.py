@@ -1,10 +1,71 @@
 import io
 import os
-import sys
 import threading
 from PIL import Image, ImageDraw
 
 from core.platform_utils import IS_MAC, get_resource_path
+
+_MAC_MENU_CLS = None
+
+
+def _get_mac_menu_cls(Foundation, objc):
+    global _MAC_MENU_CLS
+    if _MAC_MENU_CLS is not None:
+        return _MAC_MENU_CLS
+    try:
+        existing = objc.lookUpClass("SoulsLightsMenuTarget")
+        if existing is not None:
+            _MAC_MENU_CLS = existing
+            return _MAC_MENU_CLS
+    except Exception:
+        pass
+
+    class SoulsLightsMenuTarget(Foundation.NSObject):
+        def init(self):
+            self = objc.super(SoulsLightsMenuTarget, self).init()
+            if self is not None:
+                self._mgr = None
+            return self
+
+        def onShow_(self, _sender):
+            if self._mgr:
+                self._mgr.on_show_dashboard()
+
+        def onToggleMaster_(self, _sender):
+            if self._mgr:
+                self._mgr.on_toggle_master()
+
+        def onToggleAmbient_(self, _sender):
+            if self._mgr:
+                self._mgr.on_toggle_ambient()
+
+        def onToggleLyrics_(self, _sender):
+            if self._mgr:
+                self._mgr.on_toggle_lyrics()
+
+        def onToggleBackdrop_(self, _sender):
+            if self._mgr and self._mgr.on_toggle_backdrop:
+                self._mgr.on_toggle_backdrop()
+
+        def onToggleLock_(self, _sender):
+            if self._mgr:
+                self._mgr.on_toggle_lock_lyrics()
+
+        def onPreset_(self, sender):
+            if self._mgr:
+                key = str(sender.representedObject() or "studio")
+                self._mgr.on_select_preset(key)
+
+        def onRestart_(self, _sender):
+            if self._mgr:
+                self._mgr.on_restart_engines()
+
+        def onQuit_(self, _sender):
+            if self._mgr:
+                self._mgr.on_exit_all()
+
+    _MAC_MENU_CLS = SoulsLightsMenuTarget
+    return _MAC_MENU_CLS
 
 
 def create_tray_icon_image(size=64):
@@ -114,39 +175,9 @@ class SystemTrayManager:
             import Foundation
             import AppKit
 
-            mgr = self
-
-            class SoulsLightsMenuTarget(Foundation.NSObject):
-                def onShow_(self, _sender):
-                    mgr.on_show_dashboard()
-
-                def onToggleMaster_(self, _sender):
-                    mgr.on_toggle_master()
-
-                def onToggleAmbient_(self, _sender):
-                    mgr.on_toggle_ambient()
-
-                def onToggleLyrics_(self, _sender):
-                    mgr.on_toggle_lyrics()
-
-                def onToggleBackdrop_(self, _sender):
-                    if mgr.on_toggle_backdrop:
-                        mgr.on_toggle_backdrop()
-
-                def onToggleLock_(self, _sender):
-                    mgr.on_toggle_lock_lyrics()
-
-                def onPreset_(self, sender):
-                    key = str(sender.representedObject() or "studio")
-                    mgr.on_select_preset(key)
-
-                def onRestart_(self, _sender):
-                    mgr.on_restart_engines()
-
-                def onQuit_(self, _sender):
-                    mgr.on_exit_all()
-
-            delegate = SoulsLightsMenuTarget.alloc().init()
+            target_cls = _get_mac_menu_cls(Foundation, objc)
+            delegate = target_cls.alloc().init()
+            delegate._mgr = self
             self._mac_delegate = delegate
 
             status_bar = AppKit.NSStatusBar.systemStatusBar()
@@ -210,6 +241,8 @@ class SystemTrayManager:
 
     def stop(self):
         if IS_MAC:
+            if self._mac_delegate is not None:
+                self._mac_delegate._mgr = None
             if self._mac_status_item is not None:
                 item = self._mac_status_item
                 self._mac_status_item = None

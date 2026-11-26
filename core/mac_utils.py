@@ -234,6 +234,14 @@ def _get_draggable_view_class():
     if _DRAGGABLE_VIEW_CLS is not None or not HAS_MAC_OBJC:
         return _DRAGGABLE_VIEW_CLS
 
+    try:
+        existing = objc.lookUpClass("SoulsLightsOverlayView")
+        if existing is not None:
+            _DRAGGABLE_VIEW_CLS = existing
+            return _DRAGGABLE_VIEW_CLS
+    except Exception:
+        pass
+
     class SoulsLightsOverlayView(AppKit.NSView):
         def initWithFrame_(self, frame):
             self = objc.super(SoulsLightsOverlayView, self).initWithFrame_(frame)
@@ -315,7 +323,7 @@ class MacOverlayWindow:
         self._pending_frame = None
         self._flush_queued = False
 
-        run_on_main(self._create_on_main, wait=True, timeout=2.0)
+        run_on_main(self._create_on_main, wait=False)
 
     def _window_level(self) -> int:
         if not HAS_MAC_OBJC:
