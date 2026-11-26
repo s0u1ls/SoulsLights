@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SoulsLights — Synced Desktop Lyrics & Ambient Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg: #030407;
+      --card-bg: rgba(18, 22, 31, 0.65);
+      --card-border: rgba(255, 255, 255, 0.09);
+      --card-border-hover: rgba(255, 255, 255, 0.28);
+      --pill-bg: rgba(25, 30, 42, 0.75);
+      --pill-border: rgba(255, 255, 255, 0.12);
+      --text: #F3F5F9;
+      --text-muted: #8E97A8;
+      --accent-cyan: #4EE0F5;
+      --accent-coral: #FF7B54;
+      --accent-emerald: #30D158;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+
+    /* Ambient Dual Blob Canvas */
+    .ambient-canvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .blob-1 {
+      position: absolute;
+      top: -15%;
+      left: -10%;
+      width: 55vw;
+      height: 55vw;
+      background: radial-gradient(circle, rgba(16, 75, 120, 0.45) 0%, rgba(3, 4, 7, 0) 70%);
+      filter: blur(80px);
+      animation: driftLeft 16s ease-in-out infinite alternate;
+    }
+    .blob-2 {
+      position: absolute;
+      top: 5%;
+      right: -10%;
+      width: 50vw;
+      height: 50vw;
+      background: radial-gradient(circle, rgba(180, 85, 45, 0.35) 0%, rgba(3, 4, 7, 0) 70%);
+      filter: blur(80px);
+      animation: driftRight 18s ease-in-out infinite alternate;
+    }
+
+    @keyframes driftLeft {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(8%, 12%) scale(1.08); }
+    }
+    @keyframes driftRight {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(-10%, 15%) scale(1.12); }
+    }
+
+    /* Noise overlay */
+    .noise {
+      position: fixed;
+      inset: 0;
+      opacity: 0.04;
+      pointer-events: none;
+      z-index: 1;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 28px;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Header Nav */
+    header {
+      padding: 24px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #fff;
+      text-decoration: none;
+    }
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #2D82B7, #FF8360);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 4px 18px rgba(45, 130, 183, 0.4);
+    }
+    .nav-pill {
+      background: var(--pill-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--pill-border);
+      padding: 6px 14px;
+      border-radius: 24px;
+      display: flex;
+      gap: 18px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .nav-pill a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-pill a:hover { color: #fff; }
+
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      padding: 70px 0 40px;
+    }
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 6px 16px;
+      border-radius: 30px;
+      font-size: 13px;
+      color: #D3E0EC;
+      margin-bottom: 24px;
+      backdrop-filter: blur(10px);
+    }
+    .badge-pill span.dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 10px var(--accent-emerald);
+    }
+    .hero h1 {
+      font-size: clamp(42px, 6vw, 68px);
+      font-weight: 800;
+      letter-spacing: -1.8px;
+      line-height: 1.08;
+      margin-bottom: 20px;
+      background: linear-gradient(180deg, #FFFFFF 20%, #A4B3C6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      font-size: clamp(16px, 2vw, 19px);
+      color: var(--text-muted);
+      max-width: 640px;
+      margin: 0 auto 36px;
+      font-weight: 400;
+    }
+    .cta-group {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 28px;
+      border-radius: 40px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: #FFFFFF;
+      color: #080A0F;
+      box-shadow: 0 6px 30px rgba(255, 255, 255, 0.25);
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 36px rgba(255, 255, 255, 0.35);
+      background: #FAFAFC;
+    }
+    .btn-secondary {
+      background: var(--pill-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--pill-border);
+      color: var(--text);
+    }
+    .btn-secondary:hover {
+      background: rgba(35, 42, 58, 0.9);
+      border-color: rgba(255, 255, 255, 0.25);
+      transform: translateY(-2px);
+    }
+
+    /* Live Hero Mockup Stage (Picture 1 style) */
+    .stage-wrapper {
+      margin: 50px auto 90px;
+      background: linear-gradient(135deg, rgba(14, 58, 92, 0.85) 0%, rgba(145, 75, 42, 0.85) 100%);
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7);
+      position: relative;
+      overflow: hidden;
+      aspect-ratio: 16 / 9.5;
+      max-height: 520px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 32px;
+    }
+    .stage-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .stage-pills {
+      background: rgba(18, 22, 32, 0.65);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 6px 14px;
+      border-radius: 30px;
+      display: flex;
+      gap: 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #CAD5E2;
+    }
+    .stage-center {
+      position: absolute;
+      top: 48%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    .stage-center .prev-word {
+      font-size: 26px;
+      color: rgba(210, 226, 242, 0.55);
+      margin-right: 18px;
+    }
+    .stage-center .highlight-word {
+      display: inline-block;
+      font-size: 42px;
+      font-weight: 800;
+      background: #FFFFFF;
+      color: #0E121B;
+      padding: 2px 20px;
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+      letter-spacing: -0.5px;
+    }
+    .stage-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .stage-info .sub-cat {
+      font-size: 13px;
+      color: #CAD5E2;
+      margin-bottom: 2px;
+    }
+    .stage-info h3 {
+      font-family: 'Instrument Serif', serif;
+      font-size: 44px;
+      font-weight: 400;
+      line-height: 1.1;
+      letter-spacing: -0.5px;
+    }
+    .stage-info p {
+      font-size: 13px;
+      color: #B2C0D2;
+      margin-top: 4px;
+    }
+
+    /* Style Grid Section */
+    .section-title {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.6px;
+      margin-bottom: 8px;
+    }
+    .section-subtitle {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin-bottom: 36px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 22px;
+      margin-bottom: 100px;
+    }
+    .style-card {
+      background: var(--card-bg);
+      border-radius: 20px;
+      border: 1px solid var(--card-border);
+      overflow: hidden;
+      backdrop-filter: blur(14px);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+    .style-card:hover {
+      transform: translateY(-5px);
+      border-color: var(--card-border-hover);
+      box-shadow: 0 16px 38px rgba(0, 0, 0, 0.45);
+    }
+    .card-preview {
+      height: 150px;
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+    }
+    .card-info {
+      padding: 16px 18px 20px;
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+    .card-cat {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .card-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(255, 255, 255, 0.95);
+      color: #0E121B;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Features Section */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 28px;
+      margin-bottom: 110px;
+    }
+    .feature-box {
+      background: rgba(18, 22, 31, 0.45);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 32px;
+      backdrop-filter: blur(12px);
+    }
+    .feature-icon {
+      font-size: 30px;
+      margin-bottom: 16px;
+    }
+    .feature-box h4 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .feature-box p {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 40px 0 60px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    footer a { color: #fff; text-decoration: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Background Ambience -->
+  <div class="ambient-canvas">
+    <div class="blob-1"></div>
+    <div class="blob-2"></div>
+  </div>
+  <div class="noise"></div>
+
+  <div class="container">
+    
+    <!-- Header -->
+    <header>
+      <a href="#" class="brand">
+        <div class="brand-icon">✨</div>
+        SoulsLights
+      </a>
+      <div class="nav-pill">
+        <a href="#styles">Styles</a>
+        <a href="#features">Features</a>
+        <a href="https://github.com/s0u1ls/SoulsLights" target="_blank">GitHub</a>
+      </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="badge-pill">
+        <span class="dot"></span> 10 Synced Lyrics Motion Styles
+      </div>
+      <h1>Ultra-smooth desktop lyrics.<br>Ambient concert vibes.</h1>
+      <p>Transform your desktop into an audiovisual stage. Frame-accurate live lyrics sync paired with dual-blob audio-reactive screen glow.</p>
+      
+      <div class="cta-group">
+        <a href="https://github.com/s0u1ls/SoulsLights/releases/latest" class="btn btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.901-1.799"/></svg>
+          Download for Windows (.exe)
+        </a>
+        <a href="https://github.com/s0u1ls/SoulsLights/actions" class="btn btn-secondary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.61-.75 1.04-1.8 0.92-2.85-.9.04-2 .6-2.64 1.34-.56.65-1.05 1.71-.92 2.73 1.01.08 2.03-.47 2.64-1.22z"/></svg>
+          Download for macOS (.dmg)
+        </a>
+      </div>
+    </section>
+
+    <!-- Picture 1 Stage Mockup Preview -->
+    <div class="stage-wrapper">
+      <div class="stage-top">
+        <div class="stage-pills">
+          <span>Size</span>
+          <span>Font</span>
+          <span>Screen</span>
+          <span>Aesthetics</span>
+        </div>
+        <div class="stage-pills" style="color: #4EE0F5;">
+          <span>♫ Billie Eilish — BIRDS OF A FEATHER</span>
+        </div>
+      </div>
+
+      <div class="stage-center">
+        <span class="prev-word">clock</span>
+        <span class="highlight-word">Every</span>
+      </div>
+
+      <div class="stage-bottom">
+        <div class="stage-info">
+          <div class="sub-cat">Kinetic type</div>
+          <h3>Ship</h3>
+          <p>Words land one by one on a wall that drifts in 3D.</p>
+        </div>
+        <div class="stage-pills">
+          <span>🔒 Locked (Click-through)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10 Styles Grid -->
+    <div id="styles">
+      <h2 class="section-title">All 10 Lyrics Styles</h2>
+      <p class="section-subtitle">Tailored visual themes engineered for every genre and desktop mood.</p>
+
+      <div class="grid">
+        
+        <!-- Ship -->
+        <div class="style-card">
+          <div class="card-preview" style="background: linear-gradient(135deg, #0C3652, #9A4E24);">
+            <div class="card-badge">✓ Selected</div>
+            <div style="font-size: 20px; font-weight: 700; color: #fff; background: rgba(255,255,255,0.9); color: #000; padding: 2px 12px; border-radius: 6px;">city</div>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Ship</div>
+            <div class="card-cat">Kinetic type</div>
+          </div>
+        </div>
+
+        <!-- Fisheye -->
+        <div class="style-card">
+          <div class="card-preview" style="background: linear-gradient(135deg, #421054, #B2562E);">
+            <div style="font-size: 24px; font-weight: 800; transform: scaleY(1.3); letter-spacing: -1px;">morning</div>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Fisheye</div>
+            <div class="card-cat">Kinetic type</div>
+          </div>
+        </div>
+
+        <!-- Visual -->
+        <div class="style-card">
+          <div class="card-preview" style="background: linear-gradient(135deg, #0C4C42, #A8802A);">
+            <div style="font-size: 16px; font-weight: 600;">🌊 water, 🔥 fire</div>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Visual</div>
+            <div class="card-cat">Kinetic type</div>
+          </div>
+        </div>
+
+        <!-- Fisheye Visual -->
+        <div class="style-card">
+          <div class="card-preview" style="background: linear-gradient(135deg, #40163A, #A66238);">
+            <div style="font-size: 18px; font-weight: 700;">the moon 🌙</div>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Fisheye Visual</div>
+            <div class="card-cat">Kinetic type</div>
+          </div>
+        </div>
+
+        <!-- Codestyle -->
+        <div class="style-card">
+          <div class="card-preview" style="background: linear-gradient(135deg, #0E2A44, #762C22);">
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #E2E8F0;">till.the(road)<br><span style="color: #FF5A5A;">run |</span></div>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Codestyle</div>
+            <div class="card-cat">Motion scenes</div>
+          </div>
+        </div>
+
+        <!-- Codestyle Visual -->
+        <div class="style-card">
+          <div class="card-preview" style="background: linear-gradient(135deg, #181840, #923856);">
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px;">☀️ // morning<span style="background: #FF4A4A; color: transparent; margin-left: 4px;">_</span></div>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Codestyle Visual</div>
+            <div class="card-cat">Motion scenes</div>
+          </div>
+        </div>
+
+        <!-- Branches -->
+        <div class="style-card">
+          <div class="card-preview" style="background: linear-gradient(135deg, #0E3A2A, #308658);">
+            <svg width="180" height="40" viewBox="0 0 180 40">
+              <path d="M 10 20 Q 50 5, 90 20 T 170 20" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2"/>
+              <circle cx="90" cy="20" r="4" fill="#fff"/>
+            </svg>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Branches</div>
+            <div class="card-cat">Motion scenes</div>
+          </div>
+        </div>
+
+        <!-- Web -->
+        <div class="style-card">
+          <div class="card-preview" style="background: linear-gradient(135deg, #301E12, #B06024);">
+            <div style="font-size: 26px;">🕸️</div>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Web</div>
+            <div class="card-cat">Motion scenes</div>
+          </div>
+        </div>
+
+        <!-- Constellation -->
+        <div class="style-card">
+          <div class="card-preview" style="background: linear-gradient(135deg, #1A1642, #5C4892);">
+            <svg width="140" height="50" viewBox="0 0 140 50">
+              <line x1="20" y1="35" x2="70" y2="15" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+              <line x1="70" y1="15" x2="120" y2="30" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+              <circle cx="70" cy="15" r="5" fill="#FFE885"/>
+            </svg>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Constellation</div>
+            <div class="card-cat">Motion scenes</div>
+          </div>
+        </div>
+
+        <!-- Native Design -->
+        <div class="style-card">
+          <div class="card-preview" style="background: linear-gradient(135deg, #0E3056, #3076B0);">
+            <div style="background: #007AFF; color: #fff; padding: 6px 14px; border-radius: 14px; font-size: 11px; max-width: 140px;">
+              dance with me till the morning
+            </div>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Native Design</div>
+            <div class="card-cat">Phone screens</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Features -->
+    <div id="features">
+      <h2 class="section-title">Engineered for Perfection</h2>
+      <p class="section-subtitle">A native, lightweight visual experience that stays out of your way.</p>
+
+      <div class="features-grid">
+        <div class="feature-box">
+          <div class="feature-icon">⚡</div>
+          <h4>Zero Setup Auto-Sync</h4>
+          <p>Listens directly to Windows SMTC & macOS media sessions. Works out-of-the-box with Spotify, Apple Music, YouTube Music, and browsers without API keys or sign-ins.</p>
+        </div>
+
+        <div class="feature-box">
+          <div class="feature-icon">🖱️</div>
+          <h4>Transparent Click-Through</h4>
+          <p>Hit the lock icon to pass all mouse clicks straight through to windows behind. Keep writing code, gaming, or studying while lyrics drift across your desktop.</p>
+        </div>
+
+        <div class="feature-box">
+          <div class="feature-icon">🌈</div>
+          <h4>Dual-Blob Color Extraction</h4>
+          <p>Dynamically samples dominant and secondary hues from your playing track’s album artwork, projecting gentle, organic light gradients across your screen.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>© 2026 SoulsLights Studio • Open source under the <a href="https://github.com/s0u1ls/SoulsLights/blob/main/LICENSE">MIT License</a></p>
+    </footer>
+
+  </div>
+
+</body>
+</html>
