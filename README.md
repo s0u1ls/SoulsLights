@@ -71,3 +71,39 @@
 ```bash
 git clone [https://github.com/YOUR_USERNAME/SoulsLights.git](https://github.com/YOUR_USERNAME/SoulsLights.git)
 cd SoulsLights
+```
+
+### 2. Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
+Core dependencies include `customtkinter`, `pillow`, `winrt-Windows.Media.Control`, `pystray`, and `pyinstaller`.
+
+### 3. Run in development mode
+```bash
+python main.py
+```
+
+### 4. Build the executable
+```bash
+python build_exe.py
+```
+
+The standalone binary is output to `dist/SoulsLights.exe`.
+
+---
+
+## 🎛️ Studio Controls
+
+- **`Size`:** Adjust lyric font size, overlay scale, and spacing margins.
+- **`Font`:** Switch between system fonts (such as Segoe UI, Georgia, Consolas, and Trebuchet).
+- **`Screen`:** Choose which monitor displays the overlay in multi-monitor setups.
+- **`Aesthetics`:** Tune blur radius, ambient glow intensity, and background opacity.
+- **`↻ Force Refresh`:** Re-fetch and re-align lyric timestamps on demand.
+
+---
+
+## 📄 License
+
+Distributed under the [MIT License](LICENSE).
