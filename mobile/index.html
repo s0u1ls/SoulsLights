@@ -44,17 +44,26 @@
 
     .edge-glow {
       position:fixed; inset:0; z-index:5; pointer-events:none;
-      box-shadow:inset 0 0 22px 2px var(--c1);
-      animation:glowPulse 3.2s ease-in-out infinite alternate;
+      box-shadow:inset 0 0 var(--glow-blur, 28px) var(--glow-spread, 3px) var(--c1);
       transition:opacity .4s ease;
     }
-    .edge-glow i { position:absolute; display:block; pointer-events:none; }
-    .eg-t { top:0; left:0; right:0; height:28px; background:linear-gradient(180deg, var(--c1), transparent); }
-    .eg-b { bottom:0; left:0; right:0; height:28px; background:linear-gradient(0deg, var(--c2), transparent); }
-    .eg-l { top:0; bottom:0; left:0; width:28px; background:linear-gradient(90deg, var(--c3), transparent); }
-    .eg-r { top:0; bottom:0; right:0; width:28px; background:linear-gradient(270deg, var(--c1), transparent); }
-    @keyframes glowPulse { 0%{opacity:.72} 100%{opacity:1} }
-    .edge-glow.off { opacity:0 !important; animation:none; }
+    .edge-glow i { position:absolute; display:block; pointer-events:none; transition:width .35s ease, height .35s ease; }
+    .eg-t { top:0; left:0; right:0; height:var(--glow-px, 28px); background:linear-gradient(180deg, var(--c1), transparent); }
+    .eg-b { bottom:0; left:0; right:0; height:var(--glow-px, 28px); background:linear-gradient(0deg, var(--ec2, var(--c2)), transparent); }
+    .eg-l { top:0; bottom:0; left:0; width:var(--glow-px, 28px); background:linear-gradient(90deg, var(--ec3, var(--c3)), transparent); }
+    .eg-r { top:0; bottom:0; right:0; width:var(--glow-px, 28px); background:linear-gradient(270deg, var(--c1), transparent); }
+    .edge-glow.flow-water { animation:glowWater 2.8s ease-in-out infinite alternate; }
+    .edge-glow.flow-water .eg-t, .edge-glow.flow-water .eg-b { animation:waterX 3.4s ease-in-out infinite alternate; }
+    .edge-glow.flow-liquid { animation:glowLiquid 5s linear infinite; }
+    .edge-glow.flow-beat { animation:glowBeat 0.72s cubic-bezier(.22,1,.36,1) infinite alternate; }
+    .edge-glow.flow-breath { animation:glowBreath 4.8s ease-in-out infinite; }
+    .edge-glow.flow-static { opacity:.92; }
+    @keyframes glowWater { 0%{opacity:.7} 100%{opacity:1} }
+    @keyframes waterX { 0%{opacity:.65} 50%{opacity:1} 100%{opacity:.72} }
+    @keyframes glowLiquid { 0%{filter:hue-rotate(0deg) saturate(1.25)} 50%{filter:hue-rotate(48deg) saturate(1.55)} 100%{filter:hue-rotate(0deg) saturate(1.25)} }
+    @keyframes glowBeat { 0%{opacity:.42;transform:scale(1)} 100%{opacity:1;transform:scale(0.996)} }
+    @keyframes glowBreath { 0%,100%{opacity:.36} 50%{opacity:1} }
+    .edge-glow.off { opacity:0 !important; animation:none !important; }
 
     #stage {
       position:fixed; inset:0; z-index:3;
@@ -63,6 +72,23 @@
       text-align:center; cursor:pointer;
     }
     .lyric-wrap { max-width:min(92vw, 960px); transition:transform .38s cubic-bezier(.22,1.25,.36,1); }
+    .fe-dome { perspective:880px; width:min(94vw, 960px); display:flex; flex-direction:column; align-items:center; gap:clamp(8px,1.8vh,18px); }
+    .fe-dome.tr-l { animation:feL .32s cubic-bezier(.22,1.35,.36,1) both; }
+    .fe-dome.tr-r { animation:feR .32s cubic-bezier(.22,1.35,.36,1) both; }
+    .fe-dome.tr-u { animation:feU .30s cubic-bezier(.22,1.35,.36,1) both; }
+    .fe-dome.tr-z { animation:feZ .32s cubic-bezier(.22,1.35,.36,1) both; }
+    @keyframes feL { from{opacity:.25;transform:translateX(75px) scale(.92)} to{opacity:1;transform:none} }
+    @keyframes feR { from{opacity:.25;transform:translateX(-75px) scale(.92)} to{opacity:1;transform:none} }
+    @keyframes feU { from{opacity:.25;transform:translateY(38px) scale(.92)} to{opacity:1;transform:none} }
+    @keyframes feZ { from{opacity:.15;transform:scale(.68)} to{opacity:1;transform:none} }
+    .fe-row { display:flex; flex-wrap:wrap; justify-content:center; align-items:baseline; gap:.2em .34em; transform-style:preserve-3d; }
+    .fe-w { display:inline-flex; align-items:center; gap:.16em; font-weight:800; line-height:1.18; letter-spacing:-.025em; transition:transform .24s cubic-bezier(.22,1.45,.36,1), color .18s ease, opacity .18s ease, filter .2s ease; }
+    .fe-w.todo { color:rgba(205,215,235,.46); transform:scale(.86); text-shadow:0 4px 16px rgba(0,0,0,.5); }
+    .fe-w.done { color:color-mix(in srgb, #fff 62%, var(--accent)); transform:scale(.95); text-shadow:0 5px 18px rgba(0,0,0,.55); }
+    .fe-w.act { color:#fff; transform:translateY(-9px) scale(1.26); text-shadow:-3px 0 14px rgba(255,95,95,.82), 3px 0 14px rgba(95,145,255,.82), 0 0 28px var(--accent), 0 10px 28px rgba(0,0,0,.65); }
+    .fe-ico { font-size:.76em; filter:drop-shadow(0 0 12px var(--accent)); animation:icoPop .28s cubic-bezier(.2,1.5,.36,1) both; }
+    @keyframes icoPop { from{transform:scale(.4) rotate(-14deg);opacity:0} to{transform:scale(1) rotate(0);opacity:1} }
+    .fe-whisper { margin-top:10px; font-size:clamp(13px,2vw,18px); color:rgba(220,226,242,.62); background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.11); padding:6px 18px; border-radius:999px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); max-width:86vw; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .lyric-line {
       font-size:clamp(28px, 5.2vw, 56px); font-weight:800; line-height:1.24; letter-spacing:-0.02em;
       display:flex; flex-wrap:wrap; justify-content:center; gap:.22em .3em; text-shadow:0 6px 26px rgba(0,0,0,.58);
@@ -224,6 +250,7 @@
       <span id="tDur">0:00</span>
     </div>
     <div class="chips" id="styleChips"></div>
+    <div class="chips" id="glowChips"></div>
     <div class="chips" id="scriptChips"></div>
   </div>
 
@@ -273,6 +300,9 @@ let state = {
   accent:"#EC4899", lyrics_style: localStorage.getItem("sl_style") || "Fisheye Visual",
   script_mode: localStorage.getItem("sl_script") || "Auto",
   glow_enabled: localStorage.getItem("sl_glow") !== "0",
+  flow_mode: localStorage.getItem("sl_flow") || "Water Drop",
+  glow_intensity: Number(localStorage.getItem("sl_glow_int") || 1.35),
+  gradient_mode: localStorage.getItem("sl_grad") || "Multi Colors",
   backdrop_mode:"Desktop Layer", lyrics:[], styles:STYLES, lyrics_status:"Idle"
 };
 let lastPollAt = performance.now();
@@ -457,11 +487,14 @@ function parseLrc(lrc){
     const end = Math.max(ln.time + 0.5, Math.min(ln.time + 7.5, nextT - 0.1));
     const ws = ln.text.split(/\s+/).filter(Boolean);
     const dur = Math.max(0.3, end - ln.time);
-    const words = ws.map((w, wi)=>({
-      word: w, icon: wordIcon(w),
-      start: ln.time + (wi/Math.max(1,ws.length))*dur,
-      end: ln.time + ((wi+1)/Math.max(1,ws.length))*dur
-    }));
+    const wts = ws.map(w => Math.max(1.2, Math.pow(w.replace(/[^\w\u0900-\u0d7f]/g,"").length || 2, 0.72) + (/[,.!?]$/.test(w) ? 1.5 : 0)));
+    const totWt = wts.reduce((a,b)=>a+b, 0) || 1;
+    let curT = ln.time;
+    const words = ws.map((w, wi)=>{
+      const wd = dur * (wts[wi] / totWt);
+      const st = curT; curT += wd;
+      return { word: w, icon: wordIcon(w), start: st, end: st + wd };
+    });
     return {time: ln.time, end, text: ln.text, words};
   });
 }
@@ -512,11 +545,23 @@ async function fetchLrclib(title, artist, album, dur){
 
 function applyTheme(){
   const cols = state.colors || ["#6366F1","#EC4899","#8B5CF6"];
-  document.documentElement.style.setProperty("--c1", cols[0] || "#6366F1");
-  document.documentElement.style.setProperty("--c2", cols[1] || cols[0] || "#EC4899");
-  document.documentElement.style.setProperty("--c3", cols[2] || cols[1] || "#8B5CF6");
-  document.documentElement.style.setProperty("--accent", state.accent || cols[1] || "#EC4899");
-  document.getElementById("edgeGlow").className = "edge-glow" + (state.glow_enabled ? "" : " off");
+  const isOne = (state.gradient_mode === "1 Color");
+  const acc = state.accent || cols[1] || cols[0] || "#EC4899";
+  const c1 = isOne ? acc : (cols[0] || "#6366F1");
+  const c2 = isOne ? acc : (cols[1] || cols[0] || "#EC4899");
+  const c3 = isOne ? acc : (cols[2] || cols[1] || "#8B5CF6");
+  document.documentElement.style.setProperty("--c1", c1);
+  document.documentElement.style.setProperty("--c2", c2);
+  document.documentElement.style.setProperty("--c3", c3);
+  document.documentElement.style.setProperty("--ec2", c2);
+  document.documentElement.style.setProperty("--ec3", c3);
+  document.documentElement.style.setProperty("--accent", acc);
+  const gi = Math.max(0.4, Math.min(2.6, Number(state.glow_intensity || 1.35)));
+  document.documentElement.style.setProperty("--glow-px", Math.round(14 + gi * 18) + "px");
+  document.documentElement.style.setProperty("--glow-blur", Math.round(14 + gi * 22) + "px");
+  document.documentElement.style.setProperty("--glow-spread", Math.round(1 + gi * 4) + "px");
+  const flowCls = ({"Water Drop":"flow-water","Liquid Flow":"flow-liquid","Beat Pulse":"flow-beat","Breathing":"flow-breath","Static":"flow-static"})[state.flow_mode || "Water Drop"] || "flow-water";
+  document.getElementById("edgeGlow").className = "edge-glow " + flowCls + (state.glow_enabled ? "" : " off");
   document.getElementById("backdrop").style.opacity = state.backdrop_mode === "Off" ? "0.18" : "0.85";
   const gb = document.getElementById("glowBtn"); if(gb){ gb.textContent = state.glow_enabled ? "Glow: On" : "Glow: Off"; gb.style.opacity = state.glow_enabled ? "1" : "0.55"; }
   const lb = document.getElementById("lyrBtn"); if(lb) lb.style.opacity = (state.lyrics_enabled !== false) ? "1" : "0.5";
@@ -529,6 +574,17 @@ function buildChips(){
   document.getElementById("styleChips").innerHTML = list.map(st =>
     `<button class="chip ${st===state.lyrics_style?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_style','${esc(st)}')">${esc(st)}</button>`
   ).join("");
+  const flows = ["Water Drop", "Liquid Flow", "Beat Pulse", "Breathing", "Static"];
+  const curF = state.flow_mode || "Water Drop";
+  const curGi = Number(state.glow_intensity || 1.35);
+  const ints = [[0.55,"Subtle"],[1.1,"Normal"],[1.7,"Bright"],[2.4,"Max"]];
+  const nearGi = ints.reduce((a,b)=>Math.abs(b[0]-curGi)<Math.abs(a[0]-curGi)?b:a)[0];
+  const isOne = (state.gradient_mode === "1 Color");
+  document.getElementById("glowChips").innerHTML =
+    flows.map(fl => `<button class="chip ${fl===curF?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_flow_mode','${fl}')">Flow: ${fl}</button>`).join("") +
+    ints.map(([v,lbl]) => `<button class="chip ${v===nearGi?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_glow_intensity',${v})">${lbl}</button>`).join("") +
+    `<button class="chip ${!isOne?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_gradient_mode','Multi Colors')">Multi Color</button>` +
+    `<button class="chip ${isOne?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_gradient_mode','1 Color')">1 Color</button>`;
   const fSc = (state.font_scale || 1.0).toFixed(1);
   document.getElementById("scriptChips").innerHTML = [
     ["Auto","Auto"],["Native","Native"],["Romanized","Roman"]
@@ -561,6 +617,9 @@ async function sendCtrl(action, value){
   if(action === "set_style"){ state.lyrics_style = value; setStore("sl_style", value); lastRenderKey=""; buildChips(); return; }
   if(action === "set_script_mode"){ state.script_mode = value; setStore("sl_script", value); spLastTrackKey=""; lastRenderKey=""; buildChips(); pollState(); return; }
   if(action === "toggle_glow"){ state.glow_enabled = !state.glow_enabled; setStore("sl_glow", state.glow_enabled?"1":"0"); applyTheme(); return; }
+  if(action === "set_flow_mode"){ state.flow_mode = value; setStore("sl_flow", value); applyTheme(); buildChips(); return; }
+  if(action === "set_glow_intensity"){ state.glow_intensity = Number(value)||1.35; setStore("sl_glow_int", String(state.glow_intensity)); applyTheme(); buildChips(); return; }
+  if(action === "set_gradient_mode"){ state.gradient_mode = value; setStore("sl_grad", value); applyTheme(); buildChips(); return; }
   if(action === "toggle_lyrics"){ state.lyrics_enabled = !(state.lyrics_enabled !== false); applyTheme(); return; }
   if(action === "cycle_backdrop"){ state.backdrop_mode = state.backdrop_mode === "Off" ? "Desktop Layer" : "Off"; applyTheme(); buildChips(); return; }
   if(action === "nudge_offset"){ state.offset_sec = Math.max(-5, Math.min(5, (state.offset_sec||0) + value/1000)); lastRenderKey=""; buildChips(); return; }
@@ -590,9 +649,11 @@ function setArtBackdrop(src){
 async function pollState(){
   if(mode === "local"){
     try {
+      const t0 = performance.now();
       const r = await fetch("/api/state", {cache:"no-store"});
       if(!r.ok) return;
-      state = await r.json(); lastPollAt = performance.now();
+      state = await r.json();
+      lastPollAt = (t0 + performance.now()) * 0.5;
       applyTheme();
       document.getElementById("mTitle").textContent = state.title || "No Active Music";
       document.getElementById("mArtist").textContent = (state.artist||"") + (state.source?` • ${state.source}`:"");
@@ -616,6 +677,7 @@ async function pollState(){
     return;
   }
   try {
+    const t0 = performance.now();
     let r = await fetch("https://api.spotify.com/v1/me/player?additional_types=track", {headers:{Authorization:`Bearer ${tok}`}});
     if(r.status === 401){
       tok = await getSpotifyToken(true);
@@ -650,7 +712,7 @@ async function pollState(){
     state.is_playing = !!p.is_playing; state.status = p.is_playing ? "Playing" : "Paused";
     state.position_sec = (p.progress_ms || 0) / 1000.0;
     state.duration_sec = (item.duration_ms || 0) / 1000.0;
-    lastPollAt = performance.now();
+    lastPollAt = (t0 + performance.now()) * 0.5;
 
     document.getElementById("mTitle").textContent = title;
     document.getElementById("mArtist").textContent = `${artist} • Spotify`;
@@ -809,12 +871,48 @@ function renderFrame(){
       const bx=((b*197+idx*53)%760)+20, by=((b*131+idx*29)%400)+20, br=(b%5===0)?2.1:(b%2===0?1.3:0.8);
       svg+=`<circle cx="${bx}" cy="${by}" r="${br}" fill="rgba(225,235,255,${b%4===0?.52:.2})"/>`;
     }
-    const pts = words.map((w,wi)=>{
-      const u = words.length>1 ? wi/(words.length-1) : 0.5;
-      const sx = 95 + (W-190)*u + Math.sin(wi*2.7+idx)*32;
-      const sy = H*0.5 + Math.sin(wi*1.9 + idx*1.3)*120 + Math.cos(wi*3.1)*26;
-      return {x:Math.max(80,Math.min(W-80,sx)), y:Math.max(60,Math.min(H-50,sy)), w:w.word};
-    });
+    // Non-overlapping random placement + relaxation pass so Constellation words never overlap
+    const placed = [];
+    const nW = words.length;
+    for(let wi=0; wi<nW; wi++){
+      const wTxt = words[wi].word || "";
+      const hw = Math.max(54, wTxt.length * 9 + 24), hh = 34;
+      const secW = (W - 180) / Math.max(1, nW);
+      const sxLo = Math.max(75 + hw*0.4, Math.round(90 + wi * secW * 0.88));
+      const sxHi = Math.min(W - 75 - hw*0.4, Math.max(sxLo + 24, Math.round(sxLo + secW * 1.25)));
+      let seed = ((idx + 1) * 73856093) ^ ((wi + 1) * 19349663) ^ 0x5A17;
+      const nxtR = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+      let bestX = (sxLo + sxHi) * 0.5, bestY = H * 0.5, bestScore = -1e9;
+      for(let a=0; a<45; a++){
+        const cx = (a < 25) ? (sxLo + nxtR() * (sxHi - sxLo)) : (90 + nxtR() * (W - 180));
+        const cy = 72 + nxtR() * (H - 135);
+        if(!placed.length){ bestX=cx; bestY=cy; break; }
+        let ov = 0, minGap = 1e9;
+        for(const q of placed){
+          const ox = (hw + q.hw + 14) - Math.abs(cx - q.x);
+          const oy = (hh + q.hh + 12) - Math.abs(cy - q.y);
+          if(ox > 0 && oy > 0) ov += ox * oy;
+          minGap = Math.min(minGap, Math.hypot(cx - q.x, cy - q.y));
+        }
+        const sc = -1e5 * ov + minGap;
+        if(sc > bestScore){ bestScore = sc; bestX = cx; bestY = cy; }
+      }
+      placed.push({x:bestX, y:bestY, hw, hh, w:wTxt});
+    }
+    for(let it=0; it<14; it++){
+      for(let i=0; i<placed.length; i++){
+        for(let j=i+1; j<placed.length; j++){
+          const a = placed[i], b = placed[j];
+          const ox = (a.hw + b.hw + 14) - Math.abs(a.x - b.x);
+          const oy = (a.hh + b.hh + 12) - Math.abs(a.y - b.y);
+          if(ox > 0 && oy > 0){
+            if(ox < oy){ const p = ox*0.52*(a.x<b.x?-1:1); a.x = Math.max(80,Math.min(W-80,a.x+p)); b.x = Math.max(80,Math.min(W-80,b.x-p)); }
+            else { const p = oy*0.52*(a.y<b.y?-1:1); a.y = Math.max(64,Math.min(H-50,a.y+p)); b.y = Math.max(64,Math.min(H-50,b.y-p)); }
+          }
+        }
+      }
+    }
+    const pts = placed;
     for(let i=0;i<pts.length-1;i++){
       if(i < wIdx){
         const isLast = (i === wIdx - 1);
@@ -830,7 +928,7 @@ function renderFrame(){
       } else {
         svg+=`<circle cx="${p.x}" cy="${p.y}" r="${done?4.5:2.5}" fill="${done?'var(--accent)':'rgba(215,228,255,.42)'}"/>`;
       }
-      svg+=`<text x="${p.x}" y="${p.y-20}" text-anchor="middle" fill="${act?'#fff':done?'rgba(235,244,255,.85)':'rgba(195,210,235,.4)'}" font-size="${act?27:16}" font-weight="${act?800:600}" ${act?'filter="url(#stGlow)"':''}>${esc(p.w)}</text>`;
+      svg+=`<text x="${p.x}" y="${p.y-20}" text-anchor="middle" fill="${act?'#fff':done?'rgba(235,244,255,.85)':'rgba(195,210,235,.4)'}" font-size="${act?26:16}" font-weight="${act?800:600}" ${act?'filter="url(#stGlow)"':''}>${esc(p.w)}</text>`;
     });
     stage.innerHTML = `<svg class="svg-stage" viewBox="0 0 ${W} ${H}">${svg}</svg>`;
     return;
@@ -858,12 +956,35 @@ function renderFrame(){
     return;
   }
 
-  const tilt = style.startsWith("Fisheye") ? lineTiltDeg(`${state.artist}-${state.title}`, idx) : 0;
+  if(style.startsWith("Fisheye")){
+    const nw = words.length;
+    let chunks = [[0, nw]];
+    if(nw >= 8){ const c1=Math.ceil(nw/3), c2=c1+Math.ceil((nw-c1)/2); chunks=[[0,c1],[c1,c2],[c2,nw]]; }
+    else if(nw >= 4){ const s1=Math.ceil(nw/2); chunks=[[0,s1],[s1,nw]]; }
+    const trCls = ["tr-l","tr-r","tr-u","tr-z"][Math.abs((idx*7 + (state.title||"").length)) % 4];
+    const tilt = lineTiltDeg(`${state.artist}-${state.title}`, idx);
+    const fBase = nw >= 8 ? "clamp(24px,4.4vw,42px)" : (nw >= 4 ? "clamp(28px,5.2vw,52px)" : "clamp(34px,6.2vw,62px)");
+    const rowsHtml = chunks.map(([a,b], rIdx) => {
+      const rx = chunks.length === 1 ? 0 : (rIdx === 0 ? 7 : (rIdx === chunks.length - 1 ? -7 : 0));
+      const rowW = words.slice(a,b).map((w, j) => {
+        const wi = a + j;
+        const cls = wi < wIdx ? "done" : (wi === wIdx ? "act" : "todo");
+        const ico = (showIcons && w.icon && wi <= wIdx) ? `<span class="fe-ico">${w.icon}</span>` : "";
+        return `<span class="fe-w ${cls}">${esc(w.word)}${ico}</span>`;
+      }).join("");
+      return `<div class="fe-row" style="font-size:${fBase};transform:rotateX(${rx}deg)">${rowW}</div>`;
+    }).join("");
+    stage.innerHTML = `<div class="fe-dome ${trCls}" style="${tilt?`transform:rotate(${tilt.toFixed(2)}deg)`:''}">
+      ${rowsHtml}
+      ${nextTxt?`<div class="fe-whisper">${esc(nextTxt)}</div>`:""}
+    </div>`;
+    return;
+  }
+
   const wordHtml = words.map((w,wi)=>{
     const cls = wi<wIdx ? "done" : (wi===wIdx ? "act" : "todo");
     const ico = (showIcons && w.icon) ? `<span>${w.icon}</span>` : "";
-    const fsz = style.startsWith("Fisheye") ? `style="font-size:${wi===wIdx?'1.18em':(Math.abs(wi-wIdx)===1?'0.96em':'0.84em')}"` : "";
-    return `<span class="word ${cls}" ${fsz}>${esc(w.word)}${ico}</span>`;
+    return `<span class="word ${cls}">${esc(w.word)}${ico}</span>`;
   }).join("");
 
   if(style === "Apple Design"){
@@ -875,8 +996,8 @@ function renderFrame(){
     return;
   }
   const wrapCls = style === "Ship" ? "ship-wall" : "";
-  stage.innerHTML = `<div class="${wrapCls}"><div class="lyric-wrap" style="${tilt?`transform:rotate(${tilt.toFixed(2)}deg)`:''}">
-    ${prevTxt&&!style.startsWith("Fisheye")?`<div class="prev-ghost">${esc(prevTxt)}</div>`:""}
+  stage.innerHTML = `<div class="${wrapCls}"><div class="lyric-wrap">
+    ${prevTxt?`<div class="prev-ghost">${esc(prevTxt)}</div>`:""}
     <div class="lyric-line">${wordHtml||esc(cur.text)}</div>
     ${nextTxt?`<div class="sub-whisper" style="margin-inline:auto">${esc(nextTxt)}</div>`:""}
   </div></div>`;
@@ -884,7 +1005,7 @@ function renderFrame(){
 
 handleAuthCallback().then(()=>{
   applyTheme(); buildChips(); pollState();
-  setInterval(pollState, mode==="local" ? 350 : 1200);
+  setInterval(pollState, mode==="local" ? 220 : 900);
   requestAnimationFrame(renderFrame);
 });
 </script>

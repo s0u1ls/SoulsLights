@@ -123,6 +123,9 @@ class MobileCompanionServer:
             "lyrics_status": l_status,
             "lyrics_enabled": bool(cfg.get("lyrics_enabled", True)),
             "glow_enabled": bool(cfg.get("ambient_enabled", True)),
+            "flow_mode": amb.get("animation_mode", "Water Drop"),
+            "glow_intensity": float(amb.get("glow_intensity", 1.35)),
+            "gradient_mode": amb.get("gradient_mode", "Multi Colors"),
             "backdrop_mode": amb.get("album_backdrop", "Desktop Layer"),
             "backdrop_style": amb.get("backdrop_style", "2-Blob Aura"),
             "lyrics": lines,
@@ -194,6 +197,22 @@ class MobileCompanionServer:
             self.cfg_mgr.save_config()
             if self.engine:
                 self.engine.lyrics_engine.set_offset_ms(0)
+        elif act == "set_flow_mode" and val in ("Water Drop", "Liquid Flow", "Beat Pulse", "Breathing", "Static"):
+            self.cfg_mgr.config["ambient"]["animation_mode"] = val
+            self.cfg_mgr.save_config()
+            if self.engine:
+                self.engine.ambient_engine.set_animation_mode(val)
+        elif act == "set_glow_intensity" and val is not None:
+            gi = max(0.2, min(3.0, round(float(val), 2)))
+            self.cfg_mgr.config["ambient"]["glow_intensity"] = gi
+            self.cfg_mgr.save_config()
+            if self.engine:
+                self.engine.ambient_engine.set_intensity(gi)
+        elif act == "set_gradient_mode" and val in ("Multi Colors", "1 Color"):
+            self.cfg_mgr.config["ambient"]["gradient_mode"] = val
+            self.cfg_mgr.save_config()
+            if self.engine:
+                self.engine.ambient_engine.set_gradient_mode(val)
         elif act == "cycle_backdrop" and self.engine:
             self.engine.cycle_backdrop_mode()
         else:
