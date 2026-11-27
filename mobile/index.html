@@ -43,18 +43,18 @@
     @keyframes drift { 0%{transform:translate(0,0) scale(1)} 100%{transform:translate(5vw,-4vh) scale(1.14)} }
 
     .edge-glow {
-      position:fixed; inset:0; z-index:5; pointer-events:none; border-radius:20px;
-      padding:4px;
-      background:conic-gradient(from 0deg at 50% 50%, var(--c1), var(--c2), var(--c3), var(--c1));
-      -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-      -webkit-mask-composite:xor; mask-composite:exclude;
-      filter:blur(7px) saturate(1.4);
-      box-shadow:inset 0 0 36px 8px var(--c1), inset 0 0 64px 12px var(--c2);
-      animation:glowPulse 3.6s ease-in-out infinite alternate;
-      transition:opacity .45s ease;
+      position:fixed; inset:0; z-index:5; pointer-events:none;
+      box-shadow:inset 0 0 22px 2px var(--c1);
+      animation:glowPulse 3.2s ease-in-out infinite alternate;
+      transition:opacity .4s ease;
     }
-    @keyframes glowPulse { 0%{opacity:.78;filter:blur(6px) saturate(1.3)} 100%{opacity:1;filter:blur(10px) saturate(1.6)} }
-    .edge-glow.off { opacity:0 !important; }
+    .edge-glow i { position:absolute; display:block; pointer-events:none; }
+    .eg-t { top:0; left:0; right:0; height:28px; background:linear-gradient(180deg, var(--c1), transparent); }
+    .eg-b { bottom:0; left:0; right:0; height:28px; background:linear-gradient(0deg, var(--c2), transparent); }
+    .eg-l { top:0; bottom:0; left:0; width:28px; background:linear-gradient(90deg, var(--c3), transparent); }
+    .eg-r { top:0; bottom:0; right:0; width:28px; background:linear-gradient(270deg, var(--c1), transparent); }
+    @keyframes glowPulse { 0%{opacity:.72} 100%{opacity:1} }
+    .edge-glow.off { opacity:0 !important; animation:none; }
 
     #stage {
       position:fixed; inset:0; z-index:3;
@@ -198,7 +198,7 @@
     <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
     <div class="bg-scrim"></div>
   </div>
-  <div class="edge-glow" id="edgeGlow"></div>
+  <div class="edge-glow" id="edgeGlow"><i class="eg-t"></i><i class="eg-b"></i><i class="eg-l"></i><i class="eg-r"></i></div>
   <div id="stage"></div>
 
   <div id="hud">
@@ -479,8 +479,9 @@ async function fetchLrclib(title, artist, album, dur){
   const urls = [
     "https://lrclib.net/api/search?" + new URLSearchParams({track_name: cleanT, artist_name: cleanA}).toString(),
     "https://lrclib.net/api/search?" + new URLSearchParams({q: `${cleanT} ${cleanA}`.trim()}).toString(),
-    "https://lrclib.net/api/search?" + new URLSearchParams({q: cleanT}).toString(),
   ];
+  if(!cleanA) urls.push("https://lrclib.net/api/search?" + new URLSearchParams({q: cleanT}).toString());
+  const aToks = cleanA.toLowerCase().split(/[\s,&/]+/).filter(x=>x.length>=2);
   for(const u of urls){
     try {
       const r = await fetch(u);
@@ -488,12 +489,15 @@ async function fetchLrclib(title, artist, album, dur){
       if(Array.isArray(arr) && arr.length){
         const synced = arr.filter(x => x.syncedLyrics);
         if(!synced.length) continue;
-        synced.sort((a,b)=>{
-          const sa = detectScript(a.syncedLyrics), sb = detectScript(b.syncedLyrics);
-          const pa = (sm==="Native" && sa!=="roman") ? -20 : (sm==="Romanized" && sa==="roman" ? -20 : 0);
-          const pb = (sm==="Native" && sb!=="roman") ? -20 : (sm==="Romanized" && sb==="roman" ? -20 : 0);
-          return (Math.abs((a.duration||dur)-dur)+pa) - (Math.abs((b.duration||dur)-dur)+pb);
-        });
+        const scoreItem = x => {
+          const sa = detectScript(x.syncedLyrics);
+          const sp = (sm==="Native" && sa!=="roman") ? -20 : (sm==="Romanized" && sa==="roman" ? -20 : 0);
+          const an = String(x.artistName||"").toLowerCase();
+          const aMatch = aToks.length ? aToks.some(t=>an.includes(t)) : true;
+          const ap = aMatch ? -60 : 80;
+          return Math.abs((x.duration||dur)-dur) + sp + ap;
+        };
+        synced.sort((a,b)=>scoreItem(a)-scoreItem(b));
         let lines = parseLrc(synced[0].syncedLyrics);
         if(sm==="Romanized" && detectScript(lines.slice(0,6).map(x=>x.text).join(" ")) !== "roman"){
           lines = lines.map(ln=>({...ln, text:romanizeText(ln.text), words:ln.words.map(w=>({...w, word:romanizeWord(w.word)}))}));

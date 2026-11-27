@@ -1038,7 +1038,11 @@ class LyricsFetcher:
                     it_name = _tokens(item.get("trackName", ""))
                     it_art = _tokens(item.get("artistName", ""))
                     t_ov = (len(t_tokens & it_name) * 18) if t_tokens else 0
-                    a_ov = (len(a_tokens & it_art) * 20) if a_tokens else 0
+                    if a_tokens:
+                        a_hits = len(a_tokens & it_art)
+                        a_ov = (a_hits * 22) if a_hits > 0 else -75
+                    else:
+                        a_ov = 0
                     dur_diff = abs(float(item.get("duration") or 0) - duration) if duration > 10 and item.get("duration") else 0
                     dur_bonus = max(-35, 16 - int(dur_diff))
                     karaoke_pen = -45 if ("karaoke" in item.get("artistName", "").lower() and "karaoke" not in clean_a.lower()) else 0
