@@ -16,7 +16,16 @@ function json(obj, status = 200) {
 
 export default {
   async fetch(request, env) {
-    if (request.method === "OPTIONS") return json({}, 204);
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        },
+      });
+    }
     const url = new URL(request.url);
     const kv = env.SOULSLIGHTS_KV;
     const now = new Date().toISOString().replace("T", " ").slice(0, 19);
@@ -95,6 +104,43 @@ export default {
         },
         tokens, visits, downloads,
       });
+    }
+
+    if (url.pathname === "/api/admin/tokens" && request.method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      const act = String(body.action || "");
+      const tok = String(body.token || "").trim().toUpperCase();
+      const tokens = JSON.parse((await kv.get("tokens")) || "{}");
+      if (act === "generate") {
+        const count = Math.max(1, Math.min(100, Number(body.count || 10)));
+        const alpha = "ABCDEFGHJKLMNPQRSTUVWXYZ", digits = "23456789", both = alpha + digits;
+        const created = [];
+        for (let i = 0; i < count * 4 && created.length < count; i++) {
+          const arr = [];
+          for (let j = 0; j < 3; j++) arr.push(digits[Math.floor(Math.random() * digits.length)]);
+          for (let j = 0; j < 3; j++) arr.push(alpha[Math.floor(Math.random() * alpha.length)]);
+          for (let j = 0; j < 4; j++) arr.push(both[Math.floor(Math.random() * both.length)]);
+          arr.sort(() => Math.random() - 0.5);
+          const nt = arr.join("");
+          if (!tokens[nt]) {
+            tokens[nt] = { is_master: 0, used: 0, revoked: 0, uses: 0, used_by_machine: "", used_at: "", created_at: now };
+            created.push(nt);
+          }
+        }
+        await kv.put("tokens", JSON.stringify(tokens));
+        return json({ ok: true, created });
+      }
+      if (act === "revoke" && tok && tokens[tok] && !tokens[tok].is_master) tokens[tok].revoked = 1;
+      if (act === "unrevoke" && tok && tokens[tok]) tokens[tok].revoked = 0;
+      if (act === "reset" && tok && tokens[tok]) {
+        tokens[tok].used = 0; tokens[tok].used_by_machine = ""; tokens[tok].used_at = "";
+      }
+      if (act === "clear_logs") {
+        await kv.put("visits", "[]"); await kv.put("downloads", "[]");
+        await kv.put("total_visits", "0"); await kv.put("win_downloads", "0"); await kv.put("mac_downloads", "0");
+      }
+      await kv.put("tokens", JSON.stringify(tokens));
+      return json({ ok: true });
     }
 
     return json({ ok: false, error: "Not found" }, 404);
