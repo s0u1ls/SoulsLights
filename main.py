@@ -50,7 +50,6 @@ from core.engine_controller import EngineController
 from core.media_monitor import MediaMonitor
 from core.hotkeys import GlobalHotkeys
 from core.licensing import LicenseManager
-from core.updater import AutoUpdater
 from ui.activation_window import ActivationWindow
 from ui.dashboard import UnifiedDashboard
 from ui.tray import SystemTrayManager
@@ -273,15 +272,6 @@ def main():
             engine_ctrl.mobile_server.start()
             log(f"iPad/Mobile companion server listening at {engine_ctrl.mobile_server.get_url()}")
 
-        def _bg_update_check():
-            time.sleep(3.5)
-            upd = AutoUpdater()
-            info = upd.check_for_update()
-            if info.get("available"):
-                log(f"Update available: {info.get('version')}")
-                dashboard.enqueue_ui(lambda: dashboard.set_update_info(info))
-
-        threading.Thread(target=_bg_update_check, daemon=True).start()
         _write_instance_meta(dashboard.get_native_hwnd())
         media_mon.start()
         engine_ctrl.apply_media_state(media_mon.current_info)

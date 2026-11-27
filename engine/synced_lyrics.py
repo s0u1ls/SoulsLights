@@ -39,7 +39,7 @@ if IS_WIN:
         WS_POPUP, WS_VISIBLE, WS_EX_LAYERED, WS_EX_TRANSPARENT,
         WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_NOACTIVATE,
         GWL_EXSTYLE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_NOACTIVATE, SWP_FRAMECHANGED,
-        HWND_TOPMOST, WM_CLOSE, WM_LBUTTONDOWN, WM_NCLBUTTONDOWN, HTCAPTION
+        HWND_TOPMOST, HWND_BOTTOM, WM_CLOSE, WM_LBUTTONDOWN, WM_NCLBUTTONDOWN, HTCAPTION
     )
 else:
     from core.mac_utils import (
@@ -887,7 +887,7 @@ class LyricsFetcher:
         t1 = threading.Thread(target=_run_lrc, daemon=True)
         t2 = threading.Thread(target=_run_ne, daemon=True)
         t1.start(); t2.start()
-        t1.join(timeout=8.0); t2.join(timeout=8.0)
+        t1.join(timeout=12.0); t2.join(timeout=8.0)
 
         lrc_lines, lrc_src = lrc_res[0]
         ne_lines, ne_src = ne_res[0]
@@ -896,7 +896,7 @@ class LyricsFetcher:
         ne_script = _detect_lyric_script(" ".join(x.get("text", "") for x in (ne_lines or [])[:8]))
 
         if ne_lines and "Word Synced" in ne_src:
-            if sm == "Native" and lrc_script in ("malayalam", "hindi") and ne_script not in ("malayalam", "hindi"):
+            if sm == "Native" and lrc_script in ("malayalam", "hindi", "tamil") and ne_script not in ("malayalam", "hindi", "tamil"):
                 lines, source = lrc_lines, lrc_src
             elif lrc_lines:
                 lines, source = self._merge_yrc_with_lrc(ne_lines, lrc_lines, lrc_src)
@@ -911,7 +911,7 @@ class LyricsFetcher:
 
         if lines and sm == "Romanized":
             cur_script = _detect_lyric_script(" ".join(x.get("text", "") for x in lines[:8]))
-            if cur_script in ("malayalam", "hindi"):
+            if cur_script in ("malayalam", "hindi", "tamil"):
                 lines = _romanize_lines(lines)
                 source = f"{source} [Romanized]"
 
@@ -973,8 +973,8 @@ class LyricsFetcher:
                     artist_cands.append(pa)
 
         get_fallback = None
-        for cand_a in artist_cands[:3]:
-            for cand_t in seen_t:
+        for cand_a in artist_cands[:1]:
+            for cand_t in seen_t[:2]:
                 params = {"track_name": cand_t, "artist_name": cand_a}
                 if album and cand_a == clean_a:
                     params["album_name"] = album
@@ -982,7 +982,7 @@ class LyricsFetcher:
                     params["duration"] = int(round(duration))
                 url = "https://lrclib.net/api/get?" + urllib.parse.urlencode(params)
                 req = urllib.request.Request(url, headers={"User-Agent": "SoulsLights/2.2"})
-                resp = self._urlopen(req, timeout=6)
+                resp = self._urlopen(req, timeout=4)
                 if resp:
                     try:
                         with resp:
@@ -1046,11 +1046,11 @@ class LyricsFetcher:
                     sc_type = _detect_lyric_script(lrc_raw[:900])
                     sc_bonus = 0
                     if script_mode == "Native":
-                        sc_bonus = 140 if sc_type in ("malayalam", "hindi") else (-40 if sc_type == "roman" else 20)
+                        sc_bonus = 140 if sc_type in ("malayalam", "hindi", "tamil") else (-40 if sc_type == "roman" else 20)
                     elif script_mode == "Romanized":
                         sc_bonus = 110 if sc_type == "roman" else 0
                     else:  # Auto: mild preference for native synced lyrics when matching song nicely
-                        if sc_type in ("malayalam", "hindi"):
+                        if sc_type in ("malayalam", "hindi", "tamil"):
                             sc_bonus = 35
                     return has_sync + t_ov + a_ov + dur_bonus + karaoke_pen + sc_bonus
 
@@ -1059,6 +1059,8 @@ class LyricsFetcher:
                 if sc_top > best_overall_score and (top.get("syncedLyrics") or top.get("plainLyrics")):
                     best_overall_score = sc_top
                     best_overall = top
+                if best_overall is not None and best_overall.get("syncedLyrics") and best_overall_score >= 120:
+                    break
             except Exception as e:
                 self._log(f"LRCLIB search parse error: {e}")
 
@@ -1476,7 +1478,8 @@ class SyncedLyricsOverlay:
             return
         v = self.cfg_mgr.config.get("lyrics", {})
         with self._lock:
-            self.style = v.get("style", "Fisheye Visual")
+            st = v.get("style", "Fisheye Visual")
+            self.style = "Fisheye Visual" if st == "Neon Noir" else st
             self.auto_sync_colors = bool(v.get("auto_sync_colors", True))
             self.custom_accent = _hex_to_rgb(v.get("custom_accent_color", "#EC4899"))
             self.text_color = _hex_to_rgb(v.get("custom_text_color", "#FFFFFF"), (255, 255, 255))
@@ -1534,6 +1537,8 @@ class SyncedLyricsOverlay:
 
     def set_style(self, style_name: str):
         with self._lock:
+            if style_name == "Neon Noir":
+                style_name = "Fisheye Visual"
             self.style = style_name
             self._dirty_style = True
 
@@ -1604,7 +1609,7 @@ class SyncedLyricsOverlay:
             mac_win = self.mac_win
             fs = self._is_fullscreen_style(self.style)
         if IS_WIN and hwnd and not fs:
-            user32.SetWindowPos(hwnd, HWND_TOPMOST, nx, ny, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE)
+            user32.SetWindowPos(hwnd, self._z_anchor(), nx, ny, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE)
         elif mac_win and not fs:
             mac_win.set_geometry(nx, ny)
 
@@ -1631,20 +1636,34 @@ class SyncedLyricsOverlay:
                 daemon=True
             ).start()
 
+    def _z_anchor(self):
+        if not IS_WIN:
+            return None
+        bd_mode = "Desktop Layer"
+        if self.cfg_mgr:
+            bd_mode = self.cfg_mgr.config.get("ambient", {}).get("album_backdrop", "Desktop Layer")
+        return HWND_TOPMOST if bd_mode == "Cinema Stage" else HWND_BOTTOM
+
     def _apply_ex_style(self, hwnd, click_through):
         if not IS_WIN:
             if self.mac_win:
                 self.mac_win.set_click_through(click_through)
             return
         try:
+            z_anc = self._z_anchor()
+            is_top = (z_anc == HWND_TOPMOST)
             style = user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)
             if click_through:
-                style |= (WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE)
+                style |= (WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)
             else:
                 style &= ~WS_EX_TRANSPARENT
-                style |= (WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE)
+                style |= (WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)
+            if is_top:
+                style |= WS_EX_TOPMOST
+            else:
+                style &= ~WS_EX_TOPMOST
             user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, style)
-            user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED)
+            user32.SetWindowPos(hwnd, z_anc, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED)
         except Exception:
             pass
 
@@ -2061,7 +2080,7 @@ class SyncedLyricsOverlay:
                         self._apply_ex_style(self.hwnd, ct)
                     self.OVERLAY_W, self.OVERLAY_H = nw, nh
                     if IS_WIN:
-                        user32.SetWindowPos(self.hwnd, HWND_TOPMOST, nx, ny, nw, nh, SWP_NOACTIVATE)
+                        user32.SetWindowPos(self.hwnd, self._z_anchor(), nx, ny, nw, nh, SWP_NOACTIVATE)
                     elif self.mac_win:
                         self.mac_win.set_geometry(nx, ny, nw, nh)
                     surf = LayeredSurface(nw, nh)
@@ -2245,6 +2264,143 @@ class SyncedLyricsOverlay:
         f_use = self._safe_font(font, txt)
         bb = draw.textbbox((0, 0), txt, font=f_use)
         return bb[0], bb[1], bb[2] - bb[0], bb[3] - bb[1], False, f_use
+
+    def _get_condensation_layer(self, w: int, h: int) -> Image.Image:
+        """Pre-bakes a deterministic glass-like condensation mist & smoky ember flecks texture."""
+        key = (w, h, "v2")
+        cached = getattr(self, "_condensation_cache", {}).get(key)
+        if cached is not None:
+            return cached
+        import random
+        rng = random.Random(7282)
+        mask = Image.new("L", (w, h), 0)
+        md = ImageDraw.Draw(mask)
+        # Wide horizontal smoky mist patches along the center band
+        for _ in range(18):
+            mx = rng.randint(60, max(61, w - 60))
+            my = int(h * 0.5 + rng.randint(-int(h * 0.18), int(h * 0.18)))
+            rx = rng.randint(55, 145)
+            ry = rng.randint(14, 38)
+            md.ellipse([mx - rx, my - ry, mx + rx, my + ry], fill=rng.randint(16, 34))
+        mask = mask.filter(ImageFilter.GaussianBlur(radius=20))
+        # Organic ember / condensation wisps & flecks concentrated near the glow band
+        md = ImageDraw.Draw(mask)
+        for _ in range(135):
+            dx = rng.randint(40, max(41, w - 40))
+            dy = int(h * 0.5 + rng.gauss(0, h * 0.15))
+            dy = max(18, min(h - 18, dy))
+            dr = rng.choice((1, 1, 2, 2, 3, 4))
+            if dr >= 3:
+                md.line([(dx, dy), (dx + rng.randint(-5, 5), dy - rng.randint(3, 9))], fill=rng.randint(70, 145), width=2)
+            else:
+                md.ellipse([dx - dr, dy - dr, dx + dr, dy + dr], fill=rng.randint(55, 130))
+        if not hasattr(self, "_condensation_cache"):
+            self._condensation_cache = {}
+        self._condensation_cache[key] = mask
+        return mask
+
+    def _render_neon_noir_scene(self, img, d, words, w_idx, w_u, anim_t, accent, text_col):
+        """Pitch-black (#000000) stage with wide horizontal smoky neon band, ember flecks, and bold uppercase type."""
+        W, H = self.OVERLAY_W, self.OVERLAY_H
+        s = self.font_scale
+        beat_k = min(1.0, max(0.0, self._audio_bloom * 1.15 + self._audio_peak * 0.35 + 0.14 * (0.5 + 0.5 * math.sin(anim_t * 3.2))))
+
+        sx0, sy0, sx1, sy1 = 18, 12, W - 18, H - 12
+        stage_mask = Image.new("L", (W, H), 0)
+        ImageDraw.Draw(stage_mask).rounded_rectangle([sx0, sy0, sx1, sy1], radius=28, fill=255)
+
+        stage_bg = Image.new("RGBA", (W, H), (0, 0, 0, 252))
+        # Wide horizontal smoky neon glow band (matching reference)
+        amb_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ad = ImageDraw.Draw(amb_layer)
+        gx_r = int(W * (0.46 + 0.04 * beat_k))
+        gy_r = int(H * (0.14 + 0.04 * beat_k))
+        ad.ellipse([W // 2 - gx_r, H // 2 - gy_r, W // 2 + gx_r, H // 2 + gy_r], fill=(*accent, int(95 + 75 * beat_k)))
+        amb_layer = amb_layer.filter(ImageFilter.GaussianBlur(radius=38))
+        stage_bg = Image.alpha_composite(stage_bg, amb_layer)
+
+        # Condensation mist & organic ember flecks pulsing with beat
+        cond_mask = self._get_condensation_layer(W, H)
+        cond_tint = _lerp_color(accent, (255, 210, 200), 0.25)
+        cond_a = int(75 + 95 * beat_k)
+        cond_rgb = Image.new("RGBA", (W, H), (*cond_tint, 0))
+        cond_rgb.putalpha(cond_mask.point(lambda p: (p * cond_a) // 255))
+        stage_bg = Image.alpha_composite(stage_bg, cond_rgb)
+
+        img.paste(stage_bg, (0, 0), stage_mask)
+
+        if not words:
+            return img
+
+        # Wide bold uppercase kinetic phrase centered in the neon band (with punchy scale/fade on active word)
+        cur_wi = max(0, min(len(words) - 1, w_idx))
+        # Show up to 5 words around active word so wide uppercase typography stays bold & legible
+        win_start = max(0, cur_wi - 2)
+        win_end = min(len(words), win_start + 5)
+        if win_end - win_start < 5 and win_start > 0:
+            win_start = max(0, win_end - 5)
+        vis_words = words[win_start:win_end]
+
+        glow_wide = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        glow_tight = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        gw_d = ImageDraw.Draw(glow_wide)
+        gt_d = ImageDraw.Draw(glow_tight)
+        txt_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        td = ImageDraw.Draw(txt_layer)
+
+        pop_u = _ease_out_back(min(1.0, max(0.0, w_u * 2.4)))
+        fade_u = _ease_out_cubic(min(1.0, max(0.0, w_u * 3.0)))
+
+        disp_items = []
+        for idx_i, wobj in enumerate(vis_words):
+            raw_w = (wobj.get("word") or "").strip()
+            disp_items.append((win_start + idx_i, raw_w.upper() if raw_w.isascii() else raw_w))
+
+        base_pt = max(26, int(52 * min(1.35, s)))
+        f_base = self._get_font("bold", base_pt)
+        gap_px = max(14, int(22 * min(1.3, s)))
+        total_w = sum(self._measure_text(td, dw, f_base)[0] for _, dw in disp_items) + gap_px * max(0, len(disp_items) - 1)
+        max_line_w = W - 96
+        if total_w > max_line_w and total_w > 0:
+            base_pt = max(20, int(base_pt * max_line_w / total_w))
+            f_base = self._get_font("bold", base_pt)
+            gap_px = max(10, int(gap_px * max_line_w / total_w))
+            total_w = sum(self._measure_text(td, dw, f_base)[0] for _, dw in disp_items) + gap_px * max(0, len(disp_items) - 1)
+
+        act_tint = _lerp_color(accent, (255, 225, 220), 0.36)
+        done_tint = _lerp_color(accent, (255, 195, 190), 0.22)
+        todo_tint = _lerp_color(accent, (180, 140, 140), 0.15)
+
+        cur_x = (W - total_w) // 2
+        cy = H // 2
+        for wi, dw in disp_items:
+            ww, _ = self._measure_text(td, dw, f_base)
+            wx = cur_x + ww // 2
+            is_act = (wi == cur_wi)
+            is_done = (wi < cur_wi)
+            if is_act:
+                pt_a = max(22, int(base_pt * (0.94 + 0.11 * pop_u + 0.04 * beat_k)))
+                f_act = self._get_font("bold", pt_a)
+                a_core = int(170 + 75 * fade_u)
+                a_gw = int((175 + 75 * beat_k) * fade_u)
+                a_gt = int((195 + 50 * beat_k) * fade_u)
+                for dx, dy in ((-2, 0), (2, 0), (0, -2), (0, 2), (0, 0)):
+                    gw_d.text((wx + dx, cy + dy), dw, font=f_act, fill=(*accent, a_gw), anchor="mm")
+                gt_d.text((wx, cy), dw, font=f_act, fill=(*act_tint, a_gt), anchor="mm")
+                td.text((wx, cy), dw, font=f_act, fill=(*act_tint, a_core), anchor="mm")
+            elif is_done:
+                gw_d.text((wx, cy), dw, font=f_base, fill=(*accent, int(115 + 45 * beat_k)), anchor="mm")
+                td.text((wx, cy), dw, font=f_base, fill=(*done_tint, 178), anchor="mm")
+            else:
+                gw_d.text((wx, cy), dw, font=f_base, fill=(*accent, 55), anchor="mm")
+                td.text((wx, cy), dw, font=f_base, fill=(*todo_tint, 105), anchor="mm")
+            cur_x += ww + gap_px
+
+        blur_w = glow_wide.filter(ImageFilter.GaussianBlur(radius=16 + int(8 * beat_k)))
+        blur_t = glow_tight.filter(ImageFilter.GaussianBlur(radius=5))
+        out = Image.alpha_composite(img, blur_w)
+        out = Image.alpha_composite(out, blur_t)
+        return Image.alpha_composite(out, txt_layer)
 
     def _measure_text(self, draw, txt, font):
         _ox, _oy, tw, th, _sh, _f = self._text_box(draw, txt, font)
@@ -3728,6 +3884,12 @@ class SyncedLyricsOverlay:
             return self._render_native_design_scene(
                 img, d, lyrics, idx, w_idx, w_u, eff_pos, anim_t, title, artist,
                 lock_screen=False, preview_text=next_text
+            )
+
+        # ---- 6e. NEON NOIR (Pitch-black condensation stage + pulsing neon stacked uppercase typography) ----
+        if style == "Neon Noir":
+            return self._render_neon_noir_scene(
+                img, d, words, w_idx, w_u, anim_t, accent, text_col
             )
 
         # ---- 7. APPLE DESIGN ----

@@ -121,13 +121,16 @@ class MobileCompanionServer:
             "font_scale": font_scale,
             "offset_sec": offset_sec,
             "lyrics_status": l_status,
+            "lyrics_enabled": bool(cfg.get("lyrics_enabled", True)),
             "glow_enabled": bool(cfg.get("ambient_enabled", True)),
             "backdrop_mode": amb.get("album_backdrop", "Desktop Layer"),
+            "backdrop_style": amb.get("backdrop_style", "2-Blob Aura"),
             "lyrics": lines,
             "styles": [
-                "Fisheye Visual", "Native Design", "Web", "Constellation",
-                "Visual", "Branches", "Codestyle Visual", "Flashbang Visual",
-                "Ship", "Apple Design", "Minimal",
+                "Fisheye Visual", "Fisheye", "Visual", "Ship",
+                "Codestyle Visual", "Codestyle", "Branches",
+                "Web", "Constellation", "Native Design",
+                "Apple Design", "Minimal",
             ],
             "server_ts": time.time(),
         }
@@ -169,6 +172,28 @@ class MobileCompanionServer:
                     self.cfg_mgr.config["ambient_enabled"],
                     self.cfg_mgr.config.get("lyrics_enabled", True),
                 )
+        elif act == "toggle_lyrics":
+            cur = bool(self.cfg_mgr.config.get("lyrics_enabled", True))
+            self.cfg_mgr.config["lyrics_enabled"] = not cur
+            self.cfg_mgr.save_config()
+            if self.engine:
+                self.engine.sync_state(
+                    self.cfg_mgr.config.get("master_enabled", True),
+                    self.cfg_mgr.config.get("ambient_enabled", True),
+                    self.cfg_mgr.config["lyrics_enabled"],
+                )
+        elif act == "nudge_offset" and val is not None:
+            cur_ms = int(self.cfg_mgr.config["lyrics"].get("sync_offset_ms", 0))
+            nxt_ms = max(-5000, min(5000, cur_ms + int(val)))
+            self.cfg_mgr.config["lyrics"]["sync_offset_ms"] = nxt_ms
+            self.cfg_mgr.save_config()
+            if self.engine:
+                self.engine.lyrics_engine.set_offset_ms(nxt_ms)
+        elif act == "reset_offset":
+            self.cfg_mgr.config["lyrics"]["sync_offset_ms"] = 0
+            self.cfg_mgr.save_config()
+            if self.engine:
+                self.engine.lyrics_engine.set_offset_ms(0)
         elif act == "cycle_backdrop" and self.engine:
             self.engine.cycle_backdrop_mode()
         else:

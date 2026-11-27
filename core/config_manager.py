@@ -27,7 +27,9 @@ DEFAULT_CONFIG = {
         "show_over_fullscreen": True,
         "audio_reactive": True,
         "album_backdrop": "Desktop Layer",  # Desktop Layer, Cinema Stage, Off
-        "backdrop_darkness": 0.34        # 0.15 to 1.0 (higher = richer brighter cover)
+        "backdrop_style": "2-Blob Aura",    # 2-Blob Aura, Video Reel
+        "backdrop_darkness": 0.34,          # 0.15 to 1.0 (higher = richer brighter cover)
+        "backdrop_blur": 7.5                # 0.0 (sharp) to 12.0 (ultra soft)
     },
 
     # Synced Lyrics Overlay Engine (Verci)

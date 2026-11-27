@@ -93,7 +93,7 @@
         </div>
         <div class="scroll">
           <table>
-            <thead><tr><th>Token</th><th>Status</th><th>Uses</th><th>Machine / OS</th><th>Activated At</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Token</th><th>Status</th><th>Name</th><th>Uses</th><th>Machine / OS</th><th>Activated At</th><th>Actions</th></tr></thead>
             <tbody id="tokBody"></tbody>
           </table>
         </div>
@@ -203,7 +203,7 @@ function renderTokens(){
     if(curFilter === "used" && !t.used) return false;
     if(curFilter === "unused" && (t.used || t.revoked || t.is_master)) return false;
     if(curFilter === "revoked" && !t.revoked) return false;
-    if(q && !t.token.includes(q) && !(t.used_by_machine||"").toUpperCase().includes(q)) return false;
+    if(q && !t.token.includes(q) && !(t.used_by_machine||"").toUpperCase().includes(q) && !(t.used_by_name||"").toUpperCase().includes(q)) return false;
     return true;
   });
   document.getElementById("tokBody").innerHTML = rows.map(t => {
@@ -218,6 +218,7 @@ function renderTokens(){
     return `<tr>
       <td style="font-family:monospace; font-weight:700">${esc(t.token)}</td>
       <td>${pill}</td>
+      <td><b>${esc(t.used_by_name || "—")}</b></td>
       <td>${t.uses || 0}</td>
       <td>${esc(t.used_by_machine || "—")} ${t.used_os ? `(${esc(t.used_os)})` : ""}</td>
       <td>${esc(t.used_at || "—")}</td>

@@ -57,14 +57,20 @@ export default {
       const body = await request.json().catch(() => ({}));
       const tok = String(body.token || "").trim().toUpperCase();
       const mid = String(body.machine_id || "").trim();
+      const uname = String(body.name || "").trim().slice(0, 60);
+      const osName = String(body.os || "").trim().slice(0, 24);
+      const checkOnly = !!body.check_only;
       const tokens = JSON.parse((await kv.get("tokens")) || "{}");
       const rec = tokens[tok];
       if (!rec) return json({ ok: false, error: "Invalid activation token." }, 403);
       if (rec.revoked) return json({ ok: false, error: "Token revoked." }, 403);
-      if (!rec.is_master && rec.used && rec.used_by_machine && mid && rec.used_by_machine !== mid) {
-        return json({ ok: false, error: "Token already used on another device." }, 403);
+      if (!rec.is_master && rec.used) {
+        return json({ ok: false, error: "This token has already been used." }, 403);
       }
-      rec.used = 1; rec.uses = (rec.uses || 0) + 1; rec.used_by_machine = mid; rec.used_at = now;
+      if (checkOnly) {
+        return json({ ok: true, is_master: !!rec.is_master, message: "Token valid!" });
+      }
+      rec.used = 1; rec.uses = (rec.uses || 0) + 1; rec.used_by_machine = mid; rec.used_by_name = uname; rec.used_os = osName; rec.used_at = now;
       tokens[tok] = rec;
       await kv.put("tokens", JSON.stringify(tokens));
       return json({ ok: true, is_master: !!rec.is_master, message: "Token verified!" });
@@ -133,7 +139,7 @@ export default {
       if (act === "revoke" && tok && tokens[tok] && !tokens[tok].is_master) tokens[tok].revoked = 1;
       if (act === "unrevoke" && tok && tokens[tok]) tokens[tok].revoked = 0;
       if (act === "reset" && tok && tokens[tok]) {
-        tokens[tok].used = 0; tokens[tok].used_by_machine = ""; tokens[tok].used_at = "";
+        tokens[tok].used = 0; tokens[tok].used_by_machine = ""; tokens[tok].used_by_name = ""; tokens[tok].used_at = "";
       }
       if (act === "clear_logs") {
         await kv.put("visits", "[]"); await kv.put("downloads", "[]");

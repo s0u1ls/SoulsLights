@@ -59,16 +59,11 @@ jobs:
       - name: Build SoulsLights.app and DMG
         run: python build_mac.py
 
-      - name: Package SoulsLights-macOS-App.zip for Auto-Updater
-        run: ditto -c -k --sequesterRsrc --keepParent dist/SoulsLights.app dist/SoulsLights-macOS-App.zip
-
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: SoulsLights-macOS-DMG
-          path: |
-            dist/SoulsLights-macOS.dmg
-            dist/SoulsLights-macOS-App.zip
+          path: dist/SoulsLights-macOS.dmg
 
   publish-release:
     needs: [build-windows, build-macos]

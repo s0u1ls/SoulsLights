@@ -564,9 +564,10 @@ class ScaledBlitSurface:
         if not hdc_win:
             return False
         try:
-            return bool(gdi32.GdiAlphaBlend(
+            gdi32.SetStretchBltMode(hdc_win, 4)  # HALFTONE smooth filtering (no blocky nearest-neighbor)
+            return bool(gdi32.StretchBlt(
                 hdc_win, 0, 0, int(dst_w), int(dst_h),
-                self.hdc_mem, 0, 0, self.width, self.height, self._blend_dw
+                self.hdc_mem, 0, 0, self.width, self.height, 0x00CC0020  # SRCCOPY
             ))
         finally:
             user32.ReleaseDC(hwnd, hdc_win)

@@ -86,7 +86,7 @@ class LicenseManager:
             pass
         return "Not Activated"
 
-    def _save_license(self, norm_token: str, is_master: bool, remote_verified: bool):
+    def _save_license(self, norm_token: str, is_master: bool, remote_verified: bool, user_name: str = ""):
         hint = "MASTER" if is_master else f"{norm_token[:3]}****{norm_token[-3:]}"
         payload = {
             "activated": True,
@@ -94,28 +94,73 @@ class LicenseManager:
             "remote_verified": remote_verified,
             "token_hash": _hash_token(norm_token),
             "token_hint": hint,
+            "user_name": (user_name or "").strip(),
             "machine_id": get_machine_id(),
             "activated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         }
         with open(self.license_path, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
 
-    def verify_and_activate(self, raw_token: str) -> tuple[bool, str]:
+    def check_token(self, raw_token: str) -> tuple[bool, str]:
+        """Step 1: Verifies that the token is valid and unused without consuming it yet."""
         norm = (raw_token or "").strip().upper()
         if not norm:
             return False, "Please enter an activation token."
+        th = _hash_token(norm)
+        is_master = (th == self.master_hash)
+        api_url = self._get_api_url()
+        mid = get_machine_id()
+        if api_url:
+            try:
+                body = json.dumps({
+                    "token": norm,
+                    "machine_id": mid,
+                    "os": platform.system(),
+                    "version": APP_VERSION,
+                    "check_only": True,
+                }).encode("utf-8")
+                req = urllib.request.Request(
+                    f"{api_url}/api/activate",
+                    data=body,
+                    headers={"Content-Type": "application/json", "User-Agent": f"SoulsLights/{APP_VERSION}"},
+                    method="POST",
+                )
+                resp = urllib.request.urlopen(req, timeout=6, context=_SSL_CTX) if _SSL_CTX else urllib.request.urlopen(req, timeout=6)
+                with resp:
+                    res = json.loads(resp.read().decode("utf-8"))
+                if res.get("ok"):
+                    return True, "Token valid! Enter your name to continue."
+                return False, res.get("error", "Invalid or already used token.")
+            except urllib.error.HTTPError as he:
+                try:
+                    err_res = json.loads(he.read().decode("utf-8"))
+                    return False, err_res.get("error", "Invalid or already used token.")
+                except Exception:
+                    pass
+            except Exception:
+                pass
+        if is_master or (th in self.valid_hashes):
+            return True, "Token valid! Enter your name to continue."
+        return False, "Invalid activation token. Check your code and try again."
+
+    def verify_and_activate(self, raw_token: str, user_name: str = "") -> tuple[bool, str]:
+        norm = (raw_token or "").strip().upper()
+        if not norm:
+            return False, "Please enter an activation token."
+        uname = (user_name or "").strip()[:60]
 
         th = _hash_token(norm)
         is_master = (th == self.master_hash)
         api_url = self._get_api_url()
         mid = get_machine_id()
 
-        # 1. Try remote Token Server when configured (records usage + enforces single-use)
+        # 1. Try remote Token Server when configured (records usage + user name + enforces strict single-use)
         if api_url:
             try:
                 body = json.dumps({
                     "token": norm,
                     "machine_id": mid,
+                    "name": uname,
                     "os": platform.system(),
                     "version": APP_VERSION,
                 }).encode("utf-8")
@@ -129,15 +174,21 @@ class LicenseManager:
                 with resp:
                     res = json.loads(resp.read().decode("utf-8"))
                 if res.get("ok"):
-                    self._save_license(norm, bool(res.get("is_master", is_master)), True)
+                    self._save_license(norm, bool(res.get("is_master", is_master)), True, uname)
                     return True, res.get("message", "Token verified!")
                 return False, res.get("error", "Invalid or already used token.")
+            except urllib.error.HTTPError as he:
+                try:
+                    err_res = json.loads(he.read().decode("utf-8"))
+                    return False, err_res.get("error", "Invalid or already used token.")
+                except Exception:
+                    pass
             except Exception:
                 # Fall through to local hash validation when server is unreachable
                 pass
 
         # 2. Local hash verification (7282 master + 100 generated 10-char tokens)
         if is_master or (th in self.valid_hashes):
-            self._save_license(norm, is_master, False)
+            self._save_license(norm, is_master, False, uname)
             return True, "Master token verified!" if is_master else "Token verified! Welcome to SoulsLights."
         return False, "Invalid activation token. Check your code and try again."

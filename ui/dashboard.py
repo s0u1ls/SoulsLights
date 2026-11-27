@@ -525,6 +525,20 @@ def _render_style_preview(style_name: str, w: int, h: int, c_left: tuple, c_righ
         d.rounded_rectangle([bx0 + int(bw * 0.30), b2_y0, bx0 + bw, b2_y0 + bh_u], radius=7, fill=(0, 118, 255, 255))
         d.text((bx0 + int(bw * 0.30) + 6, b2_y0 + int(2.5 * s)), "You know I don't play", font=f_tiny, fill=(255, 255, 255, 255))
 
+    elif style_name == "Neon Noir":
+        d.rectangle([0, 0, w, h], fill=(0, 0, 0, 255))
+        pulse = 0.5 + 0.5 * math.sin(t_phase * 2.6)
+        glow_im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        gd = ImageDraw.Draw(glow_im)
+        gr_x = int(w * (0.46 + 0.04 * pulse))
+        gr_y = int(h * (0.14 + 0.04 * pulse))
+        gd.ellipse([cx - gr_x, cy - gr_y, cx + gr_x, cy + gr_y], fill=(220, 38, 38, int(95 + 60 * pulse)))
+        gd.text((cx, cy), "WHAT YOU WANT", font=f_med, fill=(239, 68, 68, 235), anchor="mm")
+        glow_im = glow_im.filter(ImageFilter.GaussianBlur(radius=max(4, int(8 * s))))
+        img.alpha_composite(glow_im, (0, 0))
+        d = ImageDraw.Draw(img)
+        d.text((cx, cy), "WHAT YOU WANT", font=f_med, fill=(252, 165, 165, 220), anchor="mm")
+
     return img
 
 
@@ -1076,6 +1090,10 @@ class UnifiedDashboard(ctk.CTk):
             bd = round(val, 2)
             self.cfg_mgr.config["ambient"]["backdrop_darkness"] = bd
             self.engine.backdrop_engine.set_darkness(bd)
+        elif sid == "bg_blur":
+            bl = round(val, 2)
+            self.cfg_mgr.config["ambient"]["backdrop_blur"] = bl
+            self.engine.backdrop_engine.set_blur(bl)
         if save:
             self.cfg_mgr.save_config()
         self._render_popover()
@@ -1382,7 +1400,7 @@ class UnifiedDashboard(ctk.CTk):
         colors_list = list(amb.get("custom_colors") or [amb.get("color_1", "#6366F1"), amb.get("color_2", "#EC4899")])
         pop_w = 604 if key == "Glow" else 584
         extra_col_rows = max(0, (len(colors_list) + 2) // 13) if key == "Glow" else 0
-        pop_h = {"Lyrics": 412, "Glow": 442 + extra_col_rows * 30, "Screen": 258, "Options": 484}.get(key, 340)
+        pop_h = {"Lyrics": 412, "Glow": 442 + extra_col_rows * 30, "Screen": 356, "Options": 424}.get(key, 340)
         px0 = max(18, (w - pop_w) // 2)
         py0 = 56
         self._popover_rect = (px0, py0, px0 + pop_w, py0 + pop_h)
@@ -1545,14 +1563,24 @@ class UnifiedDashboard(ctk.CTk):
             d.text((pad, y), "ALBUM COVER BACKDROP MODE", font=f_sec, fill=(192, 132, 252, 220))
             y += 18
             nx_b = self._draw_pop_chips(panel, pad, y, inner_w, ["Desktop Layer", "Cinema Stage", "Off"], amb.get("album_backdrop", "Desktop Layer"), "bd_mode", px0, py0, f_chip)
-            y = nx_b + 14
+            y = nx_b + 12
+
+            d = ImageDraw.Draw(panel)
+            d.text((pad, y), "BACKDROP STYLE", font=f_sec, fill=(192, 132, 252, 220))
+            y += 18
+            nx_bs = self._draw_pop_chips(panel, pad, y, inner_w, ["2-Blob Aura", "Video Reel"], amb.get("backdrop_style", "2-Blob Aura"), "bd_style", px0, py0, f_chip)
+            y = nx_bs + 12
 
             bd_d = float(amb.get("backdrop_darkness", 0.34))
             self._draw_pop_slider(panel, pad, y, inner_w, "Background Depth", f"{int(round(bd_d * 100))}%", (max(0.15, min(1.0, bd_d)) - 0.15) / 0.85, "bg_depth", 0.15, 1.0, px0, py0, f_lbl, f_val)
-            y += 50
+            y += 46
+
+            bd_bl = float(amb.get("backdrop_blur", 7.5))
+            self._draw_pop_slider(panel, pad, y, inner_w, "Cover Blur", f"{int(round(max(0.0, min(12.0, bd_bl)) / 12.0 * 100))}%", max(0.0, min(12.0, bd_bl)) / 12.0, "bg_blur", 0.0, 12.0, px0, py0, f_lbl, f_val)
+            y += 46
 
             self._draw_pop_toggle(panel, pad, y, "Show Over Fullscreen Windows", self.fs_var.get(), "toggle_fs", px0, py0, f_lbl)
-            y += 36
+            y += 34
 
             d = ImageDraw.Draw(panel)
             d.text((pad, y), "DISPLAY OUTPUT", font=f_sec, fill=(192, 132, 252, 220))
@@ -1612,15 +1640,7 @@ class UnifiedDashboard(ctk.CTk):
             panel.alpha_composite(_rounded_outline_overlay(url_w, 28, 10, (192, 132, 252, 85)), (pad, y))
             d = ImageDraw.Draw(panel)
             d.text((pad + 12, y + 7), mob_url, font=f_val, fill=(243, 232, 255, 250))
-            y = self._draw_pop_chips(panel, pad + url_w + 10, y + 1, 140, ["Copy URL", "Open"], "", "mob", px0, py0, f_chip) + 12
-
-            from core.version import APP_VERSION
-            upd = getattr(self, "_pending_update", None)
-            upd_lbl = f"Update to {upd['version']}" if (upd and upd.get("available")) else "Check Updates"
-            d = ImageDraw.Draw(panel)
-            d.text((pad, y), f"SOULSLIGHTS v{APP_VERSION}  •  AUTO-UPDATER", font=f_sec, fill=(192, 132, 252, 220))
-            y += 18
-            self._draw_pop_chips(panel, pad, y, inner_w, [upd_lbl], "", "upd", px0, py0, f_chip)
+            self._draw_pop_chips(panel, pad + url_w + 10, y + 1, 140, ["Copy URL", "Open"], "", "mob", px0, py0, f_chip)
 
         tk_pop = ImageTk.PhotoImage(panel)
         self._tk_photos["popover"] = tk_pop
@@ -1685,6 +1705,8 @@ class UnifiedDashboard(ctk.CTk):
             self._on_display_change(act[8:])
         elif act.startswith("bd_mode:"):
             self._on_backdrop_mode_change(act[8:])
+        elif act.startswith("bd_style:"):
+            self._on_backdrop_style_change(act[9:])
         elif act == "toggle_fs":
             self.fs_var.set(not self.fs_var.get())
             self._on_fs_toggle()
@@ -1723,8 +1745,6 @@ class UnifiedDashboard(ctk.CTk):
                     webbrowser.open(mob_url)
                 except Exception:
                     pass
-        elif act.startswith("upd:"):
-            self._trigger_manual_update()
 
         if self._active_popover:
             self._render_popover()
@@ -1732,35 +1752,6 @@ class UnifiedDashboard(ctk.CTk):
         self._render_hero_stage()
 
     # ---- Status & Handlers ----
-    def set_update_info(self, info: dict):
-        self._pending_update = info
-        if self._active_popover == "Options":
-            self._render_popover()
-
-    def _trigger_manual_update(self):
-        from tkinter import messagebox
-        from core.updater import AutoUpdater
-        upd = AutoUpdater()
-        info = getattr(self, "_pending_update", None)
-        if not info or not info.get("available"):
-            info = upd.check_for_update()
-        if not info.get("available"):
-            messagebox.showinfo("SoulsLights Up to Date", "You are already running the latest version of SoulsLights.")
-            return
-        self._pending_update = info
-        if self._active_popover == "Options":
-            self._render_popover()
-        if messagebox.askyesno(
-            "Update Available",
-            f"SoulsLights {info['version']} is available!\n\nDownload and restart automatically now?"
-        ):
-            ok, msg = upd.download_and_apply_update(info.get("url", ""))
-            if ok:
-                self._on_quit() if hasattr(self, "_on_quit") else self.destroy()
-            else:
-                import webbrowser
-                webbrowser.open(info.get("html_url", "https://github.com/s0u1ls/SoulsLights/releases/latest"))
-
     def _sync_ui_from_config(self):
         cfg = self.cfg_mgr.config
         self.master_switch_var.set(cfg.get("master_enabled", True))
@@ -1899,6 +1890,11 @@ class UnifiedDashboard(ctk.CTk):
             self.engine.stop_backdrop()
         elif self.master_switch_var.get():
             self.engine.start_backdrop()
+
+    def _on_backdrop_style_change(self, val):
+        self.cfg_mgr.config["ambient"]["backdrop_style"] = val
+        self.cfg_mgr.save_config()
+        self.engine.backdrop_engine.set_backdrop_style(val)
 
     def _on_backdrop_darkness_change(self, val):
         d = round(float(val), 2)

@@ -38,6 +38,7 @@ def init_db():
                 revoked INTEGER DEFAULT 0,
                 uses INTEGER DEFAULT 0,
                 used_by_machine TEXT DEFAULT '',
+                used_by_name TEXT DEFAULT '',
                 used_os TEXT DEFAULT '',
                 used_at TEXT DEFAULT '',
                 created_at TEXT DEFAULT ''
@@ -58,6 +59,10 @@ def init_db():
                 ts TEXT
             );
         """)
+        try:
+            conn.execute("ALTER TABLE tokens ADD COLUMN used_by_name TEXT DEFAULT ''")
+        except Exception:
+            pass
         cnt = conn.execute("SELECT COUNT(*) FROM tokens").fetchone()[0]
         if cnt == 0 and os.path.exists(INITIAL_TOKENS_PATH):
             with open(INITIAL_TOKENS_PATH, "r", encoding="utf-8") as f:
@@ -234,7 +239,9 @@ class AdminHandler(BaseHTTPRequestHandler):
         if path == "/api/activate":
             tok = str(body.get("token", "")).strip().upper()
             mid = str(body.get("machine_id", "")).strip()[:32]
+            uname = str(body.get("name", "")).strip()[:60]
             os_n = str(body.get("os", "")).strip()[:24]
+            check_only = bool(body.get("check_only", False))
             if not tok:
                 return self._send_json(400, {"ok": False, "error": "Token required"})
             with _DB_LOCK:
@@ -246,17 +253,20 @@ class AdminHandler(BaseHTTPRequestHandler):
                 if row["revoked"]:
                     conn.close()
                     return self._send_json(403, {"ok": False, "error": "This token has been revoked."})
+                if not row["is_master"] and row["used"]:
+                    conn.close()
+                    return self._send_json(403, {"ok": False, "error": "This token has already been used."})
+                if check_only:
+                    conn.close()
+                    return self._send_json(200, {"ok": True, "is_master": bool(row["is_master"]), "message": "Token valid!"})
                 if row["is_master"]:
-                    conn.execute("UPDATE tokens SET uses=uses+1, used=1, used_at=?, used_by_machine=? WHERE token=?", (now, mid, tok))
+                    conn.execute("UPDATE tokens SET uses=uses+1, used=1, used_at=?, used_by_machine=?, used_by_name=? WHERE token=?", (now, mid, uname, tok))
                     conn.commit()
                     conn.close()
                     return self._send_json(200, {"ok": True, "is_master": True, "message": "Master token verified!"})
-                if row["used"] and row["used_by_machine"] and mid and row["used_by_machine"] != mid:
-                    conn.close()
-                    return self._send_json(403, {"ok": False, "error": "Token already used on another device."})
                 conn.execute(
-                    "UPDATE tokens SET used=1, uses=uses+1, used_by_machine=?, used_os=?, used_at=? WHERE token=?",
-                    (mid, os_n, now, tok),
+                    "UPDATE tokens SET used=1, uses=uses+1, used_by_machine=?, used_by_name=?, used_os=?, used_at=? WHERE token=?",
+                    (mid, uname, os_n, now, tok),
                 )
                 conn.commit()
                 conn.close()
