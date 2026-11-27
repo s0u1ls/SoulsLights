@@ -133,7 +133,8 @@ let statsData = null;
 let curFilter = "all";
 
 function apiBase(){
-  return (document.getElementById("apiUrlInput")?.value || localStorage.getItem("sl_api_base") || "").trim().replace(/\/+$/, "");
+  const fallback = location.hostname.includes("github.io") ? "https://soulslights-api.ishaanroshanvt.workers.dev" : "";
+  return (document.getElementById("apiUrlInput")?.value || localStorage.getItem("sl_api_base") || fallback).trim().replace(/\/+$/, "");
 }
 function esc(s){ return String(s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
@@ -253,7 +254,7 @@ function exportTokens(){
   a.click();
 }
 
-document.getElementById("apiUrlInput").value = localStorage.getItem("sl_api_base") || "";
+document.getElementById("apiUrlInput").value = localStorage.getItem("sl_api_base") || (location.hostname.includes("github.io") ? "https://soulslights-api.ishaanroshanvt.workers.dev" : "");
 document.getElementById("passInput").addEventListener("keydown", e => { if(e.key==="Enter") doLogin(); });
 if(adminTok) showDash();
 </script>

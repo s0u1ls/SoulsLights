@@ -1060,7 +1060,7 @@
         <span class="dot"></span> v2.3 Studio Edition • Windows, macOS &amp; iPad/Mobile
       </div>
       <h1>Ultra-smooth desktop lyrics.<br>Ambient concert vibes.</h1>
-      <p>Turn any workspace into a kinetic audiovisual stage. Frame-accurate English, Hindi &amp; Malayalam lyrics paired with multi-color edge glow, auto-updates, and an iPad/mobile companion.</p>
+      <p>Turn any workspace into a kinetic audiovisual stage. Frame-accurate English, Hindi &amp; Malayalam lyrics paired with multi-color edge glow and an iPad/mobile companion.</p>
 
       <div class="cta-group">
         <a id="dl-win" href="https://github.com/s0u1ls/SoulsLights/releases/download/v1.1.1/SoulsLights.exe" download class="btn btn-primary glass-hover" title="Direct download SoulsLights.exe for Windows">
@@ -2362,7 +2362,7 @@
       toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
     }
 
-    const SL_API_BASE = (localStorage.getItem('sl_api_base') || (location.hostname.includes('github.io') ? '' : location.origin)).replace(/\/+$/, '');
+    const SL_API_BASE = (localStorage.getItem('sl_api_base') || (location.hostname.includes('github.io') ? 'https://soulslights-api.ishaanroshanvt.workers.dev' : location.origin)).replace(/\/+$/, '');
     function trackEvent(path, payload) {
       if (!SL_API_BASE && location.hostname.includes('github.io')) return;
       try {
