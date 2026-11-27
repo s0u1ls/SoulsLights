@@ -1908,8 +1908,8 @@ class SyncedLyricsOverlay:
                 tw, th = self._measure_text(draw, txt, f_max)
             else:
                 tw, th = len(txt) * 28, 52
-            hw = max(70, tw * 0.5 + 38)
-            hh = max(48, th * 0.5 + 42)
+            hw = max(84, tw * 0.56 + 44)
+            hh = max(58, th * 0.56 + 48)
 
             x_lo = int(min(W * 0.42, max(120, hw + 24)))
             x_hi = int(max(x_lo + 20, W - max(120, hw + 24)))
@@ -1918,7 +1918,7 @@ class SyncedLyricsOverlay:
 
             best_pt = (rng.randint(x_lo, x_hi), rng.randint(y_lo, y_hi))
             best_score = -1e12
-            for _ in range(65):
+            for _ in range(120):
                 cx = rng.randint(x_lo, x_hi)
                 cy = rng.randint(y_lo, y_hi)
                 if not placed:
@@ -1926,9 +1926,9 @@ class SyncedLyricsOverlay:
                     break
                 ov_area = 0.0
                 min_edge_gap = 1e9
-                for px, py, phw, phh in placed:
-                    ox = (hw + phw) - abs(cx - px)
-                    oy = (hh + phh) - abs(cy - py)
+                for px, py, phw, phh, *_ in placed:
+                    ox = (hw + phw + 18) - abs(cx - px)
+                    oy = (hh + phh + 14) - abs(cy - py)
                     if ox > 0 and oy > 0:
                         ov_area += ox * oy
                     gap = math.hypot(cx - px, cy - py) - (hw + phw) * 0.5
@@ -1938,9 +1938,32 @@ class SyncedLyricsOverlay:
                 if score > best_score:
                     best_score = score
                     best_pt = (cx, cy)
-            placed.append((best_pt[0], best_pt[1], hw, hh))
+            placed.append([float(best_pt[0]), float(best_pt[1]), hw, hh, float(x_lo), float(x_hi), float(y_lo), float(y_hi)])
 
-        res = [(p[0], p[1]) for p in placed]
+        for _ in range(18):
+            moved = False
+            for i in range(len(placed)):
+                xi, yi, hwi, hhi, xlo, xhi, ylo, yhi = placed[i]
+                for j in range(i + 1, len(placed)):
+                    xj, yj, hwj, hhj, xlo_j, xhi_j, ylo_j, yhi_j = placed[j]
+                    ox = (hwi + hwj + 16) - abs(xi - xj)
+                    oy = (hhi + hhj + 14) - abs(yi - yj)
+                    if ox > 0 and oy > 0:
+                        moved = True
+                        if ox < oy:
+                            push = (ox * 0.55) * (-1.0 if xi < xj else 1.0)
+                            xi = max(xlo, min(xhi, xi + push))
+                            xj = max(xlo_j, min(xhi_j, xj - push))
+                        else:
+                            push = (oy * 0.55) * (-1.0 if yi < yj else 1.0)
+                            yi = max(ylo, min(yhi, yi + push))
+                            yj = max(ylo_j, min(yhi_j, yj - push))
+                        placed[i][0], placed[i][1] = xi, yi
+                        placed[j][0], placed[j][1] = xj, yj
+            if not moved:
+                break
+
+        res = [(int(round(p[0])), int(round(p[1]))) for p in placed]
         self._constellation_nodes[cache_key] = res
         return res
 
