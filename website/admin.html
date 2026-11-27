@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SoulsLights — Admin Portal</title>
+  <style>
+    :root { --bg:#07060d; --card:rgba(20,17,34,.82); --rim:rgba(216,180,254,.2); --acc:#a855f7; --text:#f8fafc; --muted:#94a3b8; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(circle at 18% 12%, rgba(124,58,237,.18), transparent 42%), var(--bg); color:var(--text); font-family:'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; min-height:100vh; }
+    .wrap { max-width:1180px; margin:0 auto; padding:28px 20px 60px; }
+    .top { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:24px; }
+    .brand { font-size:20px; font-weight:800; letter-spacing:-.02em; display:flex; align-items:center; gap:10px; }
+    .badge { font-size:11px; padding:4px 10px; border-radius:999px; background:rgba(168,85,247,.18); border:1px solid rgba(192,132,252,.4); color:#e9d5ff; }
+    .card { background:var(--card); border:1px solid var(--rim); border-radius:20px; padding:20px; backdrop-filter:blur(20px); }
+    .login-box { max-width:410px; margin:70px auto; }
+    h2 { margin:0 0 8px; font-size:20px; }
+    .sub { color:var(--muted); font-size:13px; margin:0 0 18px; }
+    label { display:block; font-size:11px; font-weight:700; color:#c4b5fd; text-transform:uppercase; letter-spacing:.06em; margin:10px 0 6px; }
+    input { width:100%; padding:10px 12px; border-radius:11px; border:1px solid rgba(255,255,255,.15); background:rgba(7,6,13,.7); color:#fff; font-size:13.5px; outline:none; }
+    input:focus { border-color:var(--acc); }
+    .btn { border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.08); color:#fff; border-radius:11px; padding:9px 14px; font-size:12.5px; font-weight:600; cursor:pointer; }
+    .btn.primary { background:linear-gradient(135deg, #7c3aed, #a855f7); border-color:rgba(233,213,255,.45); }
+    .btn.danger { background:rgba(239,68,68,.18); border-color:rgba(248,113,113,.35); color:#fecaca; }
+    .btn.sm { padding:5px 9px; font-size:11px; border-radius:8px; }
+    .err { color:#f87171; font-size:12.5px; margin-top:10px; min-height:18px; }
+    .kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:20px; }
+    .kpi .lbl { font-size:11px; font-weight:700; color:#c4b5fd; text-transform:uppercase; letter-spacing:.05em; }
+    .kpi .val { font-size:30px; font-weight:800; margin-top:6px; }
+    .kpi .hint { font-size:12px; color:var(--muted); margin-top:2px; }
+    .toolbar { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+    .tabs { display:flex; gap:6px; flex-wrap:wrap; }
+    .tab { padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.05); color:#cbd5e1; font-size:12px; font-weight:600; cursor:pointer; }
+    .tab.active { background:linear-gradient(135deg,#7c3aed,#a855f7); color:#fff; border-color:rgba(233,213,255,.5); }
+    table { width:100%; border-collapse:collapse; font-size:12.5px; }
+    th, td { text-align:left; padding:10px 10px; border-bottom:1px solid rgba(255,255,255,.07); }
+    th { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#c4b5fd; }
+    .pill { display:inline-block; padding:3px 8px; border-radius:999px; font-size:11px; font-weight:700; }
+    .p-used { background:rgba(168,85,247,.22); color:#e9d5ff; }
+    .p-free { background:rgba(16,185,129,.18); color:#6ee7b7; }
+    .p-master { background:rgba(245,158,11,.22); color:#fde68a; }
+    .p-rev { background:rgba(239,68,68,.2); color:#fca5a5; }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:18px; }
+    @media (max-width: 860px) { .grid2 { grid-template-columns:1fr; } }
+    .scroll { max-height:360px; overflow:auto; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">SoulsLights <span class="badge">Admin Control</span></div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <a href="./" class="btn sm" style="text-decoration:none">← Back to Site</a>
+        <button class="btn sm" id="logoutBtn" style="display:none" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+
+    <div id="loginView" class="card login-box">
+      <h2>Admin Sign In</h2>
+      <p class="sub">View website visitors, EXE/DMG downloads, and manage activation tokens.</p>
+      <label>Backend API URL (optional if hosted on same server)</label>
+      <input id="apiUrlInput" placeholder="Leave blank for same origin, or https://your-worker.workers.dev">
+      <label>Username</label>
+      <input id="userInput" value="admin" autocomplete="username">
+      <label>Password</label>
+      <input id="passInput" type="password" placeholder="Enter admin password" autocomplete="current-password">
+      <div class="err" id="loginErr"></div>
+      <button class="btn primary" style="width:100%; margin-top:8px" onclick="doLogin()">Sign In</button>
+    </div>
+
+    <div id="dashView" style="display:none">
+      <div class="kpis">
+        <div class="card kpi"><div class="lbl">Website Visits</div><div class="val" id="kVisits">0</div><div class="hint" id="kUniq">0 unique IPs</div></div>
+        <div class="card kpi"><div class="lbl">Total Downloads</div><div class="val" id="kDls">0</div><div class="hint" id="kDlBreak">0 EXE • 0 DMG</div></div>
+        <div class="card kpi"><div class="lbl">Tokens Used</div><div class="val" id="kUsed">0</div><div class="hint" id="kTokTot">0 unused • 0 revoked</div></div>
+        <div class="card kpi"><div class="lbl">Master Token</div><div class="val" style="font-family:monospace">7282</div><div class="hint">Unlimited activations</div></div>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div class="tabs" id="tokFilterTabs">
+            <button class="tab active" onclick="setFilter('all', this)">All Tokens</button>
+            <button class="tab" onclick="setFilter('used', this)">Used</button>
+            <button class="tab" onclick="setFilter('unused', this)">Unused</button>
+            <button class="tab" onclick="setFilter('revoked', this)">Revoked</button>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <input id="tokSearch" placeholder="Search token / machine..." style="width:200px; padding:7px 10px" oninput="renderTokens()">
+            <button class="btn primary sm" onclick="tokAction('generate', '', 10)">+ Generate 10 Tokens</button>
+            <button class="btn sm" onclick="exportTokens()">Export .txt</button>
+            <button class="btn sm" onclick="loadStats()">↻ Refresh</button>
+          </div>
+        </div>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Token</th><th>Status</th><th>Uses</th><th>Machine / OS</th><th>Activated At</th><th>Actions</th></tr></thead>
+            <tbody id="tokBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="toolbar">
+            <h2 style="font-size:16px; margin:0">Recent Website Visitors</h2>
+            <button class="btn danger sm" onclick="if(confirm('Clear visit & download logs?')) tokAction('clear_logs')">Clear Logs</button>
+          </div>
+          <div class="scroll">
+            <table>
+              <thead><tr><th>Time</th><th>IP</th><th>Page / Device</th></tr></thead>
+              <tbody id="visBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="toolbar">
+            <h2 style="font-size:16px; margin:0">Recent Downloads</h2>
+          </div>
+          <div class="scroll">
+            <table>
+              <thead><tr><th>Time</th><th>Build</th><th>IP</th></tr></thead>
+              <tbody id="dlBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+let adminTok = sessionStorage.getItem("sl_admin_tok") || "";
+let statsData = null;
+let curFilter = "all";
+
+function apiBase(){
+  return (document.getElementById("apiUrlInput")?.value || localStorage.getItem("sl_api_base") || "").trim().replace(/\/+$/, "");
+}
+function esc(s){ return String(s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+async function doLogin(){
+  const base = apiBase();
+  localStorage.setItem("sl_api_base", base);
+  const username = document.getElementById("userInput").value.trim();
+  const password = document.getElementById("passInput").value;
+  document.getElementById("loginErr").textContent = "";
+  try {
+    const r = await fetch(base + "/api/admin/login", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({username, password})
+    });
+    const d = await r.json();
+    if(!d.ok){ document.getElementById("loginErr").textContent = d.error || "Invalid credentials"; return; }
+    adminTok = d.token;
+    sessionStorage.setItem("sl_admin_tok", adminTok);
+    showDash();
+  } catch(e){
+    document.getElementById("loginErr").textContent = "Cannot reach backend API URL. Start server/app.py or set Worker URL.";
+  }
+}
+
+function logout(){
+  adminTok = ""; sessionStorage.removeItem("sl_admin_tok");
+  document.getElementById("dashView").style.display = "none";
+  document.getElementById("logoutBtn").style.display = "none";
+  document.getElementById("loginView").style.display = "block";
+}
+
+async function showDash(){
+  document.getElementById("loginView").style.display = "none";
+  document.getElementById("dashView").style.display = "block";
+  document.getElementById("logoutBtn").style.display = "inline-block";
+  await loadStats();
+}
+
+async function loadStats(){
+  const r = await fetch(apiBase() + "/api/admin/stats", {headers:{Authorization:`Bearer ${adminTok}`}});
+  if(r.status === 401) return logout();
+  statsData = await r.json();
+  if(!statsData.ok) return;
+  const s = statsData.summary;
+  document.getElementById("kVisits").textContent = s.total_visits;
+  document.getElementById("kUniq").textContent = `${s.unique_visitors} unique IPs`;
+  document.getElementById("kDls").textContent = s.total_downloads;
+  document.getElementById("kDlBreak").textContent = `${s.win_downloads} EXE • ${s.mac_downloads} DMG`;
+  document.getElementById("kUsed").textContent = s.tokens_used;
+  document.getElementById("kTokTot").textContent = `${s.tokens_unused} unused • ${s.tokens_revoked} revoked`;
+  renderTokens();
+  renderLogs();
+}
+
+function setFilter(f, btn){
+  curFilter = f;
+  document.querySelectorAll("#tokFilterTabs .tab").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  renderTokens();
+}
+
+function renderTokens(){
+  if(!statsData) return;
+  const q = document.getElementById("tokSearch").value.trim().toUpperCase();
+  const rows = (statsData.tokens || []).filter(t => {
+    if(curFilter === "used" && !t.used) return false;
+    if(curFilter === "unused" && (t.used || t.revoked || t.is_master)) return false;
+    if(curFilter === "revoked" && !t.revoked) return false;
+    if(q && !t.token.includes(q) && !(t.used_by_machine||"").toUpperCase().includes(q)) return false;
+    return true;
+  });
+  document.getElementById("tokBody").innerHTML = rows.map(t => {
+    const pill = t.is_master ? '<span class="pill p-master">Master</span>'
+      : (t.revoked ? '<span class="pill p-rev">Revoked</span>'
+      : (t.used ? '<span class="pill p-used">Used</span>' : '<span class="pill p-free">Unused</span>'));
+    const actions = t.is_master ? "—" : `
+      <button class="btn sm" onclick="navigator.clipboard?.writeText('${t.token}')">Copy</button>
+      ${t.used ? `<button class="btn sm" onclick="tokAction('reset','${t.token}')">Reset</button>` : ""}
+      <button class="btn ${t.revoked?'':'danger'} sm" onclick="tokAction('${t.revoked?'unrevoke':'revoke'}','${t.token}')">${t.revoked?'Restore':'Revoke'}</button>
+    `;
+    return `<tr>
+      <td style="font-family:monospace; font-weight:700">${esc(t.token)}</td>
+      <td>${pill}</td>
+      <td>${t.uses || 0}</td>
+      <td>${esc(t.used_by_machine || "—")} ${t.used_os ? `(${esc(t.used_os)})` : ""}</td>
+      <td>${esc(t.used_at || "—")}</td>
+      <td style="display:flex; gap:5px; flex-wrap:wrap">${actions}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderLogs(){
+  if(!statsData) return;
+  document.getElementById("visBody").innerHTML = (statsData.visits || []).map(v =>
+    `<tr><td>${esc(v.ts)}</td><td>${esc(v.ip)}</td><td style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${esc(v.page)} • ${esc(v.user_agent)}</td></tr>`
+  ).join("");
+  document.getElementById("dlBody").innerHTML = (statsData.downloads || []).map(d =>
+    `<tr><td>${esc(d.ts)}</td><td><b>${d.os === 'macos' ? 'macOS .dmg' : 'Windows .exe'}</b></td><td>${esc(d.ip)}</td></tr>`
+  ).join("");
+}
+
+async function tokAction(action, token = "", count = 10){
+  await fetch(apiBase() + "/api/admin/tokens", {
+    method:"POST",
+    headers:{"Content-Type":"application/json", Authorization:`Bearer ${adminTok}`},
+    body: JSON.stringify({action, token, count})
+  });
+  await loadStats();
+}
+
+function exportTokens(){
+  if(!statsData) return;
+  const txt = (statsData.tokens||[]).map(t => `${t.token}\t${t.is_master?'MASTER':(t.used?'USED':'UNUSED')}`).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([txt], {type:"text/plain"}));
+  a.download = "SoulsLights_Tokens_Export.txt";
+  a.click();
+}
+
+document.getElementById("apiUrlInput").value = localStorage.getItem("sl_api_base") || "";
+document.getElementById("passInput").addEventListener("keydown", e => { if(e.key==="Enter") doLogin(); });
+if(adminTok) showDash();
+</script>
+</body>
+</html>

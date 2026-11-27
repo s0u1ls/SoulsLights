@@ -166,6 +166,15 @@ def get_fallback_font_entries() -> list:
             ("Apple Symbols.ttf", "sym"),
             ("Kohinoor.ttc", "any"),
             ("KohinoorDevanagari.ttc", "any"),
+            ("Devanagari Sangam MN.ttc", "any"),
+            ("DevanagariMT.ttc", "any"),
+            ("Malayalam Sangam MN.ttc", "any"),
+            ("Malayalam MN.ttc", "any"),
+            ("Tamil Sangam MN.ttc", "any"),
+            ("Tamil MN.ttc", "any"),
+            ("NotoSansMalayalam.ttc", "any"),
+            ("NotoSansDevanagari.ttc", "any"),
+            ("NotoSansTamil.ttc", "any"),
             ("PingFang.ttc", "bold"),
             ("AppleSDGothicNeo.ttc", "bold"),
             ("Hiragino Sans GB.ttc", "bold"),
@@ -283,3 +292,230 @@ def get_cursor_pos(evt=None) -> tuple:
     if evt is not None:
         return int(getattr(evt, "x_root", 0)), int(getattr(evt, "y_root", 0))
     return 0, 0
+
+
+# ---- Native OS OpenType Complex-Script Shaping (Malayalam, Hindi/Devanagari, Tamil, Arabic, etc.) ----
+import threading as _threading
+from PIL import Image as _Image
+
+_SHAPE_LOCK = _threading.Lock()
+_SHAPE_MEASURE_CACHE = {}
+_SHAPE_MASK_CACHE = {}
+_WIN_GDI_STATE = {}
+_WIN_FONT_CACHE = {}
+
+
+def needs_complex_shaping(text: str) -> bool:
+    """Returns True when text contains Indic/Arabic/Thai scripts requiring OpenType GSUB/GPOS shaping."""
+    if not text or text.isascii():
+        return False
+    for ch in text:
+        o = ord(ch)
+        if (0x0900 <= o <= 0x0DF7) or (0x0600 <= o <= 0x06FF) or (0x0E00 <= o <= 0x0E7F) or (0x1000 <= o <= 0x109F):
+            return True
+    return False
+
+
+def font_is_bold(font) -> bool:
+    if font is None:
+        return True
+    fpath = (getattr(font, "path", "") or "").lower()
+    if any(k in fpath for k in ("bold", "bd.", "segoeuib", "seguisb", "calibrib", "timesbd", "arialbd", "georgiab")):
+        return True
+    if any(k in fpath for k in ("segoeui.ttf", "calibri.ttf", "arial.ttf", "times.ttf", "georgia.ttf", "helvetica")):
+        return False
+    return int(getattr(font, "size", 24)) >= 25
+
+
+def _win_get_hdc_and_font(size_px: int, bold: bool):
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.WinDLL("user32")
+    gdi32 = ctypes.WinDLL("gdi32")
+    if not _WIN_GDI_STATE:
+        class RECT_G(ctypes.Structure):
+            _fields_ = [("left", ctypes.c_long), ("top", ctypes.c_long), ("right", ctypes.c_long), ("bottom", ctypes.c_long)]
+
+        class BMIH_G(ctypes.Structure):
+            _fields_ = [
+                ("biSize", ctypes.c_uint32), ("biWidth", ctypes.c_int32), ("biHeight", ctypes.c_int32),
+                ("biPlanes", ctypes.c_uint16), ("biBitCount", ctypes.c_uint16), ("biCompression", ctypes.c_uint32),
+                ("biSizeImage", ctypes.c_uint32), ("biXPelsPerMeter", ctypes.c_int32), ("biYPelsPerMeter", ctypes.c_int32),
+                ("biClrUsed", ctypes.c_uint32), ("biClrImportant", ctypes.c_uint32),
+            ]
+
+        class LOGFONTW(ctypes.Structure):
+            _fields_ = [
+                ("lfHeight", ctypes.c_int32), ("lfWidth", ctypes.c_int32), ("lfEscapement", ctypes.c_int32),
+                ("lfOrientation", ctypes.c_int32), ("lfWeight", ctypes.c_int32), ("lfItalic", ctypes.c_ubyte),
+                ("lfUnderline", ctypes.c_ubyte), ("lfStrikeOut", ctypes.c_ubyte), ("lfCharSet", ctypes.c_ubyte),
+                ("lfOutPrecision", ctypes.c_ubyte), ("lfClipPrecision", ctypes.c_ubyte), ("lfQuality", ctypes.c_ubyte),
+                ("lfPitchAndFamily", ctypes.c_ubyte), ("lfFaceName", ctypes.c_wchar * 32),
+            ]
+
+        user32.GetDC.argtypes = [wintypes.HWND]
+        user32.GetDC.restype = wintypes.HDC
+        user32.DrawTextW.argtypes = [wintypes.HDC, ctypes.c_wchar_p, ctypes.c_int, ctypes.POINTER(RECT_G), ctypes.c_uint]
+        user32.DrawTextW.restype = ctypes.c_int
+        gdi32.CreateCompatibleDC.argtypes = [wintypes.HDC]
+        gdi32.CreateCompatibleDC.restype = wintypes.HDC
+        gdi32.CreateFontIndirectW.argtypes = [ctypes.POINTER(LOGFONTW)]
+        gdi32.CreateFontIndirectW.restype = wintypes.HFONT
+        gdi32.SelectObject.argtypes = [wintypes.HDC, wintypes.HGDIOBJ]
+        gdi32.SelectObject.restype = wintypes.HGDIOBJ
+        gdi32.SetBkMode.argtypes = [wintypes.HDC, ctypes.c_int]
+        gdi32.SetTextColor.argtypes = [wintypes.HDC, ctypes.c_uint32]
+        gdi32.CreateDIBSection.argtypes = [wintypes.HDC, ctypes.POINTER(BMIH_G), ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p), wintypes.HANDLE, ctypes.c_uint32]
+        gdi32.CreateDIBSection.restype = wintypes.HBITMAP
+        gdi32.DeleteObject.argtypes = [wintypes.HGDIOBJ]
+
+        hdc_scr = user32.GetDC(0)
+        hdc = gdi32.CreateCompatibleDC(hdc_scr)
+        user32.ReleaseDC(0, hdc_scr)
+        gdi32.SetBkMode(hdc, 1)
+        gdi32.SetTextColor(hdc, 0x00FFFFFF)
+        _WIN_GDI_STATE.update({
+            "user32": user32, "gdi32": gdi32, "hdc": hdc,
+            "RECT": RECT_G, "BMIH": BMIH_G, "LOGFONTW": LOGFONTW,
+        })
+
+    fkey = (int(size_px), bool(bold))
+    hfont = _WIN_FONT_CACHE.get(fkey)
+    if hfont is None:
+        LOGFONTW = _WIN_GDI_STATE["LOGFONTW"]
+        lf = LOGFONTW(
+            lfHeight=-max(8, int(size_px)),
+            lfWeight=700 if bold else 400,
+            lfCharSet=1,
+            lfQuality=4,  # ANTIALIASED_QUALITY (grayscale alpha, zero ClearType color fringes!)
+            lfFaceName="Nirmala UI",
+        )
+        hfont = _WIN_GDI_STATE["gdi32"].CreateFontIndirectW(ctypes.byref(lf))
+        if len(_WIN_FONT_CACHE) > 96:
+            _WIN_FONT_CACHE.clear()
+        _WIN_FONT_CACHE[fkey] = hfont
+    return _WIN_GDI_STATE, hfont
+
+
+def _win_shape_render(text: str, size_px: int, bold: bool):
+    import ctypes
+    st, hfont = _win_get_hdc_and_font(size_px, bold)
+    u32, g32, hdc, RECT_G, BMIH_G = st["user32"], st["gdi32"], st["hdc"], st["RECT"], st["BMIH"]
+    old_f = g32.SelectObject(hdc, hfont)
+    rc_calc = RECT_G(0, 0, 0, 0)
+    # DT_CALCRECT (0x400) | DT_NOPREFIX (0x800) | DT_SINGLELINE (0x20)
+    u32.DrawTextW(hdc, text, -1, ctypes.byref(rc_calc), 0x0C20)
+    raw_w = max(4, int(rc_calc.right - rc_calc.left))
+    raw_h = max(8, int(rc_calc.bottom - rc_calc.top))
+
+    pad_x = max(6, int(size_px * 0.22))
+    pad_y = max(4, int(size_px * 0.14))
+    dib_w = raw_w + pad_x * 2
+    dib_h = raw_h + pad_y * 2
+    bmi = BMIH_G(ctypes.sizeof(BMIH_G), dib_w, -dib_h, 1, 32, 0)
+    ppv = ctypes.c_void_p()
+    hbmp = g32.CreateDIBSection(hdc, ctypes.byref(bmi), 0, ctypes.byref(ppv), None, 0)
+    old_b = g32.SelectObject(hdc, hbmp)
+    ctypes.memset(ppv.value, 0, dib_w * dib_h * 4)
+    rc_draw = RECT_G(pad_x, pad_y, dib_w, dib_h)
+    u32.DrawTextW(hdc, text, -1, ctypes.byref(rc_draw), 0x0820)
+    raw_buf = ctypes.string_at(ppv.value, dib_w * dib_h * 4)
+    g32.SelectObject(hdc, old_b)
+    g32.DeleteObject(hbmp)
+    g32.SelectObject(hdc, old_f)
+
+    mask = _Image.frombytes("RGB", (dib_w, dib_h), raw_buf, "raw", "BGRX").convert("L")
+    bb = mask.getbbox()
+    if bb:
+        x0 = max(0, bb[0] - 1)
+        x1 = min(dib_w, bb[2] + 1)
+        mask = mask.crop((x0, 0, x1, dib_h))
+    else:
+        mask = mask.crop((pad_x, 0, min(dib_w, pad_x + raw_w), dib_h))
+    return mask
+
+
+def _mac_shape_render(text: str, size_px: int, bold: bool):
+    try:
+        import CoreText
+        import Quartz
+        import Foundation
+
+        font_name = "HelveticaNeue-Bold" if bold else "HelveticaNeue"
+        ct_font = CoreText.CTFontCreateWithName(font_name, float(size_px), None)
+        if ct_font is None:
+            ct_font = CoreText.CTFontCreateWithName("Helvetica", float(size_px), None)
+        attrs = Foundation.NSDictionary.dictionaryWithObjectsAndKeys_(
+            ct_font, CoreText.kCTFontAttributeName,
+            Foundation.NSNumber.numberWithBool_(True), CoreText.kCTForegroundColorFromContextAttributeName,
+            None,
+        )
+        attr_str = Foundation.NSAttributedString.alloc().initWithString_attributes_(text, attrs)
+        line = CoreText.CTLineCreateWithAttributedString(attr_str)
+        typ_w, asc, desc, _lead = CoreText.CTLineGetTypographicBounds(line, 0.0, 0.0, 0.0)
+        pad_x = max(6, int(size_px * 0.22))
+        pad_y = max(4, int(size_px * 0.14))
+        w = max(8, int(round(typ_w)) + pad_x * 2)
+        h = max(10, int(round(asc + desc)) + pad_y * 2)
+
+        cs = Quartz.CGColorSpaceCreateDeviceGray()
+        ctx = Quartz.CGBitmapContextCreate(None, w, h, 8, w, cs, Quartz.kCGImageAlphaNone)
+        if ctx is None:
+            return None
+        Quartz.CGContextSetGrayFillColor(ctx, 0.0, 1.0)
+        Quartz.CGContextFillRect(ctx, Quartz.CGRectMake(0, 0, w, h))
+        Quartz.CGContextSetGrayFillColor(ctx, 1.0, 1.0)
+        Quartz.CGContextSetTextMatrix(ctx, Quartz.CGAffineTransformIdentity)
+        Quartz.CGContextSetTextPosition(ctx, float(pad_x), float(desc) + float(pad_y))
+        CoreText.CTLineDraw(line, ctx)
+        ptr = Quartz.CGBitmapContextGetData(ctx)
+        ns_d = Foundation.NSData.dataWithBytes_length_(ptr, w * h)
+        mask = _Image.frombytes("L", (w, h), bytes(ns_d))
+        bb = mask.getbbox()
+        if bb:
+            mask = mask.crop((max(0, bb[0] - 1), 0, min(w, bb[2] + 1), h))
+        return mask
+    except Exception:
+        return None
+
+
+def shape_render_mask(text: str, size_px: int, bold: bool = True):
+    """Returns a cached antialiased 'L' alpha mask with native OS Indic OpenType shaping."""
+    if not text:
+        return None
+    q = max(8, min(260, int(round(size_px))))
+    key = (text, q, bool(bold))
+    with _SHAPE_LOCK:
+        cached = _SHAPE_MASK_CACHE.get(key)
+        if cached is not None:
+            return cached
+        mask = None
+        if IS_WIN:
+            try:
+                mask = _win_shape_render(text, q, bool(bold))
+            except Exception:
+                mask = None
+        elif IS_MAC:
+            mask = _mac_shape_render(text, q, bool(bold))
+        if mask is not None:
+            if len(_SHAPE_MASK_CACHE) > 600:
+                _SHAPE_MASK_CACHE.clear()
+            _SHAPE_MASK_CACHE[key] = mask
+            _SHAPE_MEASURE_CACHE[key] = (mask.width, mask.height)
+        return mask
+
+
+def shape_measure_text(text: str, size_px: int, bold: bool = True):
+    """Returns exact OpenType shaped (width, height) for Indic / complex text."""
+    q = max(8, min(260, int(round(size_px))))
+    key = (text, q, bool(bold))
+    with _SHAPE_LOCK:
+        cached = _SHAPE_MEASURE_CACHE.get(key)
+        if cached is not None:
+            return cached
+    mask = shape_render_mask(text, q, bool(bold))
+    if mask is not None:
+        return (mask.width, mask.height)
+    return None
+

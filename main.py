@@ -49,6 +49,9 @@ from core.config_manager import ConfigManager
 from core.engine_controller import EngineController
 from core.media_monitor import MediaMonitor
 from core.hotkeys import GlobalHotkeys
+from core.licensing import LicenseManager
+from core.updater import AutoUpdater
+from ui.activation_window import ActivationWindow
 from ui.dashboard import UnifiedDashboard
 from ui.tray import SystemTrayManager
 
@@ -224,6 +227,15 @@ def main():
 
     try:
         config_mgr = ConfigManager()
+        license_mgr = LicenseManager(config_mgr)
+        if not license_mgr.is_activated():
+            log("App not activated; showing token activation gate.")
+            act_win = ActivationWindow(license_mgr)
+            act_win.mainloop()
+            if not act_win.activated and not license_mgr.is_activated():
+                log("Activation cancelled by user; exiting.")
+                return
+
         pref = config_mgr.config.get("lyrics", {}).get("player_preference", "Music Apps First")
         media_mon = MediaMonitor(player_preference=pref)
         engine_ctrl = EngineController(config_mgr, media_mon)
@@ -256,6 +268,20 @@ def main():
                 pass
 
         dashboard = UnifiedDashboard(config_mgr, engine_ctrl, media_mon, on_quit_callback=clean_exit)
+        if getattr(engine_ctrl, "mobile_server", None):
+            engine_ctrl.mobile_server.on_remote_change = lambda: dashboard.enqueue_ui(dashboard._sync_ui_from_config)
+            engine_ctrl.mobile_server.start()
+            log(f"iPad/Mobile companion server listening at {engine_ctrl.mobile_server.get_url()}")
+
+        def _bg_update_check():
+            time.sleep(3.5)
+            upd = AutoUpdater()
+            info = upd.check_for_update()
+            if info.get("available"):
+                log(f"Update available: {info.get('version')}")
+                dashboard.enqueue_ui(lambda: dashboard.set_update_info(info))
+
+        threading.Thread(target=_bg_update_check, daemon=True).start()
         _write_instance_meta(dashboard.get_native_hwnd())
         media_mon.start()
         engine_ctrl.apply_media_state(media_mon.current_info)
@@ -376,6 +402,8 @@ def main():
         _clear_instance_meta()
         log("Exiting cleanly...")
         try:
+            if getattr(engine_ctrl, "mobile_server", None):
+                engine_ctrl.mobile_server.stop()
             if engine_ctrl:
                 engine_ctrl.stop_all()
             if hotkeys:

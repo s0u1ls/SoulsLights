@@ -450,32 +450,47 @@ def _render_style_preview(style_name: str, w: int, h: int, c_left: tuple, c_righ
             d.ellipse([px - rr, py + dy - rr, px + rr, py + dy + rr], fill=(255, 255, 255, 250 if bi == lit_idx else 170))
 
     elif style_name == "Web":
-        mr = min(w, h) * (0.28 if is_hero else 0.37)
-        rot = t_phase * 0.25
+        mr = min(w, h) * (0.29 if is_hero else 0.38)
+        rot = t_phase * 0.16
         n_sp = 10
-        for k in range(n_sp):
-            a = rot + k * (2.0 * math.pi / n_sp)
-            d.line([(cx, cy), (cx + math.cos(a) * mr, cy + math.sin(a) * mr)], fill=(235, 240, 248, 88), width=1)
-        for rk in (0.28, 0.55, 0.80, 1.0):
+        spokes = [rot + k * (2.0 * math.pi / n_sp) for k in range(n_sp)]
+        for a in spokes:
+            d.line([(cx, cy), (cx + math.cos(a) * mr, cy + math.sin(a) * mr)], fill=(235, 240, 248, 86), width=1)
+        for rk in (0.28, 0.54, 0.78, 1.0):
             rr = mr * rk
-            ring = []
+            arc = []
             for k in range(n_sp):
-                a0 = rot + k * (2.0 * math.pi / n_sp)
-                a1 = rot + (k + 1) * (2.0 * math.pi / n_sp)
+                aa0, aa1 = spokes[k], spokes[(k + 1) % n_sp]
+                if aa1 < aa0:
+                    aa1 += 2.0 * math.pi
                 for si in range(5):
                     u = si / 5.0
-                    sag = 1.0 - 0.14 * (4.0 * u * (1.0 - u))
-                    ang = a0 + (a1 - a0) * u
-                    ring.append((cx + math.cos(ang) * rr * sag, cy + math.sin(ang) * rr * sag))
-            ring.append(ring[0])
-            d.line(ring, fill=(235, 240, 248, 98), width=1)
-        for side in (-1, 1):
-            for sp in (-0.65, -0.22, 0.22, 0.65):
-                la = rot + side * (1.35 + sp * 0.5)
-                jx, jy = cx + math.cos(la) * 10 * s, cy + math.sin(la) * 10 * s
-                tx, ty = cx + math.cos(la + side * 0.3) * 17 * s, cy + math.sin(la + side * 0.3) * 17 * s
-                d.line([(cx, cy), (jx, jy), (tx, ty)], fill=(245, 248, 255, 235), width=max(1, int(2 * s)))
-        d.ellipse([cx - max(4, int(5 * s)), cy - max(4, int(5 * s)), cx + max(4, int(5 * s)), cy + max(4, int(5 * s))], fill=(245, 248, 255, 248))
+                    sag = 1.0 - 0.13 * (4.0 * u * (1.0 - u))
+                    ang = aa0 + (aa1 - aa0) * u
+                    arc.append((cx + math.cos(ang) * rr * sag, cy + math.sin(ang) * rr * sag))
+            arc.append(arc[0])
+            d.line(arc, fill=(235, 240, 248, 96), width=1)
+        # Constellation-style glowing connected sung nodes around the whole web
+        w_pts = [
+            (int(cx + math.cos(spokes[0]) * mr * 0.72), int(cy + math.sin(spokes[0]) * mr * 0.72)),
+            (int(cx + math.cos(spokes[2]) * mr * 0.65), int(cy + math.sin(spokes[2]) * mr * 0.65)),
+            (int(cx + math.cos(spokes[4]) * mr * 0.75), int(cy + math.sin(spokes[4]) * mr * 0.75)),
+        ]
+        d.line(w_pts, fill=(255, 210, 150, 230), width=max(1, int(2 * s)))
+        for wi_p, (px, py) in enumerate(w_pts):
+            rt = max(3, int((5 if wi_p == 2 else 3) * s))
+            d.ellipse([px - rt, py - rt, px + rt, py + rt], fill=(255, 255, 255, 245))
+        d.text((w_pts[2][0] - int(14 * s), w_pts[2][1] - int(16 * s)), "paper", font=f_sm, fill=(255, 255, 255, 245))
+        sc_sp = (20 if is_hero else 13) * s
+        def _sp(pts):
+            return [(cx + x * sc_sp, cy + y * sc_sp) for x, y in pts]
+        sp_polys = [
+            _sp([(-0.15, -0.06), (-0.48, -0.06), (-0.72, -0.34), (-0.52, -0.80), (-0.58, -0.44), (-0.36, -0.10)]),
+            _sp([(0.15, -0.06), (0.48, -0.06), (0.72, -0.34), (0.52, -0.80), (0.58, -0.44), (0.36, -0.10)]),
+            _sp([(0.0, 0.70), (-0.18, 0.02), (-0.12, -0.18), (0.0, -0.15), (0.12, -0.18), (0.18, 0.02)]),
+        ]
+        for poly in sp_polys:
+            d.polygon(poly, fill=(242, 246, 252, 250), outline=(12, 14, 18, 255))
 
     elif style_name == "Constellation":
         s_pts = [(int(w * 0.28), int(cy + 16 * s)), (int(w * 0.50), int(cy - 14 * s)), (int(w * 0.72), int(cy + 8 * s))]
@@ -490,21 +505,25 @@ def _render_style_preview(style_name: str, w: int, h: int, c_left: tuple, c_righ
         d.text((s_pts[1][0] - int(18 * s), s_pts[1][1] + int(8 * s)), "coming", font=f_sm, fill=(255, 255, 255, 245))
 
     elif style_name == "Native Design":
-        bw = int(w * (0.40 if is_hero else 0.66))
+        bw = int(w * (0.36 if is_hero else 0.62))
         bx0 = (w - bw) // 2
-        pop = int(4 * s * abs(math.sin(t_phase * 1.8)))
-        bh_u = max(14, int(18 * s))
-        y_top = cy - int(30 * s)
-        f_tiny = _load_font("segoeui.ttf", max(6, int(7.5 * s)))
-        d.text((cx - 18, y_top - int(11 * s)), "Today 11:22", font=f_tiny, fill=(185, 195, 215, 160))
-        d.rounded_rectangle([bx0, y_top, bx0 + int(bw * 0.72), y_top + bh_u], radius=6, fill=(44, 44, 48, 240))
-        d.text((bx0 + 6, y_top + int(4 * s)), "Streetlights hum when", font=f_tiny, fill=(242, 242, 247, 230))
-        b1_y0 = y_top + bh_u + 5 - pop // 2
-        d.rounded_rectangle([bx0 + int(bw * 0.14), b1_y0, bx0 + bw, b1_y0 + bh_u], radius=6, fill=(10, 132, 255, 250))
-        d.text((bx0 + int(bw * 0.14) + 6, b1_y0 + int(4 * s)), "Every clock in the city", font=f_tiny, fill=(255, 255, 255, 250))
-        b2_y0 = y_top + bh_u * 2 + 10 + pop // 2
-        d.rounded_rectangle([bx0 + int(bw * 0.22), b2_y0, bx0 + bw, b2_y0 + bh_u], radius=6, fill=(10, 132, 255, 200))
-        d.text((bx0 + int(bw * 0.22) + 6, b2_y0 + int(4 * s)), "Dance with me till dawn", font=f_tiny, fill=(235, 245, 255, 210))
+        pop = int(3 * s * abs(math.sin(t_phase * 1.8)))
+        f_tiny = _load_font("segoeui.ttf", max(6, int(7.0 * s)))
+        y_top = cy - int(34 * s)
+        # Mini dark Apple Maps widget card + stacked iMessage blue bubbles
+        mc_h = int(36 * s)
+        d.rounded_rectangle([bx0, y_top, bx0 + bw, y_top + mc_h], radius=7, fill=(24, 28, 34, 242), outline=(255, 255, 255, 42))
+        d.rounded_rectangle([bx0 + 1, y_top + 1, bx0 + bw - 1, y_top + int(17 * s)], radius=6, fill=(26, 48, 36, 255))
+        d.ellipse([cx - int(8 * s), y_top + int(3 * s), cx + int(8 * s), y_top + int(14 * s)], outline=(145, 155, 170, 210), width=1)
+        d.ellipse([cx - 2, y_top + int(7 * s), cx + 2, y_top + int(11 * s)], fill=(56, 189, 248, 255))
+        d.text((bx0 + 6, y_top + int(20 * s)), "Baby I like your style", font=f_tiny, fill=(248, 250, 255, 245))
+        bh_u = max(13, int(15 * s))
+        b1_y0 = y_top + mc_h + 5 - pop // 2
+        d.rounded_rectangle([bx0 + int(bw * 0.24), b1_y0, bx0 + bw, b1_y0 + bh_u], radius=7, fill=(10, 132, 255, 245))
+        d.text((bx0 + int(bw * 0.24) + 6, b1_y0 + int(2.5 * s)), "Grips on your waist", font=f_tiny, fill=(255, 255, 255, 245))
+        b2_y0 = b1_y0 + bh_u + 4 + pop // 2
+        d.rounded_rectangle([bx0 + int(bw * 0.30), b2_y0, bx0 + bw, b2_y0 + bh_u], radius=7, fill=(0, 118, 255, 255))
+        d.text((bx0 + int(bw * 0.30) + 6, b2_y0 + int(2.5 * s)), "You know I don't play", font=f_tiny, fill=(255, 255, 255, 255))
 
     return img
 
@@ -1363,7 +1382,7 @@ class UnifiedDashboard(ctk.CTk):
         colors_list = list(amb.get("custom_colors") or [amb.get("color_1", "#6366F1"), amb.get("color_2", "#EC4899")])
         pop_w = 604 if key == "Glow" else 584
         extra_col_rows = max(0, (len(colors_list) + 2) // 13) if key == "Glow" else 0
-        pop_h = {"Lyrics": 356, "Glow": 442 + extra_col_rows * 30, "Screen": 258, "Options": 364}.get(key, 340)
+        pop_h = {"Lyrics": 412, "Glow": 442 + extra_col_rows * 30, "Screen": 258, "Options": 484}.get(key, 340)
         px0 = max(18, (w - pop_w) // 2)
         py0 = 56
         self._popover_rect = (px0, py0, px0 + pop_w, py0 + pop_h)
@@ -1431,6 +1450,16 @@ class UnifiedDashboard(ctk.CTk):
             y += 18
             fonts = ["Geometric", "Futura", "Didone", "Grotesque", "Rounded", "Serif"]
             y = self._draw_pop_chips(panel, pad, y, inner_w, fonts, lyr.get("font", "Geometric"), "font", px0, py0, f_chip) + 12
+
+            d = ImageDraw.Draw(panel)
+            d.text((pad, y), "LYRICS SCRIPT  (HINDI / MALAYALAM / TAMIL)", font=f_sec, fill=(192, 132, 252, 220))
+            y += 18
+            script_map = {
+                "Auto": "Auto (Best Match)",
+                "Native": "Native Script",
+                "Romanized": "Romanized (ABC)",
+            }
+            y = self._draw_pop_chips(panel, pad, y, inner_w, ["Auto", "Native", "Romanized"], lyr.get("script_mode", "Auto"), "script", px0, py0, f_chip, labels_map=script_map) + 12
 
             d = ImageDraw.Draw(panel)
             d.text((pad, y), "MEDIA SOURCE", font=f_sec, fill=(192, 132, 252, 220))
@@ -1570,7 +1599,28 @@ class UnifiedDashboard(ctk.CTk):
             cur_pr = cfg.get("active_preset", "studio")
             pr_map = {"studio": "Studio", "ambient_only": "Glow Only", "karaoke": "Karaoke", "night_mode": "Night Dim"}
             y = self._draw_pop_chips(panel, pad, y, inner_w, ["studio", "ambient_only", "karaoke", "night_mode"], cur_pr, "preset", px0, py0, f_chip, labels_map=pr_map) + 10
-            self._draw_pop_chips(panel, pad, y, inner_w, ["Restart Engines", "Refresh Lyrics", "Reset Lyrics Pos"], "", "util", px0, py0, f_chip)
+            y = self._draw_pop_chips(panel, pad, y, inner_w, ["Restart Engines", "Refresh Lyrics", "Reset Lyrics Pos"], "", "util", px0, py0, f_chip) + 14
+
+            d = ImageDraw.Draw(panel)
+            d.text((pad, y), "IPAD & MOBILE COMPANION  (OPEN IN SAFARI / CHROME ON SAME WI-FI)", font=f_sec, fill=(192, 132, 252, 220))
+            y += 18
+            srv = getattr(self.engine, "mobile_server", None)
+            mob_url = srv.get_url() if srv else "http://localhost:8765"
+            url_w = inner_w - 150
+            um = _rounded_mask(url_w, 28, 10)
+            panel.paste(Image.new("RGBA", (url_w, 28), (255, 255, 255, 16)), (pad, y), um)
+            panel.alpha_composite(_rounded_outline_overlay(url_w, 28, 10, (192, 132, 252, 85)), (pad, y))
+            d = ImageDraw.Draw(panel)
+            d.text((pad + 12, y + 7), mob_url, font=f_val, fill=(243, 232, 255, 250))
+            y = self._draw_pop_chips(panel, pad + url_w + 10, y + 1, 140, ["Copy URL", "Open"], "", "mob", px0, py0, f_chip) + 12
+
+            from core.version import APP_VERSION
+            upd = getattr(self, "_pending_update", None)
+            upd_lbl = f"Update to {upd['version']}" if (upd and upd.get("available")) else "Check Updates"
+            d = ImageDraw.Draw(panel)
+            d.text((pad, y), f"SOULSLIGHTS v{APP_VERSION}  •  AUTO-UPDATER", font=f_sec, fill=(192, 132, 252, 220))
+            y += 18
+            self._draw_pop_chips(panel, pad, y, inner_w, [upd_lbl], "", "upd", px0, py0, f_chip)
 
         tk_pop = ImageTk.PhotoImage(panel)
         self._tk_photos["popover"] = tk_pop
@@ -1596,6 +1646,8 @@ class UnifiedDashboard(ctk.CTk):
             self._nudge_offset(0, reset=True)
         elif act.startswith("font:"):
             self._on_font_change(act[5:])
+        elif act.startswith("script:"):
+            self._on_script_mode_change(act[7:])
         elif act.startswith("lyr_act:"):
             sub = act[8:]
             if sub == "Reset Stage Pos":
@@ -1655,6 +1707,24 @@ class UnifiedDashboard(ctk.CTk):
                 self.engine.lyrics_engine.force_refresh_lyrics()
             elif u == "Reset Lyrics Pos":
                 self.engine.lyrics_engine.reset_position()
+        elif act.startswith("mob:"):
+            m_act = act[4:]
+            srv = getattr(self.engine, "mobile_server", None)
+            mob_url = srv.get_url() if srv else "http://localhost:8765"
+            if m_act == "Copy URL":
+                try:
+                    self.clipboard_clear()
+                    self.clipboard_append(mob_url)
+                except Exception:
+                    pass
+            elif m_act == "Open":
+                try:
+                    import webbrowser
+                    webbrowser.open(mob_url)
+                except Exception:
+                    pass
+        elif act.startswith("upd:"):
+            self._trigger_manual_update()
 
         if self._active_popover:
             self._render_popover()
@@ -1662,6 +1732,47 @@ class UnifiedDashboard(ctk.CTk):
         self._render_hero_stage()
 
     # ---- Status & Handlers ----
+    def set_update_info(self, info: dict):
+        self._pending_update = info
+        if self._active_popover == "Options":
+            self._render_popover()
+
+    def _trigger_manual_update(self):
+        from tkinter import messagebox
+        from core.updater import AutoUpdater
+        upd = AutoUpdater()
+        info = getattr(self, "_pending_update", None)
+        if not info or not info.get("available"):
+            info = upd.check_for_update()
+        if not info.get("available"):
+            messagebox.showinfo("SoulsLights Up to Date", "You are already running the latest version of SoulsLights.")
+            return
+        self._pending_update = info
+        if self._active_popover == "Options":
+            self._render_popover()
+        if messagebox.askyesno(
+            "Update Available",
+            f"SoulsLights {info['version']} is available!\n\nDownload and restart automatically now?"
+        ):
+            ok, msg = upd.download_and_apply_update(info.get("url", ""))
+            if ok:
+                self._on_quit() if hasattr(self, "_on_quit") else self.destroy()
+            else:
+                import webbrowser
+                webbrowser.open(info.get("html_url", "https://github.com/s0u1ls/SoulsLights/releases/latest"))
+
+    def _sync_ui_from_config(self):
+        cfg = self.cfg_mgr.config
+        self.master_switch_var.set(cfg.get("master_enabled", True))
+        self.lumn_switch_var.set(cfg.get("ambient_enabled", True))
+        self.verci_switch_var.set(cfg.get("lyrics_enabled", True))
+        self.style_var.set(cfg["lyrics"].get("style", "Fisheye Visual"))
+        self.auto_sync_var.set(cfg["lyrics"].get("auto_sync_colors", True))
+        if self._active_popover:
+            self._render_popover()
+        self._render_sticky_header()
+        self._render_hero_stage()
+
     def _on_media_update(self, info):
         colors = tuple(info.get("colors", ["#D4E2EE", "#6B7280"]))
         if colors != self._last_pushed_colors:
@@ -1881,6 +1992,11 @@ class UnifiedDashboard(ctk.CTk):
         self.cfg_mgr.config["lyrics"]["font"] = val
         self.cfg_mgr.save_config()
         self.engine.lyrics_engine.set_font(val)
+
+    def _on_script_mode_change(self, val):
+        self.cfg_mgr.config["lyrics"]["script_mode"] = val
+        self.cfg_mgr.save_config()
+        self.engine.lyrics_engine.set_script_mode(val)
 
     def _on_font_scale_change(self, val):
         sc = round(float(val), 2)

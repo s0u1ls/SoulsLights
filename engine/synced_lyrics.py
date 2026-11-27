@@ -25,7 +25,8 @@ except Exception:
 from core.platform_utils import (
     IS_MAC, IS_WIN, get_app_data_dir, get_monitors,
     get_lyric_font_paths, get_fallback_font_entries,
-    load_truetype_safe, load_scalable_default_font
+    load_truetype_safe, load_scalable_default_font,
+    needs_complex_shaping, font_is_bold, shape_measure_text, shape_render_mask
 )
 
 if IS_WIN:
@@ -58,58 +59,254 @@ _SOCIAL_FEED_TITLES = {
     "threads", "snapchat", "youtube", "twitch", "netflix", "prime video", "spotify",
 }
 _JUNK_TITLE_RE = re.compile(
-    r"\s*[\(\[](?:official\s*(?:music\s*)?video|official\s*(?:lyric\s*)?(?:audio|video)|"
-    r"lyric(?:s)?(?:\s*video)?|audio(?:\s*only)?|visualizer|mv|hd|4k|explicit|"
+    r"(?:\s*[\(\[](?:official\s*(?:music\s*)?video|official\s*(?:lyric\s*)?(?:audio|video)|"
+    r"lyric(?:s)?(?:\s*video)?|full\s*(?:video\s*)?song|video\s*song|audio(?:\s*only)?|visualizer|mv|hd|4k|explicit|"
     r"from\s+[\"'\u201c\u2018]?[^\"\'\)\]]+[\"'\u201d\u2019]?|original\s+motion\s+picture\s+soundtrack|"
-    r"live(?:\s+at\s+[^\)\]]+)?|remaster(?:ed)?(?:\s*\d+)?|\d{4}\s+remaster)[\)\]]",
+    r"male\s*version|female\s*version|duet\s*version|unplugged|reprise|lofi|slowed\s*(?:\+|&|and)?\s*reverb|"
+    r"malayalam|hindi|tamil|telugu|kannada|"
+    r"live(?:\s+at\s+[^\)\]]+)?|remaster(?:ed)?(?:\s*\d+)?|\d{4}\s+remaster)[\)\]]|"
+    r"\s*[-–—]\s*(?:from\s+[\"'\u201c\u2018]?[^\"'\u201d\u2019|]+[\"'\u201d\u2019]?|male\s*version|female\s*version|duet\s*version|unplugged|reprise|lofi)|\s*\|.*$)",
     re.IGNORECASE,
 )
 _FEAT_RE = re.compile(r"\s*[\(\[](?:feat\.?|ft\.?|featuring)\s+[^\)\]]+[\)\]]", re.IGNORECASE)
 
 _class_registered = False
 
-# Curated Word Visuals mapping (reproducing Verci's expressive word icon index)
+# Curated Word Visuals mapping (reproducing Verci's expressive word icon index across English, Hindi & Malayalam)
 WORD_VISUALS = {
-    "love": "❤️", "loved": "❤️", "loving": "❤️", "lover": "❤️", "heart": "💓", "hearts": "💓",
-    "broken": "💔", "heartbreak": "💔", "fire": "🔥", "burn": "🔥", "burning": "🔥", "flame": "🔥",
-    "flames": "🔥", "hot": "🔥", "star": "⭐", "stars": "✨", "starboy": "⭐", "shine": "✨", "shining": "✨",
-    "sparkle": "✨", "magic": "✨", "soul": "✨", "believe": "✨", "moon": "🌙", "night": "🌙", "midnight": "🌙",
-    "tonight": "🌙", "sun": "☀️", "sunshine": "☀️", "morning": "🌅", "dawn": "🌅", "sunset": "🌇",
-    "day": "☀️", "light": "💡", "lights": "💡", "flash": "📸", "flashing": "📸", "shoot": "📸", "shootin": "📸", "shooting": "📸",
-    "glow": "✨", "bright": "🌟", "dark": "🌑", "darkness": "🌑", "shadow": "🌑", "shadows": "🌑",
-    "black": "🖤", "white": "🤍", "blue": "💙", "red": "❤️", "gold": "🪙", "golden": "✨",
-    "yellow": "💛", "green": "💚", "purple": "💜", "pink": "🩷", "rain": "🌧️", "raining": "🌧️",
-    "storm": "⛈️", "thunder": "⚡", "lightning": "⚡", "electric": "⚡", "energy": "⚡",
-    "cry": "💧", "crying": "💧", "tear": "💧", "tears": "💧", "water": "💧",
-    "ocean": "🌊", "sea": "🌊", "wave": "🌊", "waves": "🌊", "river": "🌊",
-    "sky": "☁️", "cloud": "☁️", "clouds": "☁️", "heaven": "☁️", "fly": "🕊️", "flying": "🕊️",
-    "wing": "🪶", "wings": "🪶", "angel": "👼", "angels": "👼", "devil": "😈", "demon": "😈",
-    "ghost": "👻", "ghosts": "👻", "dream": "💭", "dreams": "💭", "dreaming": "💭", "sleep": "😴",
-    "wake": "👀", "eyes": "👁️", "eye": "👁️", "look": "👀", "looking": "👀", "see": "👀",
-    "watch": "👀", "blind": "🕶️", "music": "🎵", "song": "🎵", "sing": "🎤", "singing": "🎤",
-    "voice": "🎙️", "sound": "🔊", "dance": "💃", "dancing": "💃", "party": "🎉", "drink": "🥂",
-    "wine": "🍷", "kiss": "💋", "kissing": "💋", "lips": "💋", "smile": "😊", "laugh": "😄",
-    "happy": "😊", "sad": "😔", "lonely": "🥀", "alone": "🥀", "rose": "🌹", "roses": "🌹",
-    "flower": "🌸", "flowers": "🌸", "bloom": "🌺", "wood": "🌳", "tree": "🌳", "forest": "🌲", "leaf": "🍃",
-    "wind": "💨", "air": "💨", "breathe": "🌬️", "breath": "🌬️", "cold": "❄️", "ice": "🧊",
-    "snow": "❄️", "winter": "❄️", "summer": "🌴", "spring": "🌷", "fall": "🍂", "time": "⏳",
-    "clock": "🕰️", "hour": "⏳", "hours": "⏳", "wait": "⏳", "waiting": "⏳", "forever": "♾️",
-    "always": "♾️", "world": "🌍", "earth": "🌍", "city": "🏙️", "street": "🛣️", "road": "🛣️",
-    "highway": "🛣️", "drive": "🚗", "car": "🚗", "cars": "🚗", "wagon": "🚙", "shoe": "👟", "shoes": "👠",
-    "run": "🏃", "running": "🏃", "home": "🏠", "house": "🏠", "crib": "🏠", "floor": "🪵", "floors": "🪵",
-    "door": "🚪", "window": "🪟", "room": "🛋️", "bed": "🛏️", "hand": "✋", "hands": "🤲",
-    "hold": "🤝", "touch": "✨", "mind": "🧠", "head": "🧠", "thought": "💭", "thoughts": "💭",
-    "memory": "🎞️", "memories": "🎞️", "king": "👑", "queen": "👑", "crown": "👑", "legend": "🏆",
-    "diamond": "💎", "diamonds": "💎", "money": "💵", "cash": "💵", "rich": "💎", "lavish": "💎", "win": "🏆",
-    "phone": "📱", "call": "📞", "calling": "📞", "message": "💬", "text": "💬", "letter": "✉️",
-    "book": "📖", "story": "📖", "write": "✍️", "word": "💬", "words": "💬", "truth": "🔆",
-    "lie": "🎭", "lies": "🎭", "mask": "🎭", "fight": "⚔️", "war": "⚔️", "sword": "⚔️",
-    "gun": "💥", "shot": "💥", "boom": "💥", "bandit": "🏴‍☠️", "fast": "💨", "slow": "🐢", "high": "🚀",
-    "space": "🪐", "planet": "🪐", "rocket": "🚀", "galaxy": "🌌", "universe": "🌌", "blood": "🩸",
-    "pain": "🩹", "hurt": "🩹", "heal": "🌿", "peace": "🕊️", "pray": "🙏", "god": "✨",
-    "coffee": "☕", "tea": "🍵", "baby": "👶", "boy": "🧑", "girl": "👩", "mama": "🫶", "friend": "🫂",
-    "friends": "🫂", "family": "🏡", "stay": "🫂", "gone": "💨", "bye": "👋", "hello": "👋",
-    "grocery": "🛒", "new": "✨", "tease": "😏",
+    # Love, romance, emotion & relationships
+    "love": "❤️", "loved": "❤️", "loving": "❤️", "lover": "❤️", "beloved": "❤️", "romance": "💕", "romantic": "💕",
+    "crush": "💘", "cupid": "💘", "valentine": "💝", "affection": "💖", "adore": "😍", "adoring": "😍",
+    "heart": "💓", "hearts": "💓", "heartbeat": "💗", "pulse": "💓", "chest": "💓", "soul": "✨", "souls": "✨",
+    "broken": "💔", "heartbreak": "💔", "heartbroken": "💔", "shatter": "💔", "shattered": "💔", "ache": "🩹",
+    "kiss": "💋", "kissing": "💋", "kisses": "💋", "lips": "💋", "lip": "💋", "hug": "🫂", "embrace": "🫂",
+    "baby": "👶", "babe": "💖", "darling": "💖", "sweetheart": "💖", "honey": "🍯", "sugar": "🍬",
+    "girl": "👩", "girls": "👩", "woman": "👩", "women": "👩", "lady": "👩",
+    "boy": "🧑", "boys": "🧑", "man": "🧑", "men": "🧑", "guy": "🧑",
+    "friend": "🫂", "friends": "🫂", "bestie": "🫂", "homie": "🫂", "crew": "👥", "squad": "👥",
+    "family": "🏡", "mama": "🫶", "mom": "🫶", "mother": "🫶", "papa": "🫶", "dad": "🫶", "father": "🫶",
+    "brother": "🤜", "sister": "🫶", "wife": "💍", "husband": "💍", "bride": "👰", "marry": "💍", "wedding": "💒",
+    "miss": "💭", "missing": "💭", "lonely": "🥀", "alone": "🥀", "solitude": "🥀", "empty": "🕳️",
+    "happy": "😊", "joy": "😊", "glad": "😊", "bliss": "😌", "smile": "😊", "smiling": "😊", "grin": "😁",
+    "laugh": "😄", "laughing": "😄", "giggle": "😄", "lol": "😂", "tease": "😏", "wink": "😉",
+    "sad": "😔", "sorrow": "😔", "grief": "😢", "cry": "💧", "crying": "💧", "sob": "😭", "weeping": "😭",
+    "tear": "💧", "tears": "💧", "angry": "😠", "mad": "😡", "rage": "🔥", "fury": "💥", "hate": "🖤",
+    "fear": "😨", "scared": "😨", "afraid": "😰", "panic": "😱", "nervous": "😬", "shy": "🫣",
+    "brave": "🦁", "strong": "💪", "power": "⚡", "powerful": "⚡", "weak": "🩹", "tired": "😴",
+    "trust": "🤝", "promise": "🤞", "swear": "🤞", "believe": "✨", "faith": "🙏", "hope": "🌟", "wish": "🌠",
+    "sorry": "🙏", "forgive": "🕊️", "please": "🙏", "thank": "🙏", "thanks": "🙏", "bless": "✨", "blessed": "🙏",
+    "jealous": "😒", "envy": "🐍", "crazy": "🤪", "insane": "🌀", "wild": "🐆", "numb": "🧊", "chill": "🧊",
+
+    # Fire, light, sky, space & nature
+    "fire": "🔥", "burn": "🔥", "burning": "🔥", "flame": "🔥", "flames": "🔥", "blaze": "🔥", "lit": "🔥",
+    "hot": "🔥", "heat": "🔥", "warm": "☀️", "warmth": "☀️", "spark": "✨", "sparks": "✨", "smoke": "💨",
+    "ash": "🌫️", "ashes": "🌫️", "dust": "🌫️", "explode": "💥", "explosion": "💥", "boom": "💥", "blast": "💥",
+    "star": "⭐", "stars": "✨", "starboy": "⭐", "starlight": "🌟", "shine": "✨", "shining": "✨", "sparkle": "✨",
+    "glitter": "✨", "glow": "✨", "glowing": "✨", "bright": "🌟", "radiant": "🌟", "neon": "🔆", "laser": "🔆",
+    "light": "💡", "lights": "💡", "lamp": "💡", "bulb": "💡", "candle": "🕯️", "lantern": "🏮", "torch": "🔦",
+    "magic": "✨", "magical": "✨", "spell": "🪄", "wand": "🪄", "illusion": "🌀", "miracle": "🌟",
+    "moon": "🌙", "moonlight": "🌙", "lunar": "🌙", "crescent": "🌙", "night": "🌙", "nights": "🌙",
+    "midnight": "🌙", "tonight": "🌙", "evening": "🌆", "dusk": "🌆", "twilight": "🌇",
+    "sun": "☀️", "sunlight": "☀️", "sunshine": "☀️", "sunny": "☀️", "morning": "🌅", "dawn": "🌅",
+    "sunrise": "🌅", "sunset": "🌇", "day": "☀️", "daylight": "☀️", "noon": "☀️", "afternoon": "🌤️",
+    "dark": "🌑", "darkness": "🌑", "blackout": "🌑", "shadow": "🌑", "shadows": "🌑", "shade": "🌑", "eclipse": "🌑",
+    "flash": "📸", "flashing": "📸", "camera": "📷", "photo": "📷", "picture": "🖼️", "shoot": "📸", "shootin": "📸", "shooting": "📸",
+    "rain": "🌧️", "raining": "🌧️", "raindrop": "💧", "drizzle": "🌦️", "storm": "⛈️", "hurricane": "🌀",
+    "tornado": "🌪️", "thunder": "⚡", "lightning": "⚡", "electric": "⚡", "electricity": "⚡", "shock": "⚡",
+    "energy": "⚡", "volt": "⚡", "charge": "🔋", "battery": "🔋",
+    "water": "💧", "drop": "💧", "splash": "💦", "wet": "💦", "flood": "🌊", "stream": "💧", "fountain": "⛲",
+    "ocean": "🌊", "sea": "🌊", "wave": "🌊", "waves": "🌊", "surf": "🏄", "tide": "🌊", "river": "🌊", "lake": "🏞️",
+    "sky": "☁️", "skies": "☁️", "cloud": "☁️", "clouds": "☁️", "fog": "🌫️", "mist": "🌫️", "rainbow": "🌈",
+    "heaven": "☁️", "paradise": "🌴", "hell": "🔥", "fly": "🕊️", "flying": "🕊️", "flight": "✈️",
+    "float": "🎈", "floating": "🎈", "balloon": "🎈", "wing": "🪶", "wings": "🪶", "feather": "🪶",
+    "angel": "👼", "angels": "👼", "halo": "😇", "devil": "😈", "demon": "😈", "demons": "😈", "evil": "😈",
+    "ghost": "👻", "ghosts": "👻", "spirit": "👻", "monster": "👾", "alien": "👽", "skull": "💀",
+    "dream": "💭", "dreams": "💭", "dreaming": "💭", "nightmare": "😱", "sleep": "😴", "sleeping": "😴", "asleep": "😴",
+    "wake": "👀", "woke": "👀", "awake": "👀", "eyes": "👁️", "eye": "👁️", "look": "👀", "looking": "👀",
+    "see": "👀", "seeing": "👀", "watch": "👀", "watching": "👀", "stare": "👀", "blind": "🕶️", "shades": "🕶️", "sunglasses": "🕶️",
+    "cold": "❄️", "freeze": "🥶", "freezing": "🥶", "frozen": "🧊", "ice": "🧊", "icy": "🧊", "chill": "❄️",
+    "snow": "❄️", "snowing": "❄️", "snowman": "☃️", "frost": "❄️", "winter": "❄️", "summer": "🌴", "spring": "🌷", "autumn": "🍂", "fall": "🍂",
+    "rose": "🌹", "roses": "🌹", "flower": "🌸", "flowers": "🌸", "blossom": "🌸", "petal": "🌸", "bloom": "🌺",
+    "tulip": "🌷", "sunflower": "🌻", "bouquet": "💐", "lotus": "🪷", "cactus": "🌵", "palm": "🌴",
+    "wood": "🌳", "woods": "🌲", "tree": "🌳", "trees": "🌳", "forest": "🌲", "jungle": "🌴", "leaf": "🍃", "leaves": "🍃",
+    "plant": "🪴", "seed": "🌱", "grow": "🌱", "earth": "🌍", "world": "🌍", "globe": "🌍", "planet": "🪐",
+    "space": "🪐", "galaxy": "🌌", "universe": "🌌", "cosmos": "🌌", "comet": "☄️", "meteor": "☄️", "rocket": "🚀",
+    "wind": "💨", "breeze": "🍃", "air": "💨", "breathe": "🌬️", "breath": "🌬️", "exhale": "💨", "sigh": "😮‍💨",
+    "mountain": "⛰️", "mountains": "🏔️", "hill": "⛰️", "volcano": "🌋", "island": "🏝️", "beach": "🏖️", "sand": "🏜️", "desert": "🏜️",
+
+    # Music, performance, body, actions & expressions
+    "music": "🎵", "song": "🎵", "songs": "🎶", "melody": "🎶", "rhythm": "🥁", "beat": "🥁", "bass": "🔊",
+    "tempo": "⏱️", "sing": "🎤", "singing": "🎤", "sang": "🎤", "singer": "🎤", "mic": "🎤", "microphone": "🎙️",
+    "voice": "🎙️", "sound": "🔊", "volume": "🔊", "loud": "📢", "noise": "📢", "quiet": "🤫", "silence": "🤫", "whisper": "🗣️",
+    "scream": "🗣️", "shout": "📢", "echo": "〰️", "radio": "📻", "headphones": "🎧", "speaker": "🔊",
+    "guitar": "🎸", "piano": "🎹", "keys": "🎹", "violin": "🎻", "trumpet": "🎺", "sax": "🎷", "drum": "🥁", "drums": "🥁",
+    "dance": "💃", "dancing": "💃", "dancer": "💃", "ballet": "🩰", "disco": "🪩", "groove": "🕺", "party": "🎉",
+    "celebrate": "🎉", "confetti": "🎊", "cheers": "🥂", "toast": "🥂", "club": "🪩", "stage": "🎭", "spotlight": "🔦",
+    "movie": "🎬", "film": "🎞️", "cinema": "🍿", "popcorn": "🍿", "video": "📹", "record": "💿", "vinyl": "💿", "album": "💿",
+    "hand": "✋", "hands": "🤲", "clap": "👏", "wave": "👋", "punch": "👊", "fist": "✊", "hold": "🤝", "holding": "🤝",
+    "touch": "✨", "touching": "✨", "fingers": "🫰", "snap": "🫰", "point": "👉",
+    "mind": "🧠", "brain": "🧠", "head": "🧠", "think": "💭", "thought": "💭", "thoughts": "💭", "idea": "💡",
+    "memory": "🎞️", "memories": "🎞️", "remember": "🎞️", "forget": "😶‍🌫️", "focus": "🎯", "target": "🎯",
+    "mouth": "👄", "tongue": "👅", "tooth": "🦷", "ear": "👂", "hear": "👂", "listen": "🎧", "nose": "👃",
+    "run": "🏃", "running": "🏃", "sprint": "🏃", "walk": "🚶", "walking": "🚶", "step": "👣", "steps": "👣",
+    "footprint": "👣", "jump": "🤸", "fall": "🍂", "falling": "🍂", "slip": "🍌", "climb": "🧗", "swim": "🏊",
+    "kick": "🦵", "spin": "🌀", "turn": "🔄", "stop": "🛑", "pause": "⏸️", "play": "▶️", "rewind": "⏪", "fast": "⚡", "slow": "🐢",
+    "high": "🚀",
+
+    # Style, objects, city, travel, wealth, weapons & games
+    "city": "🏙️", "town": "🏘️", "downtown": "🌆", "skyline": "🏙️", "building": "🏢", "tower": "🗼", "castle": "🏰", "palace": "🏰",
+    "street": "🛣️", "streets": "🛣️", "road": "🛣️", "roads": "🛣️", "avenue": "🛣️", "highway": "🛣️", "alley": "🧱",
+    "bridge": "🌉", "traffic": "🚦", "redlight": "🚦", "map": "🗺️", "compass": "🧭", "north": "🧭", "south": "🧭",
+    "drive": "🚗", "driving": "🚗", "car": "🚗", "cars": "🚗", "whip": "🏎️", "race": "🏎️", "racing": "🏎️", "speed": "🏎️",
+    "wagon": "🚙", "truck": "🚚", "bus": "🚌", "taxi": "🚕", "cab": "🚕", "police": "🚓", "siren": "🚨",
+    "train": "🚆", "subway": "🚇", "bike": "🏍️", "motorcycle": "🏍️", "bicycle": "🚲", "plane": "✈️", "airplane": "✈️", "jet": "✈️",
+    "ship": "🚢", "boat": "⛵", "sail": "⛵", "anchor": "⚓", "travel": "🧳", "trip": "✈️", "vacation": "🏝️",
+    "home": "🏠", "house": "🏠", "crib": "🏠", "apartment": "🏢", "roof": "🏠", "floor": "🪵", "floors": "🪵",
+    "wall": "🧱", "walls": "🧱", "door": "🚪", "window": "🪟", "mirror": "🪞", "room": "🛋️", "couch": "🛋️", "sofa": "🛋️",
+    "bed": "🛏️", "pillow": "🛏️", "kitchen": "🍳", "bath": "🛁", "shower": "🚿",
+    "shoe": "👟", "shoes": "👠", "sneaker": "👟", "sneakers": "👟", "heels": "👠", "boot": "👢", "boots": "👢",
+    "dress": "👗", "suit": "🤵", "shirt": "👕", "jacket": "🧥", "coat": "🧥", "hat": "🧢", "cap": "🧢", "bag": "👜",
+    "glasses": "👓", "watch": "⌚", "clock": "🕰️", "time": "⏳", "hour": "⏳", "hours": "⏳", "minute": "⏱️", "second": "⏱️",
+    "wait": "⏳", "waiting": "⏳", "forever": "♾️", "eternity": "♾️", "always": "♾️", "infinite": "♾️",
+    "today": "📅", "tomorrow": "📆", "yesterday": "🕰️", "birthday": "🎂", "calendar": "📅",
+    "king": "👑", "queen": "👑", "prince": "👑", "princess": "👸", "crown": "👑", "throne": "🪑", "royal": "👑",
+    "legend": "🏆", "champion": "🏆", "winner": "🏆", "win": "🏆", "trophy": "🏆", "medal": "🥇", "first": "🥇",
+    "diamond": "💎", "diamonds": "💎", "crystal": "🔮", "gem": "💎", "ring": "💍", "chain": "⛓️", "chains": "⛓️",
+    "money": "💵", "cash": "💵", "dollar": "💵", "dollars": "💵", "bills": "💵", "bank": "🏦", "coin": "🪙", "coins": "🪙",
+    "rich": "💎", "wealth": "💰", "treasure": "💰", "lavish": "💎", "luxury": "💎", "expensive": "💎", "baggage": "💰",
+    "phone": "📱", "cell": "📱", "call": "📞", "calling": "📞", "ringing": "📞", "text": "💬", "message": "💬", "chat": "💬",
+    "mail": "✉️", "letter": "✉️", "inbox": "📥", "screen": "🖥️", "laptop": "💻", "computer": "💻", "code": "💻",
+    "book": "📖", "books": "📚", "page": "📄", "story": "📖", "poem": "📜", "write": "✍️", "writing": "✍️", "pen": "🖊️",
+    "ink": "🖋️", "paint": "🎨", "art": "🎨", "draw": "✏️", "word": "💬", "words": "💬", "truth": "🔆",
+    "lie": "🎭", "lies": "🎭", "fake": "🎭", "mask": "🎭", "secret": "🤫", "mystery": "🔍", "search": "🔍",
+    "key": "🔑", "keys": "🔑", "lock": "🔒", "locked": "🔒", "unlock": "🔓", "free": "🕊️", "freedom": "🕊️", "cage": "⛓️",
+    "fight": "⚔️", "fighting": "⚔️", "battle": "⚔️", "war": "⚔️", "sword": "⚔️", "knife": "🔪", "blade": "🗡️",
+    "gun": "💥", "shot": "💥", "trigger": "💥", "bullet": "💥", "bomb": "💣", "danger": "⚠️", "warning": "⚠️",
+    "bandit": "🏴‍☠️", "pirate": "🏴‍☠️", "thief": "🥷", "ninja": "🥷", "knight": "🛡️", "shield": "🛡️",
+    "peace": "🕊️", "pray": "🙏", "praying": "🙏", "god": "✨", "karma": "♾️", "luck": "🍀", "lucky": "🍀", "dice": "🎲",
+    "game": "🎮", "games": "🎮", "chess": "♟️", "card": "🃏", "cards": "🃏", "joker": "🃏", "magic8": "🎱",
+    "blood": "🩸", "bleed": "🩸", "bleeding": "🩸", "pain": "🩹", "hurt": "🩹", "scar": "🩹", "heal": "🌿", "medicine": "💊", "pill": "💊",
+    "coffee": "☕", "espresso": "☕", "tea": "🍵", "drink": "🥂", "drinks": "🍹", "wine": "🍷", "champagne": "🍾",
+    "beer": "🍺", "cocktail": "🍸", "bottle": "🍾", "cup": "🥤", "milk": "🥛",
+    "candy": "🍬", "sweet": "🍭", "chocolate": "🍫", "cake": "🍰", "cookie": "🍪", "cherry": "🍒", "strawberry": "🍓",
+    "peach": "🍑", "apple": "🍎", "lemon": "🍋", "grape": "🍇", "bread": "🍞", "pizza": "🍕", "grocery": "🛒", "shop": "🛍️", "shopping": "🛍️",
+    "gift": "🎁", "present": "🎁", "ribbon": "🎀", "new": "✨", "fresh": "✨", "clean": "🧼", "perfume": "🧴",
+
+    # Colors & Animals
+    "black": "🖤", "white": "🤍", "red": "❤️", "blue": "💙", "green": "💚", "yellow": "💛", "gold": "✨", "golden": "✨",
+    "silver": "🪙", "purple": "💜", "violet": "💜", "pink": "🩷", "orange": "🧡", "brown": "🤎",
+    "bird": "🐦", "birds": "🕊️", "dove": "🕊️", "eagle": "🦅", "owl": "🦉", "crow": "🐦", "swan": "🦢", "flamingo": "🦩",
+    "butterfly": "🦋", "butterflies": "🦋", "bee": "🐝", "spider": "🕷️", "web": "🕸️",
+    "lion": "🦁", "tiger": "🐯", "wolf": "🐺", "fox": "🦊", "dog": "🐶", "puppy": "🐶", "cat": "🐱", "kitten": "🐱",
+    "snake": "🐍", "dragon": "🐉", "horse": "🐎", "unicorn": "🦄", "deer": "🦌", "bear": "🐻", "shark": "🦈", "whale": "🐋", "dolphin": "🐬",
+
+    # Punchy numeric / greeting visuals without cluttering grammar words
+    "nothing": "⭕", "zero": "0️⃣", "hundred": "💯", "million": "💰",
+    "bye": "👋", "hello": "👋", "hey": "👋",
+
+    # Hindi / Hinglish lyric visuals (Romanized + Devanagari)
+    "pyar": "❤️", "pyaar": "❤️", "mohabbat": "❤️", "ishq": "❤️", "prem": "❤️", "chahat": "💘", "ashiqui": "❤️", "aashiqui": "❤️",
+    "dil": "💓", "dharkan": "💓", "dhadkan": "💓", "jaan": "💖", "jaanu": "💖", "sanam": "❤️", "mehboob": "❤️", "dilbar": "💖",
+    "humsafar": "🫂", "saath": "🤝", "yaar": "🫂", "dost": "🫂", "dosti": "🫂", "zindagi": "✨", "jeevan": "✨", "duniya": "🌍",
+    "jahan": "🌍", "chaand": "🌙", "chand": "🌙", "chandni": "🌙", "raat": "🌙", "raatein": "🌙", "subah": "🌅", "sawera": "🌅", "bhor": "🌅",
+    "sham": "🌇", "shaam": "🌇", "suraj": "☀️", "dhoop": "☀️", "chhaon": "☁️", "roshni": "💡", "ujala": "💡", "noor": "✨",
+    "andhera": "🌑", "sitara": "⭐", "sitare": "✨", "taare": "✨", "taara": "⭐", "deepak": "🪔", "diya": "🪔", "chiraag": "🪔",
+    "barish": "🌧️", "baarish": "🌧️", "barsaat": "🌧️", "sawan": "🌧️", "saawan": "🌧️", "badal": "☁️", "baadal": "☁️",
+    "aasmaan": "☁️", "aasman": "☁️", "falak": "🌌", "zameen": "🌍", "paani": "💧", "pani": "💧", "nadi": "🌊",
+    "samundar": "🌊", "lehar": "🌊", "kinaara": "🏖️", "kashti": "⛵", "aankhein": "👀", "aankh": "👁️", "nazar": "👀",
+    "nigaah": "👀", "chehra": "✨", "khwab": "💭", "khwaab": "💭", "sapna": "💭", "sapne": "💭", "yaad": "🎞️", "yaadein": "🎞️",
+    "aansu": "💧", "ashq": "💧", "rona": "💧", "muskaan": "😊", "hasi": "😄", "khushi": "😊", "gham": "😔", "dard": "🩹", "zakhm": "🩹",
+    "aag": "🔥", "shola": "🔥", "hawa": "💨", "toofan": "⛈️", "bijli": "⚡", "barf": "❄️",
+    "phool": "🌸", "gul": "🌹", "gulab": "🌹", "kali": "🌷", "bagh": "🌿", "titali": "🦋", "titli": "🦋", "parinda": "🕊️", "pankh": "🪶",
+    "waqt": "⏳", "pal": "⏳", "lamha": "⏳", "lamhe": "⏳", "intezar": "⏳", "safar": "🛣️", "raasta": "🛣️", "manzil": "🏔️",
+    "geet": "🎵", "sangeet": "🎶", "dhun": "🎶", "awaaz": "🎙️", "khamoshi": "🤫", "shor": "📢", "nach": "💃", "naach": "💃",
+    "nasha": "🍾", "sharab": "🍷", "jaam": "🥂", "rang": "🎨", "gulabi": "🩷", "neela": "💙", "kaala": "🖤", "safed": "🤍",
+    "sona": "✨", "chandi": "🪙", "heera": "💎", "moti": "💎", "taaj": "👑", "raja": "👑", "rani": "👑",
+    "vaada": "🤞", "kasam": "🤞", "duaa": "🙏", "dua": "🙏", "shukriya": "🙏", "alvida": "👋", "deewana": "💘", "ajnabi": "👤",
+    "प्यार": "❤️", "मोहब्बत": "❤️", "इश्क": "❤️", "इश्क़": "❤️", "दिल": "💓", "धड़कन": "💓", "जान": "💖", "सनम": "❤️",
+    "महबूब": "❤️", "हमसफ़र": "🫂", "दोस्त": "🫂", "यार": "🫂", "ज़िंदगी": "✨", "जिंदगी": "✨", "दुनिया": "🌍",
+    "चाँद": "🌙", "चांद": "🌙", "चांदनी": "🌙", "रात": "🌙", "रातें": "🌙", "सुबह": "🌅", "सवेरा": "🌅", "शाम": "🌇",
+    "सूरज": "☀️", "धूप": "☀️", "रोशनी": "💡", "उजाला": "💡", "नूर": "✨", "अंधेरा": "🌑", "तारे": "✨", "तारा": "⭐", "सितारा": "⭐",
+    "बारिश": "🌧️", "बरसात": "🌧️", "सावन": "🌧️", "बादल": "☁️", "आसमान": "☁️", "ज़मीन": "🌍", "पानी": "💧", "नदी": "🌊", "लहर": "🌊", "किनारा": "🏖️", "कश्ती": "⛵",
+    "आँखें": "👀", "आंखें": "👀", "नज़र": "👀", "चेहरा": "✨", "ख्वाब": "💭", "सपना": "💭", "सपने": "💭", "याद": "🎞️", "यादें": "🎞️",
+    "आँसू": "💧", "आंसू": "💧", "मुस्कान": "😊", "हँसी": "😄", "खुशी": "😊", "दर्द": "🩹", "ग़म": "😔",
+    "आग": "🔥", "हवा": "💨", "तूफ़ान": "⛈️", "बिजली": "⚡", "फूल": "🌸", "गुलाब": "🌹", "तितली": "🦋", "पंछी": "🕊️", "पंख": "🪶",
+    "वक़्त": "⏳", "वक्त": "⏳", "पल": "⏳", "लम्हा": "⏳", "इंतज़ार": "⏳", "सफर": "🛣️", "सफ़र": "🛣️", "रास्ता": "🛣️", "मंज़िल": "🏔️",
+    "गीत": "🎵", "संगीत": "🎶", "धुन": "🎶", "आवाज़": "🎙️", "ख़ामोशी": "🤫", "नशा": "🍾", "जाम": "🥂", "रंग": "🎨",
+    "सोना": "✨", "हीरा": "💎", "ताज": "👑", "राजा": "👑", "रानी": "👑", "वादा": "🤞", "दुआ": "🙏", "अलविदा": "👋", "दीवाना": "💘", "दीया": "🪔",
+
+    # Malayalam / Manglish lyric visuals (Romanized + Malayalam Unicode)
+    "sneham": "❤️", "sneeham": "❤️", "pranayam": "❤️", "ishtam": "❤️", "premam": "❤️", "anuraagam": "💖",
+    "hridayam": "💓", "nenjam": "💓", "uyir": "✨", "jeevan": "✨", "jeevitham": "✨", "aathmaavu": "✨",
+    "mazha": "🌧️", "mazhai": "🌧️", "mazhakkaalam": "🌧️", "kaattu": "💨", "kattu": "💨", "thennal": "🍃",
+    "kadal": "🌊", "thira": "🌊", "puzha": "🌊", "nadi": "🌊", "theeram": "🏖️", "thoni": "⛵", "kappal": "🚢",
+    "nila": "🌙", "nilaavu": "🌙", "nilavu": "🌙", "ambili": "🌙", "chandran": "🌙", "raathri": "🌙", "rathri": "🌙", "ravu": "🌙",
+    "pakal": "☀️", "suryan": "☀️", "veyil": "☀️", "prabhatham": "🌅", "pulari": "🌅", "sandhya": "🌇", "sayam": "🌇",
+    "velicham": "💡", "prakasham": "✨", "irul": "🌑", "niram": "🎨", "varnam": "🎨",
+    "nakshathram": "⭐", "tharam": "⭐", "tharakam": "✨", "akasham": "☁️", "aakaasham": "☁️", "megham": "☁️", "manju": "❄️",
+    "minnal": "⚡", "idi": "⛈️", "minnaminni": "✨", "kanneer": "💧", "kannu": "👀", "mizhi": "👀", "mizhikal": "👀",
+    "chiri": "😊", "punchiri": "😊", "mukhams": "✨", "swapnam": "💭", "kinaavu": "💭", "kinavu": "💭",
+    "ormakal": "🎞️", "orma": "🎞️", "poovu": "🌸", "pookkal": "🌸", "malar": "🌺", "poomaram": "🌳", "mullappoo": "🌸",
+    "thee": "🔥", "agni": "🔥", "kaalam": "⏳", "kalam": "⏳", "samayam": "⏳", "neram": "⏳", "yathra": "🛣️", "vazhi": "🛣️",
+    "paattu": "🎵", "pattu": "🎵", "sangeetham": "🎶", "ragam": "🎶", "thalam": "🥁", "chenda": "🥁", "veena": "🎻",
+    "kuyil": "🐦", "kili": "🐦", "pakshi": "🕊️", "thumbi": "🦋", "mayil": "🦚", "chiraku": "🪶",
+    "thozhan": "🫂", "sakhi": "🫂", "koottu": "🫂", "veedu": "🏠", "kudil": "🏡", "vaathil": "🚪", "janala": "🪟", "kannadi": "🪞",
+    "mutthu": "💎", "swarnam": "✨", "velli": "🪙", "rajavu": "👑", "rani": "👑", "shanthi": "🕊️", "prarthana": "🙏", "daivam": "✨",
+    "സ്നേഹം": "❤️", "പ്രണയം": "❤️", "ഇഷ്ടം": "❤️", "ഹൃദയം": "💓", "നെഞ്ച്": "💓", "ജീവൻ": "✨", "ജീവിതം": "✨",
+    "മഴ": "🌧️", "നിലാവ്": "🌙", "നിലാ": "🌙", "അമ്പിളി": "🌙", "രാത്രി": "🌙", "രാവ്": "🌙", "ചന്ദ്രൻ": "🌙",
+    "സൂര്യൻ": "☀️", "വെയിൽ": "☀️", "പകൽ": "☀️", "പുലരി": "🌅", "സന്ധ്യ": "🌇", "വെളിച്ചം": "💡", "ഇരുൾ": "🌑",
+    "നക്ഷത്രം": "⭐", "താരം": "⭐", "മിന്നാമിന്നി": "✨", "ആകാശം": "☁️", "മേഘം": "☁️", "മഞ്ഞ്": "❄️",
+    "കാറ്റ്": "💨", "തെന്നൽ": "🍃", "മിന്നൽ": "⚡", "ഇടി": "⛈️", "കടൽ": "🌊", "തിര": "🌊", "പുഴ": "🌊", "തീരം": "🏖️", "തോണി": "⛵",
+    "മിഴി": "👀", "മിഴികൾ": "👀", "കണ്ണ്": "👀", "കണ്ണീർ": "💧", "ചിരി": "😊", "പുഞ്ചിരി": "😊",
+    "സ്വപ്നം": "💭", "കിനാവ്": "💭", "ഓർമ്മ": "🎞️", "ഓർമ്മകൾ": "🎞️", "പൂവ്": "🌸", "പൂക്കൾ": "🌸", "മലർ": "🌺", "പൂമരം": "🌳",
+    "തീ": "🔥", "കാലം": "⏳", "സമയം": "⏳", "നേരം": "⏳", "ലോകം": "🌍", "യാത്ര": "🛣️", "വഴി": "🛣️",
+    "പാട്ട്": "🎵", "സംഗീതം": "🎶", "രാഗം": "🎶", "താളം": "🥁", "കുയിൽ": "🐦", "കിളി": "🐦", "തുമ്പി": "🦋", "മയിൽ": "🦚", "ചിറക്": "🪶",
+    "വീട്": "🏠", "വാതിൽ": "🚪", "ജനാല": "🪟", "കണ്ണാടി": "🪞", "സ്വർണ്ണം": "✨", "മുത്ത്": "💎", "രാജാവ്": "👑", "ശാന്തി": "🕊️", "പ്രാർത്ഥന": "🙏",
+
+    # Tamil / Tanglish lyric visuals (Romanized + Tamil Unicode)
+    "kaadhal": "❤️", "kadhal": "❤️", "anbu": "💖", "paasam": "🫂", "idhayam": "💓", "nenjam": "💓", "uyir": "✨", "aathma": "✨",
+    "mazhai": "🌧️", "nilaa": "🌙", "nila": "🌙", "nilavu": "🌙", "chandran": "🌙", "iravu": "🌙", "pagal": "☀️", "sooriyan": "☀️",
+    "kaalai": "🌅", "maalai": "🌇", "vaanam": "☁️", "megam": "☁️", "minnal": "⚡", "idi": "⛈️", "kaatru": "💨", "thendral": "🍃",
+    "kadal": "🌊", "alai": "🌊", "nadhi": "🌊", "malar": "🌺", "poo": "🌸", "pookkal": "🌸", "roja": "🌹",
+    "thee": "🔥", "neruppu": "🔥", "kann": "👁️", "kangal": "👀", "kanneer": "💧", "sirippu": "😊", "punnagai": "😊",
+    "kanavu": "💭", "ninaivu": "🎞️", "ulagam": "🌍", "payanam": "🛣️", "vazhi": "🛣️", "paattu": "🎵", "isai": "🎶",
+    "thangam": "✨", "velli": "🪙", "vairam": "💎", "raja": "👑", "rani": "👑", "veedu": "🏠", "natchathiram": "⭐",
+    "காதல்": "❤️", "அன்பு": "💖", "பாசம்": "🫂", "இதயம்": "💓", "நெஞ்சம்": "💓", "உயிர்": "✨", "மழை": "🌧️",
+    "நிலா": "🌙", "நிலவு": "🌙", "சந்திரன்": "🌙", "சூரியன்": "☀️", "இரவு": "🌙", "பகல்": "☀️", "காலை": "🌅", "மாலை": "🌇",
+    "வானம்": "☁️", "மேகம்": "☁️", "மின்னல்": "⚡", "இடி": "⛈️", "காற்று": "💨", "தென்றல்": "🍃", "கடல்": "🌊", "அலை": "🌊", "நதி": "🌊",
+    "மலர்": "🌺", "பூ": "🌸", "பூக்கள்": "🌸", "ரோஜா": "🌹", "தீ": "🔥", "நெருப்பு": "🔥", "கண்": "👁️", "கண்கள்": "👀", "கண்ணீர்": "💧",
+    "சிரிப்பு": "😊", "புன்னகை": "😊", "கனவு": "💭", "நினைவு": "🎞️", "உலகம்": "🌍", "பயணம்": "🛣️", "வழி": "🛣️",
+    "பாட்டு": "🎵", "இசை": "🎶", "தங்கம்": "✨", "வைரம்": "💎", "ராஜா": "👑", "ராணி": "👑", "வீடு": "🏠", "நட்சத்திரம்": "⭐",
+
+    # Extra high-frequency English pop/R&B/rap/indie words for dense expressive Visual lyrics
+    "feel": "💫", "feeling": "💫", "mood": "✨", "vibe": "✨", "vibes": "✨", "aura": "✨", "glowup": "✨",
+    "stay": "🫂", "leave": "🚪", "leaving": "🚪", "fade": "🌫️", "fading": "🌫️", "lost": "🧭", "found": "🧭",
+    "save": "🛟", "rescue": "🛟", "alive": "⚡", "dead": "💀", "die": "💀", "dying": "🥀", "born": "🌟",
+    "young": "✨", "forever": "♾️", "truth": "🔆", "honest": "🔆", "secret": "🤫", "whisper": "🗣️",
+    "close": "🫂", "apart": "💔", "distance": "🛣️", "far": "🌌", "deep": "🌊", "drown": "🌊", "drowning": "🌊",
+    "sink": "⚓", "float": "🎈", "rise": "🚀", "soar": "🦅", "crash": "💥", "collide": "💥",
+    "burnout": "🔥", "ember": "🔥", "ignite": "🔥", "freeze": "🧊", "shiver": "🥶", "chill": "❄️",
+    "butterflies": "🦋", "wings": "🪶", "feather": "🪶", "halo": "😇", "sin": "😈", "sinner": "😈",
+    "pray": "🙏", "grace": "🕊️", "destiny": "🌠", "fate": "🌠", "fortune": "🍀", "wish": "🌠",
+    "midnight": "🌙", "starry": "🌌", "cosmic": "🌌", "orbit": "🪐", "gravity": "🪐", "horizon": "🌅",
+    "thunderstorm": "⛈️", "lightning": "⚡", "spark": "✨", "neon": "🔆", "prism": "🌈", "aurora": "🌌",
+    "velvet": "🍷", "silk": "🎀", "champagne": "🍾", "liquor": "🥃", "whiskey": "🥃", "smoke": "💨",
+    "mirror": "🪞", "reflection": "🪞", "glass": "🥂", "crystal": "🔮", "blade": "🗡️", "arrow": "💘",
+    "crown": "👑", "empire": "🏰", "kingdom": "👑", "throne": "👑", "hero": "🦸", "villain": "😈",
+    "stranger": "👤", "ghosting": "👻", "haunt": "👻", "haunted": "👻", "nightlife": "🌃", "skyline": "🏙️",
+    "freeway": "🛣️", "speeding": "🏎️", "drift": "🏎️", "cruising": "🚗", "cruisin": "🚗",
+    "spotlight": "🔦", "encore": "👏", "stage": "🎭", "chorus": "🎶", "harmony": "🎶", "lyrics": "📜",
+    "melodies": "🎶", "acoustic": "🎸", "synth": "🎹", "stereo": "🔊", "tempo": "⏱️", "echoes": "〰️",
+    "photograph": "📷", "polaroid": "📸", "snapshot": "📸", "reel": "🎞️", "cinematic": "🎬",
+    "summer": "🌴", "tropical": "🏝️", "island": "🏝️", "paradise": "🌴", "sunset": "🌇", "twilight": "🌆",
+    "bloom": "🌺", "blossom": "🌸", "wildflower": "🌼", "daisy": "🌼", "lavender": "🪻", "cherry": "🍒",
+    "honey": "🍯", "sweet": "🍭", "sugar": "🍬", "bitter": "🍋", "toxic": "☣️", "venom": "🐍",
+    "scar": "🩹", "scars": "🩹", "wound": "🩹", "cure": "🌿", "remedy": "🌿", "relief": "😌",
+    "laughing": "😄", "giggling": "😄", "smirk": "😏", "blush": "😊", "adore": "😍", "obsessed": "💘",
+    "heartbeat": "💗", "pulse": "💓", "breathe": "🌬️", "exhale": "💨", "inhale": "🌬️",
+    "promise": "🤞", "forevermore": "♾️", "always": "♾️", "endless": "♾️", "infinite": "♾️",
+    "money": "💵", "wealth": "💰", "million": "💰", "billion": "💰", "rich": "💎", "luxury": "💎",
+    "celebration": "🎉", "champ": "🏆", "victory": "🏆", "golden": "✨", "shiny": "✨",
 }
 
 FONT_MAP = {
@@ -133,8 +330,51 @@ def _hex_to_rgb(hx, fallback=(236, 72, 153)):
 
 
 def _word_icon(word: str):
-    cleaned = re.sub(r"[^a-z]", "", word.lower())
-    return WORD_VISUALS.get(cleaned)
+    if not word:
+        return None
+    low = word.lower().strip()
+    bare_ascii = re.sub(r"[^a-z]", "", low)
+    if bare_ascii:
+        hit = WORD_VISUALS.get(bare_ascii)
+        if hit:
+            return hit
+        cands = []
+        if bare_ascii.endswith("ies") and len(bare_ascii) > 4:
+            cands.append(bare_ascii[:-3] + "y")
+        if bare_ascii.endswith("ves") and len(bare_ascii) > 4:
+            cands.append(bare_ascii[:-3] + "f")
+        if bare_ascii.endswith("es") and len(bare_ascii) > 3:
+            cands.append(bare_ascii[:-2])
+        if bare_ascii.endswith("s") and len(bare_ascii) > 3:
+            cands.append(bare_ascii[:-1])
+        if bare_ascii.endswith("ing") and len(bare_ascii) > 5:
+            stem = bare_ascii[:-3]
+            cands.extend([stem, stem + "e"])
+            if len(stem) >= 2 and stem[-1] == stem[-2]:
+                cands.append(stem[:-1])
+        if bare_ascii.endswith("in") and len(bare_ascii) > 4:
+            stem = bare_ascii[:-2]
+            cands.extend([stem, stem + "e"])
+        if bare_ascii.endswith("ed") and len(bare_ascii) > 4:
+            stem = bare_ascii[:-2]
+            cands.extend([stem, stem + "e", bare_ascii[:-1]])
+            if len(stem) >= 2 and stem[-1] == stem[-2]:
+                cands.append(stem[:-1])
+        if bare_ascii.endswith("ly") and len(bare_ascii) > 4:
+            cands.append(bare_ascii[:-2])
+        if bare_ascii.endswith("y") and len(bare_ascii) > 4:
+            cands.append(bare_ascii[:-1])
+        for suf in ("less", "ness", "ful", "ment", "ous"):
+            if bare_ascii.endswith(suf) and len(bare_ascii) > len(suf) + 3:
+                cands.append(bare_ascii[:-len(suf)])
+        if bare_ascii.startswith("un") and len(bare_ascii) > 5:
+            cands.append(bare_ascii[2:])
+        for c in cands:
+            hit = WORD_VISUALS.get(c)
+            if hit:
+                return hit
+    bare_uni = re.sub(r"[^\w\u0900-\u0963\u0966-\u0D7F\u200C\u200D]", "", low)
+    return WORD_VISUALS.get(bare_uni)
 
 
 _INSTRUMENTAL_LINE_RE = re.compile(r"^[\s\u2669-\u266f\U0001f3b5\U0001f3b6\u2022\u00b7\u2026\.\-\u2014\u2013~_*|/\\()\[\]]+$")
@@ -163,16 +403,31 @@ def _sanitize_lyric_text(text: str) -> str:
 
 
 def _slow_cue_weight(word: str, is_final: bool, gap: float, n_words: int) -> float:
-    """Estimates relative sung duration with slow-cue hold, melisma, punctuation, and function-word lightness."""
-    core = re.sub(r"[^A-Za-z0-9]", "", word)
-    alpha_len = len(core)
-    vowel_groups = len(re.findall(r"[aeiouy]+", core.lower())) or 1
+    """Estimates relative sung duration with slow-cue hold, melisma, punctuation, and Indic syllable awareness."""
+    core_lat = re.sub(r"[^A-Za-z0-9]", "", word)
+    core_uni = re.sub(r"[^\w\u0900-\u0963\u0966-\u0D7F\u200C\u200D]", "", word)
+    if core_lat:
+        alpha_len = len(core_lat)
+        vowel_groups = len(re.findall(r"[aeiouy]+", core_lat.lower())) or 1
+    else:
+        # Count Indic aksharas (base consonants & independent vowels rather than combining signs)
+        base_chars = [
+            c for c in core_uni
+            if not (
+                0x093E <= ord(c) <= 0x094D
+                or 0x0D3E <= ord(c) <= 0x0D4D
+                or 0x0BBE <= ord(c) <= 0x0BCD
+                or ord(c) in (0x0901, 0x0902, 0x093C, 0x0D02, 0x0D03, 0x0B82)
+            )
+        ]
+        alpha_len = max(1, len(core_uni))
+        vowel_groups = max(1, len(base_chars))
     w_base = max(1.4, float(alpha_len) * 0.72 + vowel_groups * 1.15)
 
-    low = core.lower()
+    low = core_lat.lower()
     has_punct_slow = ("..." in word) or ("\u2026" in word) or ("\u2014" in word) or ("\u2013" in word) or ("~" in word)
-    has_pause_punct = word.endswith((",", ";", ":", "?", "!"))
-    has_melisma = ("-" in word.strip("-")) or bool(_ELONGATED_WORD_RE.search(core))
+    has_pause_punct = word.endswith((",", ";", ":", "?", "!", "।", "॥"))
+    has_melisma = ("-" in word.strip("-")) or bool(_ELONGATED_WORD_RE.search(core_lat))
 
     if low in _LIGHT_FUNC_WORDS and not (is_final or has_punct_slow or has_pause_punct or has_melisma):
         w_base *= 0.62
@@ -233,7 +488,221 @@ def _clean_track_meta(title: str, artist: str):
 
 
 def _tokens(s: str):
-    return set(re.findall(r"[a-z0-9]+", (s or "").lower()))
+    return set(re.findall(r"(?:[^\W_]|[\u0900-\u0963\u0966-\u0D7F\u200C\u200D])+", (s or "").lower()))
+
+
+def _detect_lyric_script(text: str) -> str:
+    """Detects primary writing script across Malayalam, Hindi/Devanagari, Tamil, other Indic, CJK, or Roman."""
+    ml = hi = ta = other_in = cjk = lat = 0
+    for ch in (text or ""):
+        o = ord(ch)
+        if 0x0D00 <= o <= 0x0D7F:
+            ml += 1
+        elif 0x0900 <= o <= 0x097F:
+            hi += 1
+        elif 0x0B80 <= o <= 0x0BFF:
+            ta += 1
+        elif 0x0980 <= o <= 0x0CFF:
+            other_in += 1
+        elif (0x3040 <= o <= 0x9FFF) or (0xAC00 <= o <= 0xD7AF):
+            cjk += 1
+        elif ("a" <= ch.lower() <= "z"):
+            lat += 1
+    if ml >= max(4, hi, ta, other_in):
+        return "malayalam"
+    if hi >= max(4, ml, ta, other_in):
+        return "hindi"
+    if ta >= max(4, ml, hi, other_in):
+        return "tamil"
+    if other_in >= max(4, ml, hi, ta):
+        return "other_indic"
+    if cjk >= 4 and cjk > lat:
+        return "cjk"
+    return "roman"
+
+
+# Phonetic Tamil -> Tanglish maps
+_TA_VOWELS = {
+    "\u0b85": "a", "\u0b86": "aa", "\u0b87": "i", "\u0b88": "ee", "\u0b89": "u", "\u0b8a": "oo",
+    "\u0b8e": "e", "\u0b8f": "ee", "\u0b90": "ai", "\u0b92": "o", "\u0b93": "oo", "\u0b94": "au",
+}
+_TA_MATRAS = {
+    "\u0bbe": "aa", "\u0bbf": "i", "\u0bc0": "ee", "\u0bc1": "u", "\u0bc2": "oo",
+    "\u0bc6": "e", "\u0bc7": "ee", "\u0bc8": "ai", "\u0bca": "o", "\u0bcb": "oo", "\u0bcc": "au", "\u0bd7": "au",
+}
+_TA_CONS = {
+    "\u0b95": "k", "\u0b99": "ng", "\u0b9a": "s", "\u0b9c": "j", "\u0b9e": "nj",
+    "\u0b9f": "t", "\u0ba3": "n", "\u0ba4": "th", "\u0ba8": "n", "\u0ba9": "n",
+    "\u0baa": "p", "\u0bae": "m", "\u0baf": "y", "\u0bb0": "r", "\u0bb1": "r",
+    "\u0bb2": "l", "\u0bb3": "l", "\u0bb4": "zh", "\u0bb5": "v", "\u0bb6": "sh",
+    "\u0bb7": "sh", "\u0bb8": "s", "\u0bb9": "h",
+}
+
+# Lightweight phonetic Devanagari (Hindi) & Malayalam -> Hinglish/Manglish Romanizer
+_DEVA_VOWELS = {
+    "\u0905": "a", "\u0906": "aa", "\u0907": "i", "\u0908": "ee", "\u0909": "u", "\u090a": "oo",
+    "\u090b": "ri", "\u090f": "e", "\u0910": "ai", "\u0913": "o", "\u0914": "au", "\u0911": "o",
+}
+_DEVA_MATRAS = {
+    "\u093e": "aa", "\u093f": "i", "\u0940": "ee", "\u0941": "u", "\u0942": "oo",
+    "\u0943": "ri", "\u0947": "e", "\u0948": "ai", "\u094b": "o", "\u094c": "au", "\u0949": "o",
+}
+_DEVA_CONS = {
+    "\u0915": "k", "\u0916": "kh", "\u0917": "g", "\u0918": "gh", "\u0919": "ng",
+    "\u091a": "ch", "\u091b": "chh", "\u091c": "j", "\u091d": "jh", "\u091e": "ny",
+    "\u091f": "t", "\u0920": "th", "\u0921": "d", "\u0922": "dh", "\u0923": "n",
+    "\u0924": "t", "\u0925": "th", "\u0926": "d", "\u0927": "dh", "\u0928": "n",
+    "\u0929": "n", "\u092a": "p", "\u092b": "ph", "\u092c": "b", "\u092d": "bh", "\u092e": "m",
+    "\u092f": "y", "\u0930": "r", "\u0931": "r", "\u0932": "l", "\u0933": "l", "\u0935": "v",
+    "\u0936": "sh", "\u0937": "sh", "\u0938": "s", "\u0939": "h",
+    "\u0958": "q", "\u0959": "kh", "\u095a": "gh", "\u095b": "z", "\u095c": "d", "\u095d": "dh", "\u095e": "f",
+}
+_ML_VOWELS = {
+    "\u0d05": "a", "\u0d06": "aa", "\u0d07": "i", "\u0d08": "ee", "\u0d09": "u", "\u0d0a": "oo",
+    "\u0d0b": "ri", "\u0d0e": "e", "\u0d0f": "ee", "\u0d10": "ai", "\u0d12": "o", "\u0d13": "oo", "\u0d14": "au",
+}
+_ML_MATRAS = {
+    "\u0d3e": "aa", "\u0d3f": "i", "\u0d40": "ee", "\u0d41": "u", "\u0d42": "oo", "\u0d43": "ri",
+    "\u0d46": "e", "\u0d47": "ee", "\u0d48": "ai", "\u0d4a": "o", "\u0d4b": "oo", "\u0d4c": "au", "\u0d57": "au",
+}
+_ML_CONS = {
+    "\u0d15": "k", "\u0d16": "kh", "\u0d17": "g", "\u0d18": "gh", "\u0d19": "ng",
+    "\u0d1a": "ch", "\u0d1b": "chh", "\u0d1c": "j", "\u0d1d": "jh", "\u0d1e": "nj",
+    "\u0d1f": "t", "\u0d20": "th", "\u0d21": "d", "\u0d22": "dh", "\u0d23": "n",
+    "\u0d24": "th", "\u0d25": "th", "\u0d26": "d", "\u0d27": "dh", "\u0d28": "n", "\u0d29": "n",
+    "\u0d2a": "p", "\u0d2b": "ph", "\u0d2c": "b", "\u0d2d": "bh", "\u0d2e": "m",
+    "\u0d2f": "y", "\u0d30": "r", "\u0d31": "r", "\u0d32": "l", "\u0d33": "l", "\u0d34": "zh",
+    "\u0d35": "v", "\u0d36": "sh", "\u0d37": "sh", "\u0d38": "s", "\u0d39": "h",
+}
+_ML_CHILLU = {"\u0d7a": "n", "\u0d7b": "n", "\u0d7c": "r", "\u0d7d": "l", "\u0d7e": "l", "\u0d7f": "k"}
+
+
+def _romanize_indic_word(word: str) -> str:
+    if not word:
+        return word
+    # Apply nukta pairs cleanly for Hindi (e.g., ज़, फ़, क़, ख़, ग़)
+    w = (
+        word.replace("\u091c\u093c", "\u095b")
+        .replace("\u092b\u093c", "\u095e")
+        .replace("\u0915\u093c", "\u0958")
+        .replace("\u0916\u093c", "\u0959")
+        .replace("\u0917\u093c", "\u095a")
+        .replace("\u0921\u093c", "\u095c")
+        .replace("\u0922\u093c", "\u095d")
+        .replace("\u200d", "")
+    )
+    out = []
+    i = 0
+    n = len(w)
+    while i < n:
+        ch = w[i]
+        nxt = w[i + 1] if i + 1 < n else ""
+        if ch in _DEVA_VOWELS:
+            out.append(_DEVA_VOWELS[ch])
+            i += 1
+        elif ch in _DEVA_CONS:
+            out.append(_DEVA_CONS[ch])
+            if nxt == "\u094d":
+                i += 2
+            elif nxt in _DEVA_MATRAS:
+                out.append(_DEVA_MATRAS[nxt])
+                i += 2
+            else:
+                # Trim silent schwa at end of multi-char Hindi words
+                if not (i == n - 1 and len(w) > 1):
+                    out.append("a")
+                i += 1
+        elif ch in ("\u0901", "\u0902"):
+            out.append("n")
+            i += 1
+        elif ch == "\u0903":
+            out.append("h")
+            i += 1
+        elif ch in _ML_CHILLU:
+            out.append(_ML_CHILLU[ch])
+            i += 1
+        elif ch in _ML_VOWELS:
+            out.append(_ML_VOWELS[ch])
+            i += 1
+        elif ch in _ML_CONS:
+            out.append(_ML_CONS[ch])
+            if nxt == "\u0d4d":
+                if i + 2 >= n:
+                    out.append("u")  # trailing Malayalam half-u samvruthokaram
+                i += 2
+            elif nxt in _ML_MATRAS:
+                out.append(_ML_MATRAS[nxt])
+                i += 2
+            else:
+                out.append("a")
+                i += 1
+        elif ch == "\u0d02":
+            out.append("m")
+            i += 1
+        elif ch == "\u0d03":
+            out.append("h")
+            i += 1
+        elif ch in _TA_VOWELS:
+            out.append(_TA_VOWELS[ch])
+            i += 1
+        elif ch in _TA_CONS:
+            c_rom = _TA_CONS[ch]
+            # Soften intervocalic Tamil stops (க->g, ட->d, த->dh, ப->b) cleanly when non-initial & not geminated
+            prev_ch = w[i - 1] if i > 0 else ""
+            if i > 0 and prev_ch != "\u0bcd" and nxt != "\u0bcd":
+                c_rom = {"k": "g", "t": "d", "th": "dh", "p": "b"}.get(c_rom, c_rom)
+            out.append(c_rom)
+            if nxt == "\u0bcd":
+                i += 2
+            elif nxt in _TA_MATRAS:
+                out.append(_TA_MATRAS[nxt])
+                i += 2
+            else:
+                out.append("a")
+                i += 1
+        elif ch in ("\u0b82", "\u0b83"):
+            out.append("m" if ch == "\u0b82" else "h")
+            i += 1
+        elif ch in ("\u0964", "\u0965"):
+            out.append(".")
+            i += 1
+        elif ch in _DEVA_MATRAS or ch in _ML_MATRAS or ch in _TA_MATRAS or ch in ("\u094d", "\u0d4d", "\u0bcd", "\u093c", "\u200c"):
+            i += 1
+        else:
+            out.append(ch)
+            i += 1
+    res = "".join(out)
+    # Clean common geminated aspirated clusters (khkh -> kkh, ngg -> ng)
+    return res.replace("thth", "tth").replace("chchh", "cch").replace("phph", "pph")
+
+
+def _romanize_indic_text(text: str) -> str:
+    if not text or not any((0x0900 <= ord(c) <= 0x097F) or (0x0B80 <= ord(c) <= 0x0DFF) for c in text):
+        return text
+    parts = re.split(r"(\s+)", text)
+    return "".join(_romanize_indic_word(p) if (p and not p.isspace()) else p for p in parts)
+
+
+def _romanize_lines(lines):
+    out = []
+    for ln in lines:
+        new_words = []
+        for w in ln.get("words", []):
+            rw = _romanize_indic_word(w["word"])
+            new_words.append({
+                "word": rw,
+                "start": w["start"],
+                "end": w["end"],
+                "icon": _word_icon(rw) or w.get("icon"),
+            })
+        out.append({
+            "time": ln["time"],
+            "end": ln["end"],
+            "text": _romanize_indic_text(ln.get("text", "")),
+            "words": new_words,
+            "has_stop_marker": ln.get("has_stop_marker", False),
+        })
+    return out
 
 
 def _ease_out_cubic(u: float) -> float:
@@ -316,8 +785,8 @@ class LyricsFetcher:
                 if any(p in k.lower() for p in _NON_MUSIC_PREFIXES):
                     dirty = True
                     continue
-                if isinstance(v, dict) and v.get("cache_v", 1) < 5:
-                    # Invalidate pre-v5 cache entries so tracks upgrade to verbatim YRC word-sync where available
+                if isinstance(v, dict) and v.get("cache_v", 1) < 6:
+                    # Invalidate pre-v6 cache entries so Malayalam/Hindi script & word-sync upgrades apply cleanly
                     dirty = True
                     continue
                 if isinstance(v, list):
@@ -381,16 +850,17 @@ class LyricsFetcher:
             self._log(f"HTTP error {req.full_url[:80]}: {last_err}")
         return None
 
-    def get_lyrics(self, title, artist, album="", duration=0, force_refresh=False):
+    def get_lyrics(self, title, artist, album="", duration=0, force_refresh=False, script_mode="Auto"):
         t_low = (title or "").lower().strip()
         a_low = (artist or "").lower().strip()
+        sm = (script_mode or "Auto").strip()
         t_no_notif = re.sub(r"^\(\d+\)\s*", "", t_low).strip()
         if any(t_low.startswith(p) for p in _NON_MUSIC_PREFIXES):
             return [], "Non-music stream"
         if a_low in _GENERIC_ARTISTS and t_no_notif in _SOCIAL_FEED_TITLES:
             return [], "Social/Browser feed"
 
-        key = f"{a_low} - {t_low}"
+        key = f"{a_low} - {t_low} [{sm}]"
         with self._cache_lock:
             cached = None if force_refresh else self.cache.get(key)
         if isinstance(cached, dict) and cached.get("lines"):
@@ -400,16 +870,16 @@ class LyricsFetcher:
             if entries:
                 lines = self._build_word_timings(sorted(entries, key=lambda x: x[0]))
                 with self._cache_lock:
-                    self.cache[key] = {"source": "Cache (Synced)", "lines": lines}
+                    self.cache[key] = {"cache_v": 6, "source": "Cache (Synced)", "lines": lines}
                 self._save_cache()
                 return lines, "Cache (Synced)"
 
-        self._log(f"Fetching lyrics for '{artist}' - '{title}' (dur={duration:.1f}s)")
+        self._log(f"Fetching lyrics for '{artist}' - '{title}' (dur={duration:.1f}s, script={sm})")
         lrc_res = [([], "None")]
         ne_res = [([], "None")]
 
         def _run_lrc():
-            lrc_res[0] = self._fetch_from_lrclib(title, artist, album, duration)
+            lrc_res[0] = self._fetch_from_lrclib(title, artist, album, duration, script_mode=sm)
 
         def _run_ne():
             ne_res[0] = self._fetch_from_netease(title, artist, duration)
@@ -422,8 +892,13 @@ class LyricsFetcher:
         lrc_lines, lrc_src = lrc_res[0]
         ne_lines, ne_src = ne_res[0]
 
+        lrc_script = _detect_lyric_script(" ".join(x.get("text", "") for x in (lrc_lines or [])[:8]))
+        ne_script = _detect_lyric_script(" ".join(x.get("text", "") for x in (ne_lines or [])[:8]))
+
         if ne_lines and "Word Synced" in ne_src:
-            if lrc_lines:
+            if sm == "Native" and lrc_script in ("malayalam", "hindi") and ne_script not in ("malayalam", "hindi"):
+                lines, source = lrc_lines, lrc_src
+            elif lrc_lines:
                 lines, source = self._merge_yrc_with_lrc(ne_lines, lrc_lines, lrc_src)
             else:
                 lines, source = ne_lines, ne_src
@@ -434,9 +909,15 @@ class LyricsFetcher:
         else:
             lines, source = lrc_lines, lrc_src
 
+        if lines and sm == "Romanized":
+            cur_script = _detect_lyric_script(" ".join(x.get("text", "") for x in lines[:8]))
+            if cur_script in ("malayalam", "hindi"):
+                lines = _romanize_lines(lines)
+                source = f"{source} [Romanized]"
+
         if lines:
             with self._cache_lock:
-                self.cache[key] = {"cache_v": 5, "source": source, "lines": lines}
+                self.cache[key] = {"cache_v": 6, "source": source, "lines": lines}
             self._save_cache()
             self._log(f"Resolved {len(lines)} lines via {source} for '{title}'")
         else:
@@ -476,7 +957,7 @@ class LyricsFetcher:
             return merged, "NetEase + LRCLIB (Word Synced)"
         return yrc_lines, "NetEase (Word Synced)"
 
-    def _fetch_from_lrclib(self, title, artist, album, duration):
+    def _fetch_from_lrclib(self, title, artist, album, duration, script_mode="Auto"):
         raw_t, clean_t, bare_t, clean_a = _clean_track_meta(title, artist)
         seen_t = []
         for cand_t in (raw_t, clean_t, bare_t):
@@ -486,11 +967,13 @@ class LyricsFetcher:
         artist_cands = []
         if clean_a:
             artist_cands.append(clean_a)
-            primary_a = re.split(r"[,&/;]|\bfeat\.?\b|\bft\.?\b", clean_a, maxsplit=1, flags=re.IGNORECASE)[0].strip()
-            if primary_a and primary_a not in artist_cands:
-                artist_cands.append(primary_a)
+            for part_a in re.split(r"[,&/;]|\bfeat\.?\b|\bft\.?\b|\bx\b", clean_a, flags=re.IGNORECASE):
+                pa = part_a.strip()
+                if pa and len(pa) >= 2 and pa not in artist_cands:
+                    artist_cands.append(pa)
 
-        for cand_a in artist_cands:
+        get_fallback = None
+        for cand_a in artist_cands[:3]:
             for cand_t in seen_t:
                 params = {"track_name": cand_t, "artist_name": cand_a}
                 if album and cand_a == clean_a:
@@ -508,26 +991,36 @@ class LyricsFetcher:
                             if data.get("syncedLyrics"):
                                 parsed = self._parse_lrc(data["syncedLyrics"])
                                 if parsed:
-                                    return parsed, "LRCLIB (Synced)"
-                            if data.get("plainLyrics"):
+                                    sc = _detect_lyric_script(" ".join(x["text"] for x in parsed[:8]))
+                                    if script_mode == "Native" and sc == "roman":
+                                        get_fallback = (parsed, "LRCLIB (Synced)")
+                                    else:
+                                        return parsed, "LRCLIB (Synced)"
+                            if data.get("plainLyrics") and get_fallback is None:
                                 parsed = self._fallback_plain(data["plainLyrics"], duration)
                                 if parsed:
-                                    return parsed, "LRCLIB (Timed Est.)"
+                                    get_fallback = (parsed, "LRCLIB (Timed Est.)")
                     except Exception as e:
                         self._log(f"LRCLIB get parse error: {e}")
+                if get_fallback is not None:
+                    break
+            if get_fallback is not None:
+                break
 
         t_tokens = _tokens(bare_t or clean_t)
         a_tokens = _tokens(clean_a)
         queries = []
-        for cand_a in (artist_cands or [""]):
-            for cand_t in (bare_t, clean_t, raw_t):
+        for cand_a in (artist_cands[:3] or [""]):
+            for cand_t in (bare_t, clean_t):
                 q = f"{cand_t} {cand_a}".strip()
                 if q and q not in queries:
                     queries.append(q)
         if bare_t and bare_t not in queries:
             queries.append(bare_t)
 
-        for q in queries[:3]:
+        best_overall = None
+        best_overall_score = -10**9
+        for q in queries[:4]:
             search_url = "https://lrclib.net/api/search?" + urllib.parse.urlencode({"q": q})
             req = urllib.request.Request(search_url, headers={"User-Agent": "SoulsLights/2.2"})
             resp = self._urlopen(req, timeout=6)
@@ -540,27 +1033,47 @@ class LyricsFetcher:
                     continue
 
                 def _score(item):
+                    lrc_raw = item.get("syncedLyrics") or item.get("plainLyrics") or ""
                     has_sync = 100 if item.get("syncedLyrics") else (20 if item.get("plainLyrics") else -1000)
                     it_name = _tokens(item.get("trackName", ""))
                     it_art = _tokens(item.get("artistName", ""))
-                    t_ov = (len(t_tokens & it_name) * 15) if t_tokens else 0
+                    t_ov = (len(t_tokens & it_name) * 18) if t_tokens else 0
                     a_ov = (len(a_tokens & it_art) * 20) if a_tokens else 0
                     dur_diff = abs(float(item.get("duration") or 0) - duration) if duration > 10 and item.get("duration") else 0
-                    dur_bonus = max(-25, 15 - int(dur_diff))
-                    karaoke_pen = -40 if ("karaoke" in item.get("artistName", "").lower() and "karaoke" not in clean_a.lower()) else 0
-                    return has_sync + t_ov + a_ov + dur_bonus + karaoke_pen
+                    dur_bonus = max(-35, 16 - int(dur_diff))
+                    karaoke_pen = -45 if ("karaoke" in item.get("artistName", "").lower() and "karaoke" not in clean_a.lower()) else 0
 
-                best = sorted(results, key=_score, reverse=True)[0]
-                if best.get("syncedLyrics"):
-                    parsed = self._parse_lrc(best["syncedLyrics"])
-                    if parsed:
-                        return parsed, "LRCLIB Search (Synced)"
-                if best.get("plainLyrics"):
-                    parsed = self._fallback_plain(best["plainLyrics"], duration)
-                    if parsed:
-                        return parsed, "LRCLIB Search (Est.)"
+                    sc_type = _detect_lyric_script(lrc_raw[:900])
+                    sc_bonus = 0
+                    if script_mode == "Native":
+                        sc_bonus = 140 if sc_type in ("malayalam", "hindi") else (-40 if sc_type == "roman" else 20)
+                    elif script_mode == "Romanized":
+                        sc_bonus = 110 if sc_type == "roman" else 0
+                    else:  # Auto: mild preference for native synced lyrics when matching song nicely
+                        if sc_type in ("malayalam", "hindi"):
+                            sc_bonus = 35
+                    return has_sync + t_ov + a_ov + dur_bonus + karaoke_pen + sc_bonus
+
+                top = sorted(results, key=_score, reverse=True)[0]
+                sc_top = _score(top)
+                if sc_top > best_overall_score and (top.get("syncedLyrics") or top.get("plainLyrics")):
+                    best_overall_score = sc_top
+                    best_overall = top
             except Exception as e:
                 self._log(f"LRCLIB search parse error: {e}")
+
+        if best_overall is not None:
+            if best_overall.get("syncedLyrics"):
+                parsed = self._parse_lrc(best_overall["syncedLyrics"])
+                if parsed:
+                    return parsed, "LRCLIB Search (Synced)"
+            if best_overall.get("plainLyrics"):
+                parsed = self._fallback_plain(best_overall["plainLyrics"], duration)
+                if parsed:
+                    return parsed, "LRCLIB Search (Est.)"
+
+        if get_fallback is not None:
+            return get_fallback
 
         return [], "None"
 
@@ -931,6 +1444,7 @@ class SyncedLyricsOverlay:
         self.font_scale = 1.0
         self.offset_sec = 0.0
         self.click_through = True
+        self.script_mode = "Auto"
         self.pos_x = None
         self.pos_y = None
 
@@ -941,6 +1455,7 @@ class SyncedLyricsOverlay:
         self._sized_fonts = {}
         self._mesh_cache = {}
         self._icon_patch_cache = {}
+        self._shaped_patch_cache = {}
         self._audio_peak = 0.0
         self._audio_bloom = 0.0
 
@@ -969,6 +1484,7 @@ class SyncedLyricsOverlay:
             self.font_scale = max(0.6, min(2.8, float(v.get("font_scale", 1.0))))
             self.offset_sec = float(v.get("sync_offset_ms", 0)) / 1000.0
             self.click_through = bool(v.get("click_through", True))
+            self.script_mode = v.get("script_mode", "Auto")
             self.pos_x = v.get("pos_x")
             self.pos_y = v.get("pos_y")
             self._dirty_font = True
@@ -1034,6 +1550,17 @@ class SyncedLyricsOverlay:
     def set_offset_ms(self, ms: int):
         with self._lock:
             self.offset_sec = ms / 1000.0
+
+    def set_script_mode(self, mode: str):
+        m = mode if mode in ("Auto", "Native", "Romanized") else "Auto"
+        with self._lock:
+            changed = (m != self.script_mode)
+            self.script_mode = m
+            if changed:
+                self._dirty_style = True
+                self._constellation_nodes.clear()
+        if changed:
+            self.retry_fetch()
 
     def set_auto_sync_colors(self, enable: bool):
         with self._lock:
@@ -1355,8 +1882,7 @@ class SyncedLyricsOverlay:
         for wobj in line_words:
             txt = re.sub(r'[\(\)\[\]]', '', wobj["word"]).strip() or wobj["word"]
             if draw is not None and f_max is not None:
-                bb = draw.textbbox((0, 0), txt, font=f_max)
-                tw, th = bb[2] - bb[0], bb[3] - bb[1]
+                tw, th = self._measure_text(draw, txt, f_max)
             else:
                 tw, th = len(txt) * 28, 52
             hw = max(70, tw * 0.5 + 38)
@@ -1623,7 +2149,9 @@ class SyncedLyricsOverlay:
     def _fetch_worker(self, title, artist, album, dur, force):
         expected = f"{artist} - {title}"
         try:
-            lines, src = self.fetcher.get_lyrics(title, artist, album, dur, force_refresh=force)
+            with self._lock:
+                sm = self.script_mode
+            lines, src = self.fetcher.get_lyrics(title, artist, album, dur, force_refresh=force, script_mode=sm)
             flat = self._build_flat_words(lines) if lines else []
             with self._lock:
                 if self.current_track_key == expected or force:
@@ -1670,10 +2198,84 @@ class SyncedLyricsOverlay:
                 break
         return idx, w_idx, g_idx
 
-    def _measure_text(self, draw, txt, font):
+    def _composite_clamped(self, canvas_img, patch, x: int, y: int):
+        if canvas_img is None or patch is None:
+            return
+        ix, iy = int(round(x)), int(round(y))
+        pw, ph = patch.width, patch.height
+        cw, ch = canvas_img.width, canvas_img.height
+        if ix >= cw or iy >= ch or ix + pw <= 0 or iy + ph <= 0:
+            return
+        if ix >= 0 and iy >= 0 and ix + pw <= cw and iy + ph <= ch:
+            canvas_img.alpha_composite(patch, (ix, iy))
+            return
+        sx0 = max(0, -ix)
+        sy0 = max(0, -iy)
+        sx1 = min(pw, cw - ix)
+        sy1 = min(ph, ch - iy)
+        if sx1 > sx0 and sy1 > sy0:
+            canvas_img.alpha_composite(patch, (max(0, ix), max(0, iy)), (sx0, sy0, sx1, sy1))
+
+    def _tint_mask_rgba(self, mask, rgba: tuple):
+        r, g, b = int(rgba[0]), int(rgba[1]), int(rgba[2])
+        a_target = max(0, min(255, int(rgba[3]) if len(rgba) > 3 else 255))
+        if a_target <= 0 or mask is None:
+            return None
+        key = (id(mask), r, g, b, a_target)
+        cached = self._shaped_patch_cache.get(key)
+        if cached is not None:
+            return cached
+        patch = Image.new("RGBA", mask.size, (r, g, b, 255))
+        if a_target < 252:
+            scaled_a = mask.point(lambda p: (p * a_target) // 255)
+            patch.putalpha(scaled_a)
+        else:
+            patch.putalpha(mask)
+        if len(self._shaped_patch_cache) > 500:
+            self._shaped_patch_cache.clear()
+        self._shaped_patch_cache[key] = patch
+        return patch
+
+    def _text_box(self, draw, txt: str, font):
+        if needs_complex_shaping(txt):
+            sz = int(getattr(font, "size", 24))
+            mask = shape_render_mask(txt, sz, font_is_bold(font))
+            if mask is not None:
+                return 0, 0, mask.width, mask.height, True, mask
         f_use = self._safe_font(font, txt)
         bb = draw.textbbox((0, 0), txt, font=f_use)
-        return bb[2] - bb[0], bb[3] - bb[1]
+        return bb[0], bb[1], bb[2] - bb[0], bb[3] - bb[1], False, f_use
+
+    def _measure_text(self, draw, txt, font):
+        _ox, _oy, tw, th, _sh, _f = self._text_box(draw, txt, font)
+        return tw, th
+
+    def _stamp_text(self, canvas_img, draw, x, y, text, font, fill_rgba, shadow_alpha: int = 0, lit_ratio=None, lit_rgba=None):
+        if not text:
+            return
+        if needs_complex_shaping(text):
+            sz = int(getattr(font, "size", 24))
+            mask = shape_render_mask(text, sz, font_is_bold(font))
+            if mask is not None and canvas_img is not None:
+                if shadow_alpha > 0:
+                    sh_patch = self._tint_mask_rgba(mask, (0, 0, 0, shadow_alpha))
+                    self._composite_clamped(canvas_img, sh_patch, int(x) + 1, int(y) + 2)
+                fg_patch = self._tint_mask_rgba(mask, fill_rgba)
+                self._composite_clamped(canvas_img, fg_patch, int(x), int(y))
+                if lit_ratio is not None and lit_rgba is not None:
+                    lr = max(0.0, min(1.0, float(lit_ratio)))
+                    lw = max(1, min(mask.width, int(round(mask.width * lr))))
+                    lit_patch = self._tint_mask_rgba(mask, lit_rgba)
+                    if lit_patch is not None:
+                        self._composite_clamped(canvas_img, lit_patch.crop((0, 0, lw, mask.height)), int(x), int(y))
+                return
+        f_use = self._safe_font(font, text)
+        if shadow_alpha > 0:
+            draw.text((x + 1, y + 2), text, font=f_use, fill=(0, 0, 0, shadow_alpha))
+        draw.text((x, y), text, font=f_use, fill=fill_rgba)
+        if lit_ratio is not None and lit_rgba is not None:
+            lit_n = max(1, min(len(text), int(math.ceil(len(text) * max(0.0, min(1.0, lit_ratio))))))
+            draw.text((x, y), text[:lit_n], font=f_use, fill=lit_rgba)
 
     def _in_instrumental_gap(self, lyrics, idx, eff_pos) -> bool:
         if not lyrics:
@@ -1750,37 +2352,28 @@ class SyncedLyricsOverlay:
         raw_iw = self._measure_text(draw, clean_ico, emoji_font)[0]
         return min(raw_iw, int(emoji_font.size * 1.18)) + 6
 
-    def _draw_text_shadow(self, draw, x, y, text, font, fill_rgba, shadow_alpha=215):
-        f_use = self._safe_font(font, text)
-        draw.text((x + 1, y + 2), text, font=f_use, fill=(0, 0, 0, shadow_alpha))
-        draw.text((x, y), text, font=f_use, fill=fill_rgba)
+    def _draw_text_shadow(self, draw, x, y, text, font, fill_rgba, shadow_alpha=215, canvas_img=None):
+        self._stamp_text(canvas_img, draw, x, y, text, font, fill_rgba, shadow_alpha=shadow_alpha)
 
-    def _draw_centered_with_shadow(self, draw, y, text, font, fill_rgba, shadow_alpha=205):
-        f_use = self._safe_font(font, text)
-        tw, th = self._measure_text(draw, text, f_use)
-        x = max(16, (self.OVERLAY_W - tw) // 2)
-        self._draw_text_shadow(draw, x, y, text, f_use, fill_rgba, shadow_alpha)
+    def _draw_centered_with_shadow(self, draw, y, text, font, fill_rgba, shadow_alpha=205, canvas_img=None):
+        ox, oy, tw, th, is_sh, _ = self._text_box(draw, text, font)
+        x = max(16, (self.OVERLAY_W - tw) // 2) - (0 if is_sh else ox)
+        self._stamp_text(canvas_img, draw, x, y - (0 if is_sh else oy), text, font, fill_rgba, shadow_alpha=shadow_alpha)
         return tw, th
 
     def _draw_word_with_opt_icon(
         self, canvas_img, draw, cx_center, y_center, word_text, font, fill_rgba,
         ico=None, emoji_font=None, accent_rgb=(236, 72, 153), is_active=True,
-        shadow_a=210, glow_draw=None, glow_col=None, lit_ratio=None, lit_rgba=None
+        shadow_a=210, glow_draw=None, glow_col=None, lit_ratio=None, lit_rgba=None, glow_img=None
     ):
-        f_use = self._safe_font(font, word_text)
-        bb = draw.textbbox((0, 0), word_text, font=f_use)
-        tw = bb[2] - bb[0]
-        th = bb[3] - bb[1]
+        ox, oy, tw, th, is_sh, f_use = self._text_box(draw, word_text, font)
         iw = self._icon_width(draw, ico, emoji_font)
         total_w = tw + (iw + 8 if iw else 0)
-        x = int(cx_center - total_w * 0.5 - bb[0])
-        y = int(y_center - (bb[1] + bb[3]) * 0.5)
+        x = int(cx_center - total_w * 0.5 - ox)
+        y = int(y_center - (oy + th * 0.5))
         if glow_draw is not None and glow_col is not None:
-            glow_draw.text((x, y), word_text, font=f_use, fill=glow_col)
-        self._draw_text_shadow(draw, x, y, word_text, f_use, fill_rgba, shadow_alpha=shadow_a)
-        if lit_ratio is not None and lit_rgba is not None and word_text:
-            lit_n = max(1, min(len(word_text), int(math.ceil(len(word_text) * max(0.0, min(1.0, lit_ratio))))))
-            draw.text((x, y), word_text[:lit_n], font=f_use, fill=lit_rgba)
+            self._stamp_text(glow_img, glow_draw, x, y, word_text, f_use if not is_sh else font, glow_col)
+        self._stamp_text(canvas_img, draw, x, y, word_text, f_use if not is_sh else font, fill_rgba, shadow_alpha=shadow_a, lit_ratio=lit_ratio, lit_rgba=lit_rgba)
         if iw and emoji_font and canvas_img is not None:
             patch = self._get_tinted_icon(ico, emoji_font, accent_rgb, is_active)
             if patch is not None:
@@ -1809,28 +2402,28 @@ class SyncedLyricsOverlay:
                     f_use = self._get_font("bold", int(f_txt.size * (1.0 + 0.16 * pop_u))) or f_txt
                     fe_use = self._get_font("emoji", int(f_emo.size * (1.0 + 0.16 * pop_u))) if f_emo else None
                 w = wobj["word"]
-                f_use = self._safe_font(f_use, w)
-                bb = draw.textbbox((0, 0), w, font=f_use)
-                ww = bb[2] - bb[0]
-                ico = wobj.get("icon") if show_icons else None
+                ox, oy, ww, wh, is_sh, f_real = self._text_box(draw, w, f_use)
+                ico = (_word_icon(wobj["word"]) or wobj.get("icon")) if show_icons else None
                 iw = self._icon_width(draw, ico, fe_use)
-                toks.append((i, w, bb, ww, f_use, fe_use, ico, iw))
+                toks.append((i, w, ox, oy, ww, wh, is_sh, f_use, f_real, fe_use, ico, iw))
                 tot += ww + iw + (sp if i < len(words) - 1 else 0)
             return sp, toks, tot
 
         space_w, tokens, total_w = _layout(font, emoji_font)
-        if total_w > max_line_w:
-            f_c = self._get_font("bold", int(font.size * 0.74)) or font
-            fe_c = self._get_font("emoji", int(emoji_font.size * 0.74)) if emoji_font else None
-            space_w, tokens, total_w = _layout(f_c, fe_c)
+        for _sh_pass in range(4):
+            if total_w <= max_line_w or font.size <= 16:
+                break
+            ratio = max(0.55, min(0.84, (max_line_w - 16) / max(1, total_w)))
+            f_c = self._get_font("bold", max(14, int(font.size * ratio))) or font
+            fe_c = self._get_font("emoji", max(12, int(emoji_font.size * ratio))) if emoji_font else None
+            if f_c.size >= font.size:
+                break
             font, emoji_font = f_c, fe_c
-            if total_w > max_line_w:
-                f_s = self._get_font("bold", int(font.size * 0.78)) or font
-                space_w, tokens, total_w = _layout(f_s, fe_c)
+            space_w, tokens, total_w = _layout(font, emoji_font)
 
         cx = max(24, int((self.OVERLAY_W - total_w) * 0.5))
         gd = ImageDraw.Draw(glow_layer) if glow_layer is not None else None
-        for i, w, bb, ww, f_use, fe_use, ico, iw in tokens:
+        for i, w, ox, oy, ww, wh, is_sh, f_orig, f_real, fe_use, ico, iw in tokens:
             is_act = (i == w_idx and w_idx >= 0)
             if w_idx < 0:
                 col = todo_col
@@ -1848,13 +2441,14 @@ class SyncedLyricsOverlay:
                 lift_u = math.sin(max(0.0, min(1.0, w_u)) * math.pi)
                 wy -= active_lift * (0.45 + 0.55 * lift_u)
 
-            tx = cx - bb[0]
-            ty = int(wy - (bb[1] + bb[3]) * 0.5)
+            tx = cx - ox
+            ty = int(wy - (oy + wh * 0.5))
+            f_draw = f_orig if is_sh else f_real
 
             if is_act and gd is not None:
-                gd.text((tx, ty), w, font=f_use, fill=(*active_col[:3], 235))
+                self._stamp_text(glow_layer, gd, tx, ty, w, f_draw, (*active_col[:3], 235))
 
-            self._draw_text_shadow(draw, tx, ty, w, f_use, col, shadow_alpha=215)
+            self._stamp_text(canvas_img, draw, tx, ty, w, f_draw, col, shadow_alpha=215)
             cx += ww
             if iw and fe_use and canvas_img is not None:
                 ico_dy = int(-6 * math.sin(anim_t * 8.0)) if is_act else 0
@@ -1876,9 +2470,19 @@ class SyncedLyricsOverlay:
         draw.polygon(pts, fill=fill)
 
     def _render_no_lyrics_visualizer(
-        self, img, d, lyrics, idx, eff_pos, anim_t, l_status, title, artist, accent, sec, text_col
+        self, img, d, lyrics, idx, eff_pos, anim_t, l_status, title, artist, accent, sec, text_col, style="Fisheye Visual"
     ):
-        """Sleek Apple-Music-style animated loading dots & subtle beat thump for interludes / searching."""
+        """Sleek Apple-Music-style animated loading dots or iOS Lock Screen + typing bubble for Native Design."""
+        if style == "Native Design":
+            nxt_txt = ""
+            if lyrics and 0 <= idx < len(lyrics):
+                next_i = 0 if eff_pos < lyrics[0]["time"] else (idx + 1 if idx + 1 < len(lyrics) else -1)
+                if 0 <= next_i < len(lyrics):
+                    nxt_txt = lyrics[next_i]["text"]
+            return self._render_native_design_scene(
+                img, d, lyrics, max(0, idx), -1, 0.0, eff_pos, anim_t,
+                title, artist, lock_screen=True, preview_text=nxt_txt or title
+            )
         W, H = self.OVERLAY_W, self.OVERLAY_H
         cx, cy = W // 2, H // 2
         s = self.font_scale
@@ -1935,16 +2539,357 @@ class SyncedLyricsOverlay:
                 if wait_s <= 3.8:
                     nxt_txt = lyrics[next_i]["text"][:54]
                     alpha_nxt = max(70, min(225, int(215 * (1.0 - max(0.0, wait_s - 0.4) / 3.4))))
-                    self._draw_centered_with_shadow(d, cy + int(34 * s), nxt_txt, f_next, (*text_col, alpha_nxt))
+                    self._draw_centered_with_shadow(d, cy + int(34 * s), nxt_txt, f_next, (*text_col, alpha_nxt), canvas_img=img)
                 else:
-                    self._draw_centered_with_shadow(d, cy + int(32 * s), f"Vocals in {max(1, int(math.ceil(wait_s)))}s", f_sub, (210, 218, 232, 165))
+                    self._draw_centered_with_shadow(d, cy + int(32 * s), f"Vocals in {max(1, int(math.ceil(wait_s)))}s", f_sub, (210, 218, 232, 165), canvas_img=img)
         elif l_status == "Searching lyrics...":
-            self._draw_centered_with_shadow(d, cy + int(30 * s), "Searching synced lyrics", f_sub, (208, 216, 232, 165))
+            self._draw_centered_with_shadow(d, cy + int(30 * s), "Searching synced lyrics", f_sub, (208, 216, 232, 165), canvas_img=img)
         else:
             caption = f"{title[:42]}" + (f"  •  {artist[:28]}" if artist else "")
-            self._draw_centered_with_shadow(d, cy + int(30 * s), caption, f_sub, (212, 220, 234, 155))
+            self._draw_centered_with_shadow(d, cy + int(30 * s), caption, f_sub, (212, 220, 234, 155), canvas_img=img)
 
         return img
+
+    def _get_native_map_tile(self, w: int, h: int, variant: int = 0):
+        """Renders and caches an authentic dark-mode Apple Maps vector mini-map tile."""
+        key = ("native_map", w, h, variant % 2)
+        cached = self._mesh_cache.get(key)
+        if cached is not None:
+            return cached
+
+        tile = Image.new("RGBA", (w, h), (22, 26, 33, 255))
+        td = ImageDraw.Draw(tile)
+        if (variant % 2) == 0:
+            # Apple Park Cupertino dark map aesthetic
+            td.polygon([(0, 0), (w * 0.42, 0), (w * 0.34, h), (0, h)], fill=(25, 44, 34, 255))
+            td.polygon([(w * 0.56, h * 0.14), (w, h * 0.08), (w, h), (w * 0.62, h)], fill=(26, 48, 37, 255))
+            # Delicate arterial roads
+            for pts, wid, col in (
+                ([(0, h * 0.24), (w, h * 0.18)], max(1, int(h * 0.032)), (46, 52, 64, 255)),
+                ([(0, h * 0.78), (w, h * 0.72)], max(1, int(h * 0.036)), (50, 56, 70, 255)),
+                ([(w * 0.18, 0), (w * 0.24, h)], max(1, int(h * 0.028)), (42, 48, 58, 255)),
+                ([(w * 0.80, 0), (w * 0.74, h)], max(1, int(h * 0.028)), (42, 48, 58, 255)),
+                ([(w * 0.08, h * 0.52), (w * 0.92, h * 0.46)], 1, (38, 44, 54, 255)),
+            ):
+                td.line(pts, fill=col, width=wid)
+            # Refined circular Apple Park glass ring + green courtyard
+            cx, cy = w * 0.50, h * 0.49
+            rx, ry = max(18, w * 0.092), max(12, h * 0.30)
+            td.ellipse([cx - rx, cy - ry, cx + rx, cy + ry], fill=(32, 62, 46, 255), outline=(146, 154, 168, 200), width=max(2, int(h * 0.036)))
+            irx, iry = rx * 0.56, ry * 0.56
+            td.ellipse([cx - irx, cy - iry, cx + irx, cy + iry], fill=(25, 50, 37, 255), outline=(92, 102, 116, 140), width=1)
+        else:
+            # Alamo Square / San Francisco crisp dark city street grid + square park block
+            td.polygon([(w * 0.36, h * 0.20), (w * 0.64, h * 0.18), (w * 0.65, h * 0.82), (w * 0.35, h * 0.84)], fill=(27, 54, 39, 255))
+            for frac in (0.14, 0.36, 0.64, 0.86):
+                td.line([(int(w * frac), 0), (int(w * frac) - 10, h)], fill=(45, 51, 63, 255), width=max(1, int(h * 0.030)))
+            for frac in (0.20, 0.50, 0.82):
+                td.line([(0, int(h * frac)), (w, int(h * frac) + 6)], fill=(50, 56, 68, 255), width=max(1, int(h * 0.032)))
+
+        # Bottom gradient vignette so map blends smoothly into notification footer
+        fade = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        fd = ImageDraw.Draw(fade)
+        fh = max(12, int(h * 0.32))
+        for yi in range(fh):
+            alpha_f = int(130 * ((yi / max(1, fh - 1)) ** 1.5))
+            fd.line([(0, h - fh + yi), (w, h - fh + yi)], fill=(24, 26, 32, alpha_f))
+        tile.alpha_composite(fade)
+
+        if len(self._mesh_cache) > 64:
+            self._mesh_cache.clear()
+        self._mesh_cache[key] = tile
+        return tile
+
+    def _wrap_text_to_width(self, draw, text: str, font, max_w: int):
+        words = (text or "").split()
+        if not words:
+            return [""]
+        lines = []
+        cur = words[0]
+        for w in words[1:]:
+            cand = f"{cur} {w}"
+            if self._measure_text(draw, cand, font)[0] <= max_w:
+                cur = cand
+            else:
+                lines.append(cur)
+                cur = w
+        lines.append(cur)
+        return lines
+
+    def _draw_imessage_bubble(self, img, draw, x_right: int, y_top: int, max_w: int, text: str, font, is_active: bool, with_tail: bool, s: float, pop_u: float = 1.0):
+        """Draws an authentic iOS blue iMessage bubble with optional bottom-right curved tail."""
+        wrapped = self._wrap_text_to_width(draw, text, font, max(80, max_w - 34))
+        wrapped = wrapped[:2]
+        line_metrics = [self._text_box(draw, ln, font) for ln in wrapped]
+        tw_max = max((m[2] for m in line_metrics), default=24)
+        th_sum = sum((max(int(font.size * 1.1), m[3]) for m in line_metrics)) + max(0, len(line_metrics) - 1) * 4
+
+        bw = min(max_w, max(int(48 * s), tw_max + int(30 * s)))
+        bh = th_sum + int(18 * s)
+        bx0 = x_right - bw
+        by0 = int(y_top + (1.0 - min(1.0, pop_u)) * 12.0 * s)
+
+        top_col = (24, 150, 255, 252) if is_active else (14, 132, 252, 232)
+        bot_col = (0, 118, 255, 254) if is_active else (10, 116, 240, 232)
+        rad = min(int(18 * s), bh // 2)
+        grad = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
+        gd = ImageDraw.Draw(grad)
+        for yi in range(bh):
+            c = _lerp_color(top_col, bot_col, yi / max(1, bh - 1))
+            gd.line([(0, yi), (bw, yi)], fill=c)
+
+        mask = Image.new("L", (bw, bh), 0)
+        ImageDraw.Draw(mask).rounded_rectangle([0, 0, bw - 1, bh - 1], radius=rad, fill=255)
+        img.paste(grad, (bx0, by0), mask)
+
+        # Classic iMessage outgoing tail on bottom-right corner of latest bubble
+        if with_tail:
+            tail_col = bot_col
+            tx1 = x_right - 2
+            ty1 = by0 + bh - 1
+            tail_pts = [
+                (tx1 - int(11 * s), ty1 - int(10 * s)),
+                (tx1 - int(1 * s), ty1 - int(3 * s)),
+                (tx1 + int(5 * s), ty1 + int(1 * s)),
+                (tx1 - int(4 * s), ty1 + int(1 * s)),
+                (tx1 - int(13 * s), ty1 - int(2 * s)),
+            ]
+            draw.polygon(tail_pts, fill=tail_col)
+
+        cy_line = by0 + int(9 * s)
+        for ln, (ox, oy, tw, th, is_sh, f_u) in zip(wrapped, line_metrics):
+            lh = max(int(font.size * 1.1), th)
+            self._stamp_text(
+                img, draw,
+                bx0 + int(15 * s) - (0 if is_sh else ox),
+                cy_line + max(0, (lh - th) // 2) - (0 if is_sh else oy),
+                ln, f_u if not is_sh else font, (255, 255, 255, 252 if is_active else 235),
+            )
+            cy_line += lh + 4
+        return bh
+
+    def _draw_imessage_typing_bubble(self, img, draw, x_right: int, y_top: int, anim_t: float, s: float):
+        """Draws the signature pulsing blue '...' iMessage typing bubble from the reference video."""
+        bw, bh = int(66 * s), int(34 * s)
+        bx0 = x_right - bw
+        rad = bh // 2
+        draw.rounded_rectangle([bx0, y_top, x_right, y_top + bh], radius=rad, fill=(14, 132, 255, 248))
+        # Cute two-circle typing tail on bottom-right
+        draw.ellipse([x_right - int(10 * s), y_top + bh - int(8 * s), x_right + int(2 * s), y_top + bh + int(4 * s)], fill=(10, 122, 252, 245))
+        draw.ellipse([x_right + int(1 * s), y_top + bh + int(1 * s), x_right + int(7 * s), y_top + bh + int(7 * s)], fill=(10, 122, 252, 225))
+        dot_r = max(2, int(3.8 * s))
+        gap = int(13 * s)
+        cx_mid = bx0 + bw // 2
+        cy_mid = y_top + bh // 2
+        for k in range(3):
+            wave = 0.5 + 0.5 * math.sin(anim_t * 6.5 - k * 1.15)
+            dx = (k - 1) * gap
+            dy = -int(2.2 * s * math.sin(anim_t * 6.5 - k * 1.15))
+            a_d = int(145 + 110 * wave)
+            draw.ellipse([cx_mid + dx - dot_r, cy_mid + dy - dot_r, cx_mid + dx + dot_r, cy_mid + dy + dot_r], fill=(255, 255, 255, a_d))
+        return bh
+
+    def _render_native_design_scene(
+        self, img, d, lyrics, idx, w_idx, w_u, eff_pos, anim_t, title, artist,
+        lock_screen: bool = False, preview_text: str = ""
+    ):
+        """Native Design: iOS Apple Maps dark widget + stacked iMessage bubbles + Lock Screen / typing indicator."""
+        W, H = self.OVERLAY_W, self.OVERLAY_H
+        # Bounded layout scale so Apple Maps card + 3 iMessage bubbles ALWAYS fit comfortably inside H
+        s = min(max(0.80, self.font_scale * 0.65 + 0.32), H / 410.0, (W - 60) / 420.0)
+        card_w = min(W - 84, int(390 * s))
+        bx0 = (W - card_w) // 2
+        bx1 = bx0 + card_w
+
+        f_kicker = self._get_font("reg", int(11 * s))
+        f_card_t = self._get_font("bold", int(16 * s))
+        f_card_sub = self._get_font("reg", int(12 * s))
+        f_chat = self._get_font("reg", int(15 * s))
+        f_chat_b = self._get_font("bold", int(16 * s))
+
+        # Alternate stylized locations matching the Apple Park / Alamo Square reference clip
+        verse_block = (idx // 4) if lyrics else 0
+        locs = ("Apple Park, Cupertino", "Alamo Square, San Francisco")
+        loc_str = locs[(verse_block + (1 if lock_screen else 0)) % 2]
+        map_h = int(72 * s)
+        foot_h = int(60 * s)
+        map_card_h = map_h + foot_h
+
+        now_clock = time.strftime("%I:%M").lstrip("0") or "11:32"
+        now_ampm = time.strftime("%I:%M %p").lstrip("0") or "11:32 PM"
+        now_date = time.strftime("%a %b %d")
+
+        if lock_screen:
+            # 00:13 reference shot: Lock Screen date + bold iOS time above Apple Maps notification + typing bubble
+            cy_cur = max(18, int(H * 0.12))
+            self._draw_centered_with_shadow(d, cy_cur, now_date, self._get_font("bold", int(14 * s)), (222, 228, 240, 215), shadow_alpha=150, canvas_img=img)
+            f_clk = self._get_font("bold", int(46 * s))
+            _, _, tw_clk, th_clk, is_sh_c, f_clk_r = self._text_box(d, now_clock, f_clk)
+            self._draw_centered_with_shadow(d, cy_cur + int(18 * s), now_clock, f_clk_r if not is_sh_c else f_clk, (244, 248, 255, 240), shadow_alpha=170, canvas_img=img)
+            cy_map = cy_cur + int(22 * s) + th_clk + int(12 * s)
+        else:
+            # 00:00-00:12 reference shot: subtle "Today 11:22 PM" above Apple Maps card
+            cy_hdr = max(14, int(H * 0.08))
+            self._draw_centered_with_shadow(d, cy_hdr, f"Today  {now_ampm}", f_kicker, (195, 204, 220, 175), shadow_alpha=130, canvas_img=img)
+            cy_map = cy_hdr + int(18 * s)
+
+        # ---- Draw Dark-Mode Apple Maps Notification Card ----
+        card_img = Image.new("RGBA", (card_w, map_card_h), (26, 28, 34, 242))
+        tile = self._get_native_map_tile(card_w, map_h, variant=verse_block + (1 if lock_screen else 0))
+        card_img.paste(tile, (0, 0))
+        cd = ImageDraw.Draw(card_img)
+
+        # Pulsing iOS GPS beacon dot inside the Apple Park / Alamo Square center
+        gx, gy = card_w // 2, map_h // 2
+        pulse = 0.5 + 0.5 * math.sin(anim_t * 3.4)
+        hr = int((7 + 4.5 * pulse) * s)
+        cd.ellipse([gx - hr, gy - hr, gx + hr, gy + hr], fill=(10, 132, 255, int(65 + 45 * (1.0 - pulse))))
+        dr = max(3, int(4.5 * s))
+        cd.ellipse([gx - dr, gy - dr, gx + dr, gy + dr], fill=(56, 189, 248, 255), outline=(255, 255, 255, 240), width=2)
+
+        # Anchor lyric text inside the Apple Maps card (like "Baby I like your style" at 00:01-00:12)
+        card_anchor_idx = verse_block * 4
+        if lock_screen:
+            card_title = preview_text or (title or "Music Playing")
+        elif idx == card_anchor_idx and lyrics and card_anchor_idx < len(lyrics):
+            w_list = lyrics[idx].get("words", [])
+            card_title = " ".join(w["word"] for w in w_list[: max(1, w_idx + 1)]) if w_idx >= 0 else lyrics[idx]["text"]
+        elif lyrics and card_anchor_idx < len(lyrics):
+            card_title = lyrics[card_anchor_idx]["text"]
+        else:
+            card_title = title or "Lyrics"
+        card_title = (card_title or title or "Lyrics")[:44]
+
+        kicker_txt = "♪ Lyrics"
+        ox_k, oy_k, _, _, sh_k, fk_u = self._text_box(cd, kicker_txt, f_kicker)
+        self._stamp_text(card_img, cd, int(14 * s) - (0 if sh_k else ox_k), map_h + int(6 * s) - (0 if sh_k else oy_k), kicker_txt, fk_u if not sh_k else f_kicker, (162, 172, 190, 210))
+
+        ox_t, oy_t, _, _, sh_t, ft_u = self._text_box(cd, card_title, f_card_t)
+        self._stamp_text(card_img, cd, int(14 * s) - (0 if sh_t else ox_t), map_h + int(20 * s) - (0 if sh_t else oy_t), card_title, ft_u if not sh_t else f_card_t, (248, 250, 255, 252))
+
+        pin_sub = f"⌖  {loc_str}"
+        ox_s, oy_s, _, _, sh_s, fs_u = self._text_box(cd, pin_sub, f_card_sub)
+        self._stamp_text(card_img, cd, int(14 * s) - (0 if sh_s else ox_s), map_h + int(41 * s) - (0 if sh_s else oy_s), pin_sub, fs_u if not sh_s else f_card_sub, (186, 195, 212, 200))
+
+        # Rounded clip + crisp glass rim on Apple Maps card
+        card_clipped = Image.new("RGBA", (card_w, map_card_h), (0, 0, 0, 0))
+        c_mask = Image.new("L", (card_w, map_card_h), 0)
+        ImageDraw.Draw(c_mask).rounded_rectangle([0, 0, card_w - 1, map_card_h - 1], radius=int(20 * s), fill=255)
+        card_clipped.paste(card_img, (0, 0), c_mask)
+        ImageDraw.Draw(card_clipped).rounded_rectangle([0, 0, card_w - 1, map_card_h - 1], radius=int(20 * s), outline=(255, 255, 255, 42), width=1)
+        img.alpha_composite(card_clipped, (bx0, cy_map))
+
+        cy_cur = cy_map + map_card_h + int(12 * s)
+        d = ImageDraw.Draw(img)
+
+        if lock_screen:
+            self._draw_imessage_typing_bubble(img, d, bx1, cy_cur, anim_t, s)
+            self._draw_centered_with_shadow(d, min(H - 36, cy_cur + int(56 * s)), "Touch ID or Lyrics Synced", f_kicker, (180, 190, 208, 155), shadow_alpha=120, canvas_img=img)
+            return img
+
+        curr_line = lyrics[idx]
+        words = curr_line.get("words", [])
+        # Verse bubbles stack below anchor card (00:08-00:12 style); pause after anchor shows '...' typing bubble (00:06-00:07)
+        if idx == card_anchor_idx:
+            if eff_pos > curr_line["end"] + 0.35:
+                self._draw_imessage_typing_bubble(img, d, bx1, cy_cur, anim_t, s)
+            return img
+
+        start_i = max(card_anchor_idx + 1, idx - 2)
+        for bi in range(start_i, idx + 1):
+            is_act = (bi == idx)
+            if is_act:
+                w_list = words[: max(1, w_idx + 1)] if w_idx >= 0 else words
+                txt = " ".join(w["word"] for w in w_list) or curr_line["text"]
+                pop_u = _ease_out_back(min(1.0, max(0.0, (eff_pos - curr_line["time"]) / 0.22)))
+                bh = self._draw_imessage_bubble(img, d, bx1, cy_cur, card_w - 18, txt, f_chat_b, True, True, s, pop_u=pop_u)
+            else:
+                txt = lyrics[bi]["text"]
+                bh = self._draw_imessage_bubble(img, d, bx1, cy_cur, card_w - 28, txt, f_chat, False, False, s, pop_u=1.0)
+            cy_cur += bh + int(8 * s)
+        return img
+
+    def _get_chrome_spider(self, size_px: int):
+        """Renders and caches a 2x supersampled metallic chrome spider with crisp black ink outline."""
+        q = max(48, min(360, int(round(size_px / 8.0) * 8)))
+        key = ("chrome_spider_v3", q)
+        cached = self._mesh_cache.get(key)
+        if cached is not None:
+            return cached
+
+        ss = 2
+        w = h = q * ss
+        cx, cy = w * 0.5, h * 0.54
+        sc = q * ss * 0.45
+
+        def _p(pts):
+            return [(cx + x * sc, cy + y * sc) for x, y in pts]
+
+        # Pointed dagger abdomen + thorax + sharp twin fangs (emulating exact Y2K chrome spider silhouette)
+        body_pts = _p([
+            (0.00, 0.76), (-0.07, 0.42), (-0.15, 0.10), (-0.21, -0.05),
+            (-0.14, -0.14), (-0.09, -0.32), (-0.05, -0.19), (0.00, -0.17),
+            (0.05, -0.19), (0.09, -0.32), (0.14, -0.14), (0.21, -0.05),
+            (0.15, 0.10), (0.07, 0.42),
+        ])
+        # Smooth multi-point outer left sweeping scythe tapering cleanly to razor tip
+        leg_outer_L = _p([
+            (-0.15, -0.06), (-0.36, -0.04), (-0.56, -0.09), (-0.70, -0.24),
+            (-0.76, -0.46), (-0.70, -0.68), (-0.54, -0.88),
+            (-0.61, -0.66), (-0.64, -0.45), (-0.60, -0.27), (-0.49, -0.15), (-0.32, -0.10), (-0.14, -0.12),
+        ])
+        # Smooth outer right sweeping scythe mirroring reference wing-blade arch
+        leg_outer_R = _p([
+            (0.15, -0.06), (0.36, -0.04), (0.56, -0.09), (0.70, -0.24),
+            (0.76, -0.46), (0.70, -0.68), (0.54, -0.88),
+            (0.61, -0.66), (0.64, -0.45), (0.60, -0.27), (0.49, -0.15), (0.32, -0.10), (0.14, -0.12),
+        ])
+        # Inner left layered scythe + horizontal web-gripping left foreleg (matching reference asymmetric poise)
+        leg_inner_L = _p([
+            (-0.13, -0.12), (-0.31, -0.12), (-0.47, -0.21), (-0.56, -0.39),
+            (-0.53, -0.61), (-0.37, -0.84),
+            (-0.44, -0.60), (-0.46, -0.40), (-0.40, -0.25), (-0.27, -0.17), (-0.12, -0.16),
+        ])
+        leg_grip_L = _p([
+            (-0.16, 0.03), (-0.46, 0.02), (-0.68, -0.08), (-0.76, -0.20),
+            (-0.62, -0.11), (-0.42, -0.04), (-0.16, -0.03),
+        ])
+
+        parts = [leg_outer_L, leg_outer_R, leg_inner_L, leg_grip_L, body_pts]
+
+        # Build crisp silver/chrome gradient fill mask + thick dark ink silhouette
+        fill_mask = Image.new("L", (w, h), 0)
+        fm_d = ImageDraw.Draw(fill_mask)
+        for poly in parts:
+            fm_d.polygon(poly, fill=255)
+
+        out_w = max(3, int(round(q * 0.032))) * ss
+        outline_mask = fill_mask.filter(ImageFilter.MaxFilter(out_w | 1))
+
+        # Metallic chrome vertical gradient (#FFFFFF specular -> #E2E8F0 -> #94A3B8)
+        grad = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        gd = ImageDraw.Draw(grad)
+        for yi in range(h):
+            u = yi / max(1, h - 1)
+            if u < 0.42:
+                col = _lerp_color((255, 255, 255), (232, 238, 248), u / 0.42)
+            else:
+                col = _lerp_color((232, 238, 248), (156, 166, 182), (u - 0.42) / 0.58)
+            gd.line([(0, yi), (w, yi)], fill=(*col, 255))
+
+        sp_ss = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        sp_ss.paste(Image.new("RGBA", (w, h), (10, 12, 16, 248)), (0, 0), outline_mask)
+        sp_ss.paste(grad, (0, 0), fill_mask)
+
+        # Center bright chrome specular ridge down thorax/abdomen
+        sd = ImageDraw.Draw(sp_ss)
+        sd.polygon(_p([(0.00, -0.12), (-0.06, -0.04), (0.00, 0.52), (0.04, -0.04)]), fill=(255, 255, 255, 195))
+
+        spider = sp_ss.resize((q, q), Image.Resampling.LANCZOS)
+        if len(self._mesh_cache) > 64:
+            self._mesh_cache.clear()
+        self._mesh_cache[key] = spider
+        return spider
 
     def _render_fisheye(
         self, lyrics, idx, w_idx, w_u, eff_pos, anim_t, accent, sec, text_col, show_icons
@@ -1975,19 +2920,27 @@ class SyncedLyricsOverlay:
             raw_chunks = [(words, 0)]
             base_pt, y_slots = 64, (0.46,)
 
-        rng = random.Random(idx * 73856093 ^ 0x4F1E)
+        track_seed = 0
+        for ch_s in (self.current_track_key or "default"):
+            track_seed = ((track_seed * 131) + ord(ch_s)) & 0xFFFFFFFF
+        rng = random.Random((idx * 73856093) ^ track_seed ^ 0x4F1E)
         trans_mode = rng.choice((
             "swipe_left", "swipe_right", "swipe_up", "swipe_down",
             "diagonal_left", "diagonal_right", "zoom_burst", "split_merge"
         ))
         warp_base_k = rng.choice((0.52, 0.60, 0.68))
 
+        # Per-song tilt affinity + per-line chance for sung phrases to tilt organically in 3D lens
+        tilt_prob = 0.28 + 0.01 * (track_seed % 25)  # 28%..52% depending on song personality
+        has_sustained_tilt = (rng.random() < tilt_prob)
+        steady_tilt = (rng.choice((-1, 1)) * rng.uniform(3.8, 8.2)) if has_sustained_tilt else 0.0
+
         # Snappy 0.26s spring entry with more overshoot for Apple-feel pop
         line_t = max(0.0, eff_pos - curr_line["time"])
         line_u = _ease_out_back(min(1.0, line_t / 0.26))
         rem = 1.0 - line_u
 
-        dx_in, dy_in, tilt_deg = 0, 0, 0.0
+        dx_in, dy_in, tilt_deg = 0, 0, steady_tilt
         zoom_scale = 1.0
         split_dx = 0
         if trans_mode == "swipe_left":
@@ -1999,13 +2952,18 @@ class SyncedLyricsOverlay:
         elif trans_mode == "swipe_down":
             dy_in = int(-95 * rem)
         elif trans_mode == "diagonal_left":
-            dx_in, dy_in, tilt_deg = int(190 * rem), int(65 * rem), -7.0 * max(0.0, rem)
+            dx_in, dy_in = int(190 * rem), int(65 * rem)
+            tilt_deg = steady_tilt - 7.0 * max(0.0, rem)
         elif trans_mode == "diagonal_right":
-            dx_in, dy_in, tilt_deg = int(-190 * rem), int(65 * rem), 7.0 * max(0.0, rem)
+            dx_in, dy_in = int(-190 * rem), int(65 * rem)
+            tilt_deg = steady_tilt + 7.0 * max(0.0, rem)
         elif trans_mode == "zoom_burst":
             zoom_scale = max(0.52, 0.58 + 0.42 * line_u)
         elif trans_mode == "split_merge":
             split_dx = int(155 * rem)
+
+        if has_sustained_tilt:
+            tilt_deg += 0.85 * math.sin(anim_t * 1.9 + idx) + (steady_tilt * 0.25 * max(0.0, rem))
 
         line_canvas = Image.new("RGBA", (LW, LH), (0, 0, 0, 0))
         # Glow quarter-res layer for active word halo
@@ -2016,7 +2974,7 @@ class SyncedLyricsOverlay:
         atk_pulse = max(0.0, 1.0 - w_u * 2.2) if w_idx >= 0 else 0.0
 
         f_line = self._get_font("bold", int(base_pt * s * zoom_scale))
-        f_emo = self._get_font("emoji", int(base_pt * 0.88 * s * zoom_scale)) if self._font_paths.get("emoji") else None
+        f_emo = self._get_font("emoji", int(base_pt * 0.74 * s * zoom_scale)) if self._font_paths.get("emoji") else None
 
         saved_w, saved_h = self.OVERLAY_W, self.OVERLAY_H
         self.OVERLAY_W, self.OVERLAY_H = LW, LH
@@ -2056,25 +3014,22 @@ class SyncedLyricsOverlay:
         qcx = glow_q.width // 2
         if words and 0 <= w_idx < len(words):
             cw_txt = words[w_idx]["word"]
-            f_glow_q = self._safe_font(self._get_font("bold", max(8, int(base_pt * s * zoom_scale // 4))), cw_txt)
-            bb_q = qgd.textbbox((0, 0), cw_txt, font=f_glow_q)
-            tw_q, th_q = bb_q[2] - bb_q[0], bb_q[3] - bb_q[1]
+            f_glow_raw = self._get_font("bold", max(8, int(base_pt * s * zoom_scale // 4)))
+            ox_q, oy_q, tw_q, th_q, sh_q, f_glow_q = self._text_box(qgd, cw_txt, f_glow_raw)
             row_hit = 0
             for ri_c, (rw_c, b_wi_c) in enumerate(raw_chunks):
                 if b_wi_c <= w_idx < b_wi_c + len(rw_c):
                     row_hit = ri_c
                     break
             qy = max(8, min(glow_q.height - th_q - 8,
-                            int(glow_q.height * y_slots[row_hit] - (bb_q[1] + bb_q[3]) * 0.5)))
+                            int(glow_q.height * y_slots[row_hit] - (oy_q + th_q * 0.5))))
             sh_a = int(130 + 100 * max(atk_pulse, sustain_hold * (0.75 + 0.25 * math.sin(anim_t * 3.8))))
-            # Red-shifted (accent-warm, left shift)
+            f_use_q = f_glow_raw if sh_q else f_glow_q
             ca_r = _lerp_color(accent, (255, 100, 100), 0.6)
-            qgd.text((max(4, qcx - tw_q // 2 - 3), qy), cw_txt, font=f_glow_q, fill=(*ca_r, sh_a))
-            # Blue-shifted (sec-cool, right shift)
+            self._stamp_text(glow_q, qgd, max(4, qcx - tw_q // 2 - 3), qy, cw_txt, f_use_q, (*ca_r, sh_a))
             ca_b = _lerp_color(sec, (100, 140, 255), 0.5)
-            qgd.text((max(4, qcx - tw_q // 2 + 3), qy), cw_txt, font=f_glow_q, fill=(*ca_b, sh_a))
-            # White center glow (no shift)
-            qgd.text((max(4, qcx - tw_q // 2), qy), cw_txt, font=f_glow_q, fill=(255, 255, 255, int(sh_a * 0.7)))
+            self._stamp_text(glow_q, qgd, max(4, qcx - tw_q // 2 + 3), qy, cw_txt, f_use_q, (*ca_b, sh_a))
+            self._stamp_text(glow_q, qgd, max(4, qcx - tw_q // 2), qy, cw_txt, f_use_q, (255, 255, 255, int(sh_a * 0.7)))
 
             # Beat-pulse radial halo around active word area
             pulse_r = int((tw_q * 0.5 + 18) * (1.0 + 0.25 * atk_pulse))
@@ -2092,14 +3047,14 @@ class SyncedLyricsOverlay:
             ld.rounded_rectangle([whisper_x - 16, whisper_y - 6, whisper_x + tw_n + 16, whisper_y + th_n + 6],
                                   radius=12, fill=(255, 255, 255, 18))
             self._draw_text_shadow(ld, whisper_x, whisper_y, next_text[:48], f_next,
-                                   (215, 220, 235, 120), shadow_alpha=140)
-
-        if abs(tilt_deg) > 0.2:
-            line_canvas = line_canvas.rotate(tilt_deg, resample=Image.Resampling.BILINEAR)
+                                   (215, 220, 235, 120), shadow_alpha=140, canvas_img=line_canvas)
 
         # Glow blur — slightly stronger radius for bigger canvas
         glow_full = glow_q.filter(ImageFilter.GaussianBlur(radius=3.8)).resize((LW, LH), Image.Resampling.BILINEAR)
         lens_combined = Image.alpha_composite(glow_full, line_canvas)
+
+        if abs(tilt_deg) > 0.2:
+            lens_combined = lens_combined.rotate(tilt_deg, resample=Image.Resampling.BILINEAR)
 
         # Stronger fisheye warp + audio reactivity
         warp_k = warp_base_k + 0.09 * atk_pulse + 0.08 * self._audio_bloom + 0.025 * math.sin(anim_t * 2.6)
@@ -2259,14 +3214,15 @@ class SyncedLyricsOverlay:
                 end_glow = 0.28 + 0.72 * (word_prog ** 1.35)
                 if word_prog >= 0.88:
                     end_glow *= (0.88 + 0.12 * math.sin(anim_t * 3.8))
-                f_gq = self._safe_font(self._get_font("bold", max(8, sz // 4)), display_word)
-                bb_q = gd.textbbox((0, 0), display_word, font=f_gq)
-                qx = int(px // 4 - (bb_q[2] - bb_q[0]) * 0.5 - bb_q[0])
-                qy = int((py + int(6 * s)) // 4 - (bb_q[1] + bb_q[3]) * 0.5)
-                gd.text((qx, qy), display_word, font=f_gq, fill=(*accent, int(225 * end_glow)))
+                f_gq_raw = self._get_font("bold", max(8, sz // 4))
+                ox_q, oy_q, tw_q, th_q, sh_q, f_gq = self._text_box(gd, display_word, f_gq_raw)
+                qx = int(px // 4 - tw_q * 0.5 - ox_q)
+                qy = int((py + int(6 * s)) // 4 - (oy_q + th_q * 0.5))
+                f_gq_u = f_gq_raw if sh_q else f_gq
+                self._stamp_text(gl, gd, qx, qy, display_word, f_gq_u, (*accent, int(225 * end_glow)))
                 if word_prog > 0.55:
                     warm_a = int(185 * ((word_prog - 0.55) / 0.45))
-                    gd.text((qx, qy), display_word, font=f_gq, fill=(255, 250, 225, warm_a))
+                    self._stamp_text(gl, gd, qx, qy, display_word, f_gq_u, (255, 250, 225, warm_a))
 
                 base_rgb = _lerp_color((175, 190, 218), accent, 0.35)
                 lit_rgb = _lerp_color((255, 248, 215), (255, 255, 255), trans_u)
@@ -2344,13 +3300,13 @@ class SyncedLyricsOverlay:
 
         if status == "Idle" or not title or title in _NO_MEDIA_TITLES:
             if not click_through and not self._is_fullscreen_style(style):
-                self._draw_centered_with_shadow(d, H // 2 - 18, "SoulsLights Lyrics Stage — Ready for Music", self._font_cache["sub"], (205, 212, 225, 215))
+                self._draw_centered_with_shadow(d, H // 2 - 18, "SoulsLights Lyrics Stage — Ready for Music", self._font_cache["sub"], (205, 212, 225, 215), canvas_img=img)
             return img
 
         # Creative Audio-Reactive Visualizer whenever no lyrics are being sung (instrumental tracks, intros, & interludes!)
         if not lyrics or idx < 0 or self._in_instrumental_gap(lyrics, idx, eff_pos):
             return self._render_no_lyrics_visualizer(
-                img, d, lyrics, idx, eff_pos, anim_t, l_status, title, artist, accent, sec, text_col
+                img, d, lyrics, idx, eff_pos, anim_t, l_status, title, artist, accent, sec, text_col, style=style
             )
 
         curr_line = lyrics[idx]
@@ -2407,28 +3363,27 @@ class SyncedLyricsOverlay:
                     continue
                 fw = flat_words[wi_g]
                 w_txt = fw["word"]
-                ico = fw.get("icon")
+                ico = _word_icon(w_txt) or fw.get("icon")
                 is_act = (rel_off == 0)
                 pt = int((pt_base + (6 * pop_u if is_act else 0)) * s)
                 f_v = self._safe_font(self._get_font("bold" if rel_off <= 0 else "reg", pt), w_txt)
                 fe_v = self._get_font("emoji", int(pt * 0.85)) if (ico and self._font_paths.get("emoji")) else None
                 yy = H // 2 + dy + glide
 
-                bb = d.textbbox((0, 0), w_txt, font=f_v)
-                tw = bb[2] - bb[0]
+                ox, oy, tw, th, is_sh, _ = self._text_box(d, w_txt, f_v)
                 iw = self._icon_width(d, ico, fe_v)
                 gap_i = 12 if iw else 0
                 tot_w = tw + iw + gap_i
                 # Icon on LEFT side of word (matching Verci video & Pic 2)
                 x0 = int(W * 0.5 - tot_w * 0.5)
-                tx = x0 + iw + gap_i - bb[0]
-                ty = int(yy - (bb[1] + bb[3]) * 0.5)
+                tx = x0 + iw + gap_i - (0 if is_sh else ox)
+                ty = int(yy - th * 0.5 - (0 if is_sh else oy))
 
                 col = (255, 255, 255, alpha) if is_act else ((*text_col, alpha) if rel_off < 0 else (215, 222, 236, alpha))
                 if is_act:
                     sustain_glow = 0.72 + 0.28 * (0.5 + 0.5 * math.sin(anim_t * 3.5)) * (0.4 + 0.6 * w_u)
-                    gd.text((tx, ty), w_txt, font=f_v, fill=(*accent, int(205 * pop_u * sustain_glow)))
-                self._draw_text_shadow(d, tx, ty, w_txt, f_v, col, shadow_alpha=215 if is_act else 155)
+                    self._stamp_text(glow_layer, gd, tx, ty, w_txt, f_v, (*accent, int(205 * pop_u * sustain_glow)))
+                self._draw_text_shadow(d, tx, ty, w_txt, f_v, col, shadow_alpha=215 if is_act else 155, canvas_img=img)
                 if iw and fe_v:
                     patch = self._get_tinted_icon(ico, fe_v, accent, is_active=is_act)
                     if patch is not None:
@@ -2442,7 +3397,7 @@ class SyncedLyricsOverlay:
             glow_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
             gd = ImageDraw.Draw(glow_layer)
             y_base = int(H * 0.52)
-            margin = 96
+            margin = max(140, int(W * 0.14))
             span = W - 2 * margin
             n = max(1, len(words))
 
@@ -2506,7 +3461,7 @@ class SyncedLyricsOverlay:
                 pt = prev_text[:48]
                 fp_u = self._safe_font(f_prev, pt)
                 tw_p, _ = self._measure_text(d, pt, fp_u)
-                d.text(((W - tw_p) // 2, int(H * 0.34)), pt, font=fp_u, fill=(185, 198, 220, 105))
+                self._stamp_text(img, d, (W - tw_p) // 2, int(H * 0.34), pt, fp_u, (185, 198, 220, 105))
 
             # Line 2: Verci dot/call notation of words leading up to active word (e.g. till.the(road) / till(the))
             ctx_words = [w["word"] for w in words[: max(0, w_idx)]] if w_idx > 0 else []
@@ -2519,7 +3474,7 @@ class SyncedLyricsOverlay:
                     ctx_str = ".".join(ctx_words[:-1]) + f"({ctx_words[-1]})"
                 fc_u = self._safe_font(f_ctx, ctx_str)
                 tw_c, _ = self._measure_text(d, ctx_str, fc_u)
-                d.text(((W - tw_c) // 2, int(H * 0.42)), ctx_str, font=fc_u, fill=(195, 208, 232, 185))
+                self._stamp_text(img, d, (W - tw_c) // 2, int(H * 0.42), ctx_str, fc_u, (195, 208, 232, 185))
 
             # Line 3: Active token + blinking RED cursor block
             cur_typed = ""
@@ -2528,7 +3483,7 @@ class SyncedLyricsOverlay:
                 cw = words[w_idx]["word"]
                 n_chars = max(1, int(math.ceil(len(cw) * min(1.0, 0.10 + 0.90 * (w_u ** 0.92)))))
                 cur_typed = cw[:n_chars]
-                cur_ico = words[w_idx].get("icon") if show_ico else None
+                cur_ico = (_word_icon(cw) or words[w_idx].get("icon")) if show_ico else None
 
             ty = int(H * 0.53)
             if show_ico:
@@ -2546,14 +3501,14 @@ class SyncedLyricsOverlay:
                     if patch is not None:
                         self._stamp_icon(img, sx, ty + th_d // 2 - patch.height // 2, cur_ico, em_f, accent, True)
                     sx += iw + 8
-                self._draw_text_shadow(d, sx, ty, display_str, fd_u, (240, 246, 255, 245), shadow_alpha=185)
+                self._draw_text_shadow(d, sx, ty, display_str, fd_u, (240, 246, 255, 245), shadow_alpha=185, canvas_img=img)
                 cx = sx + tw_d + 5
             else:
                 # "word █" in electric blue monospace
                 fd_u = self._safe_font(f_code, cur_typed)
                 tw_d, th_d = self._measure_text(d, cur_typed, fd_u)
                 sx = (W - tw_d - 16) // 2
-                self._draw_text_shadow(d, sx, ty, cur_typed, fd_u, (78, 161, 255, 255), shadow_alpha=195)
+                self._draw_text_shadow(d, sx, ty, cur_typed, fd_u, (78, 161, 255, 255), shadow_alpha=195, canvas_img=img)
                 cx = sx + tw_d + 5
 
             cur_a = int(145 + 110 * (0.5 + 0.5 * math.sin(anim_t * 10.0)))
@@ -2574,10 +3529,10 @@ class SyncedLyricsOverlay:
             shake_y = int(4.0 * flash_k * math.cos(anim_t * 47.0))
 
             if prev_text:
-                self._draw_centered_with_shadow(d, int(H * 0.24), prev_text[:60], f_sub, (180, 190, 210, 115))
+                self._draw_centered_with_shadow(d, int(H * 0.24), prev_text[:60], f_sub, (180, 190, 210, 115), canvas_img=img)
 
             f_flash = self._get_font("bold", int(68 * s * pop_scale))
-            ico = wobj.get("icon") if show_ico else None
+            ico = (_word_icon(wobj["word"]) or wobj.get("icon")) if show_ico else None
             f_em = self._get_font("emoji", int(56 * s * pop_scale)) if (ico and self._font_paths.get("emoji")) else None
 
             if flash_k > 0.02:
@@ -2596,10 +3551,10 @@ class SyncedLyricsOverlay:
             self._draw_word_with_opt_icon(
                 img, d, W * 0.5 + shake_x, H * 0.49 + shake_y, wobj["word"], f_flash, (*word_col, 255),
                 ico=ico, emoji_font=f_em, accent_rgb=accent, is_active=True,
-                shadow_a=235, glow_draw=gd, glow_col=(255, 255, 255, int(185 + 70 * flash_k))
+                shadow_a=235, glow_draw=gd, glow_col=(255, 255, 255, int(185 + 70 * flash_k)), glow_img=glow_layer
             )
             if next_text:
-                self._draw_centered_with_shadow(d, int(H * 0.70), next_text[:60], f_sub, (190, 200, 215, 135))
+                self._draw_centered_with_shadow(d, int(H * 0.70), next_text[:60], f_sub, (190, 200, 215, 135), canvas_img=img)
             glow_blur = glow_layer.filter(ImageFilter.GaussianBlur(radius=14))
             return Image.alpha_composite(glow_blur, img)
 
@@ -2630,147 +3585,150 @@ class SyncedLyricsOverlay:
                 if rel_o == 0:
                     hold_breathe = 1.0 + 0.03 * math.sin(anim_t * 3.2) * w_u
                     f_ship = self._safe_font(self._get_font("bold", int(pt_b * s * (0.86 + 0.14 * pop_u) * hold_breathe)), w_txt)
-                    bb = wd.textbbox((0, 0), w_txt, font=f_ship)
-                    tw, th = bb[2] - bb[0], bb[3] - bb[1]
-                    tx = int(xx - tw * 0.5 - bb[0])
-                    ty = int(yy - (bb[1] + bb[3]) * 0.5)
+                    ox, oy, tw, th, is_sh, _ = self._text_box(wd, w_txt, f_ship)
+                    tx = int(xx - tw * 0.5 - (0 if is_sh else ox))
+                    ty = int(yy - th * 0.5 - (0 if is_sh else oy))
                     px0 = int(xx - tw * 0.5 - 14)
                     py0 = int(yy - th * 0.5 - 8)
                     wd.rounded_rectangle([px0, py0, px0 + tw + 28, py0 + th + 16], radius=6, fill=(244, 247, 255, 248))
-                    wd.text((tx, ty), w_txt, font=f_ship, fill=(14, 17, 24, 255))
+                    self._stamp_text(wall, wd, tx, ty, w_txt, f_ship, (14, 17, 24, 255))
                 else:
                     f_ship = self._safe_font(self._get_font("bold" if rel_o < 0 else "reg", int(pt_b * s)), w_txt)
-                    bb = wd.textbbox((0, 0), w_txt, font=f_ship)
-                    tx = int(xx - (bb[2] - bb[0]) * 0.5 - bb[0])
-                    ty = int(yy - (bb[1] + bb[3]) * 0.5)
-                    self._draw_text_shadow(wd, tx, ty, w_txt, f_ship, (235, 242, 252, alpha), shadow_alpha=175)
+                    ox, oy, tw, th, is_sh, _ = self._text_box(wd, w_txt, f_ship)
+                    tx = int(xx - tw * 0.5 - (0 if is_sh else ox))
+                    ty = int(yy - th * 0.5 - (0 if is_sh else oy))
+                    self._draw_text_shadow(wd, tx, ty, w_txt, f_ship, (235, 242, 252, alpha), shadow_alpha=175, canvas_img=wall)
             tilt = 2.8 * math.sin(anim_t * 0.48)
             if abs(tilt) > 0.2:
                 wall = wall.rotate(tilt, resample=Image.Resampling.BILINEAR)
             return wall
 
-        # ---- 6c. WEB (1:1 Verci scalloped silver spiderweb with chrome spider + node words) ----
+        # ---- 6c. WEB (Whole 360° scalloped web + centered chrome spider + Constellation-style glowing sung connections) ----
         if style == "Web":
+            glow_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+            gd = ImageDraw.Draw(glow_layer)
+
             cx, cy = W // 2, H // 2
-            max_r = min(W * 0.36, H * 0.41)
-            rot = anim_t * 0.10
-            n_spokes = 10
-            for k in range(n_spokes):
-                ang = rot + k * (2.0 * math.pi / n_spokes)
-                d.line([(cx, cy), (cx + math.cos(ang) * max_r, cy + math.sin(ang) * max_r)],
-                       fill=(215, 224, 240, 82), width=1)
-            # Scalloped inward-sagging silk rings (8 sub-steps per sector)
+            max_r = min(W * 0.42, H * 0.44)
+            rot = anim_t * 0.08
+            n_spokes = 12
+            spoke_angles = [rot + k * (2.0 * math.pi / n_spokes) for k in range(n_spokes)]
+
+            # Whole 360-degree radial silk spokes
+            for ang in spoke_angles:
+                d.line(
+                    [(cx, cy), (cx + math.cos(ang) * max_r, cy + math.sin(ang) * max_r)],
+                    fill=(225, 232, 246, 86), width=1
+                )
+
+            # 5 concentric whole-circle inward-scalloped silk web rings + node pearls
             sub_segs = 8
-            for ring_k in (0.24, 0.46, 0.68, 0.88, 1.0):
+            for ring_k in (0.22, 0.41, 0.60, 0.80, 1.0):
                 rr = max_r * ring_k
                 ring_xy = []
                 for k in range(n_spokes):
-                    a0 = rot + k * (2.0 * math.pi / n_spokes)
-                    a1 = rot + (k + 1) * (2.0 * math.pi / n_spokes)
+                    a0 = spoke_angles[k]
+                    a1 = spoke_angles[(k + 1) % n_spokes]
+                    if a1 < a0:
+                        a1 += 2.0 * math.pi
                     for si in range(sub_segs):
                         u = si / sub_segs
                         ang = a0 + (a1 - a0) * u
-                        # Parabolic inward sag at midpoint (4*u*(1-u))
                         sag = 1.0 - 0.13 * (4.0 * u * (1.0 - u))
                         ring_xy.append((cx + math.cos(ang) * rr * sag, cy + math.sin(ang) * rr * sag))
                 ring_xy.append(ring_xy[0])
-                d.line(ring_xy, fill=(220, 228, 244, int(58 + 32 * ring_k)), width=1)
+                d.line(ring_xy, fill=(230, 238, 250, int(54 + 38 * ring_k)), width=1)
+                for ang in spoke_angles:
+                    ix = int(cx + math.cos(ang) * rr)
+                    iy = int(cy + math.sin(ang) * rr)
+                    d.ellipse([ix - 2, iy - 2, ix + 2, iy + 2], fill=(240, 245, 255, int(75 + 35 * ring_k)))
 
-            # Chrome 3D-shaded spider at center oriented toward active word, gliding smoothly at word completion
+            # Place words cleanly around the whole 360-degree web (clear of center spider)
             n_w = max(1, len(words))
-            aim_w = max(0, w_idx) + max(0.0, (w_u - 0.72) / 0.28)
-            sp_ang = rot + (aim_w * (2.0 * math.pi / n_w)) - math.pi * 0.5
-            # 8 articulated silver legs (femur + tibia bends)
-            for side in (-1, 1):
-                for leg_i, spread in enumerate((-0.75, -0.32, 0.15, 0.60)):
-                    la = sp_ang + side * (math.pi * 0.46 + spread * 0.55)
-                    jx = cx + math.cos(la) * 20
-                    jy = cy + math.sin(la) * 20
-                    tx = cx + math.cos(la + side * 0.30) * 34
-                    ty = cy + math.sin(la + side * 0.30) * 34
-                    d.line([(cx, cy), (jx, jy)], fill=(215, 222, 234, 230), width=3)
-                    d.line([(jx, jy), (tx, ty)], fill=(248, 250, 255, 235), width=2)
-            # Abdomen + highlighted cephalothorax
-            ax_sp = cx - math.cos(sp_ang) * 9
-            ay_sp = cy - math.sin(sp_ang) * 9
-            d.ellipse([ax_sp - 10, ay_sp - 10, ax_sp + 10, ay_sp + 10], fill=(175, 184, 198, 240), outline=(245, 248, 255, 220))
-            d.ellipse([ax_sp - 5, ay_sp - 6, ax_sp + 3, ay_sp + 2], fill=(248, 250, 255, 210))
-            hx_sp = cx + math.cos(sp_ang) * 8
-            hy_sp = cy + math.sin(sp_ang) * 8
-            d.ellipse([hx_sp - 6, hy_sp - 6, hx_sp + 6, hy_sp + 6], fill=(235, 240, 248, 245), outline=(95, 105, 120, 220))
+            node_coords = []
+            for wi in range(n_w):
+                ang = rot + wi * (2.0 * math.pi / n_w) - math.pi * 0.5
+                rad = max_r * (0.78 if wi % 2 == 0 else 0.58)
+                nx = max(108, min(W - 108, int(cx + math.cos(ang) * rad)))
+                ny = max(62, min(H - 58, int(cy + math.sin(ang) * rad)))
+                node_coords.append((nx, ny, ang))
 
-            # Hang words along web strands
-            n_w = max(1, len(words))
+            # Constellation-style glowing silk connections across already-sung words -> active word!
+            shoot_u = _ease_out_cubic(min(1.0, w_u / 0.35)) if w_idx >= 0 else 1.0
+            for i in range(len(node_coords) - 1):
+                xa, ya, _ = node_coords[i]
+                xb, yb, _ = node_coords[i + 1]
+                if w_idx >= 0 and i < w_idx - 1:
+                    # Already-sung connection: glowing accent + white silk beam
+                    gd.line([(xa, ya), (xb, yb)], fill=(*accent, 195), width=7)
+                    d.line([(xa, ya), (xb, yb)], fill=(*accent, 215), width=3)
+                    d.line([(xa, ya), (xb, yb)], fill=(255, 252, 245, 235), width=1)
+                elif w_idx >= 1 and i == w_idx - 1:
+                    # Travelling silk-constellation beam from previous word to active word
+                    d.line([(xa, ya), (xb, yb)], fill=(205, 215, 235, 65), width=1)
+                    mx = int(xa + (xb - xa) * shoot_u)
+                    my = int(ya + (yb - ya) * shoot_u)
+                    if shoot_u > 0.02:
+                        gd.line([(xa, ya), (mx, my)], fill=(*accent, 225), width=8)
+                        d.line([(xa, ya), (mx, my)], fill=(*accent, 235), width=4)
+                        d.line([(xa, ya), (mx, my)], fill=(255, 255, 255, 250), width=2)
+                else:
+                    # Upcoming silk guide thread
+                    d.line([(xa, ya), (xb, yb)], fill=(200, 212, 232, 58), width=1)
+
+            # Giant black-outlined chrome spider centered cleanly on the web
+            sp_size = max(108, min(int(H * 0.32), int(146 * min(1.35, s))))
+            spider_img = self._get_chrome_spider(sp_size)
+            sp_ang_deg = 0.0
+            if 0 <= w_idx < len(node_coords):
+                ax, ay, aim_ang = node_coords[w_idx]
+                sp_ang_deg = -math.degrees(aim_ang + math.pi * 0.5) * 0.25
+                # Glowing spider anchor thread + bullseye ring at active word
+                gd.line([(cx, cy), (ax, ay)], fill=(255, 255, 255, 130), width=4)
+                d.line([(cx, cy), (ax, ay)], fill=(255, 255, 255, 165), width=1)
+                r_out = int(11 * min(1.5, s))
+                r_in = max(3, int(4 * min(1.5, s)))
+                gd.ellipse([ax - r_out, ay - r_out, ax + r_out, ay + r_out], outline=(*accent, 210), width=4)
+                d.ellipse([ax - r_out, ay - r_out, ax + r_out, ay + r_out], outline=(255, 255, 255, 245), width=2)
+                d.ellipse([ax - r_in, ay - r_in, ax + r_in, ay + r_in], fill=(255, 255, 255, 255))
+
+            sp_rot = spider_img.rotate(sp_ang_deg, resample=Image.Resampling.BILINEAR)
+            img.alpha_composite(sp_rot, (cx - sp_rot.width // 2, cy - sp_rot.height // 2))
+            d = ImageDraw.Draw(img)
+
+            # Render words at nodes with Constellation-style glow on touched/sung words
+            done_tint = _lerp_color(text_col, accent, 0.40)
             for wi, wobj in enumerate(words):
+                nx, ny, _ = node_coords[wi]
                 is_act = (wi == w_idx)
                 is_done = (w_idx >= 0 and wi < w_idx)
-                ang = rot + wi * (2.0 * math.pi / n_w) - math.pi * 0.5
-                node_r = max_r * (0.72 if wi % 2 == 0 else 0.48)
-                nx = int(cx + math.cos(ang) * node_r)
-                ny = int(cy + math.sin(ang) * node_r)
                 if is_act:
-                    f_w = self._get_font("bold", int(34 * s))
-                    d.ellipse([nx - 4, ny + 14, nx + 4, ny + 22], fill=(*accent, 245))
-                    self._draw_word_with_opt_icon(img, d, nx, ny - 6, wobj["word"], f_w, (255, 255, 255, 255), shadow_a=230)
+                    f_w = self._get_font("bold", int(30 * min(1.6, s)))
+                    self._draw_word_with_opt_icon(
+                        img, d, nx, ny - int(22 * min(1.5, s)), wobj["word"], f_w, (255, 255, 255, 255),
+                        shadow_a=235, glow_draw=gd, glow_col=(*accent, 215), glow_img=glow_layer
+                    )
                 elif is_done:
-                    f_w = self._get_font("bold", int(24 * s))
-                    self._draw_word_with_opt_icon(img, d, nx, ny - 4, wobj["word"], f_w, (*text_col, 205), shadow_a=175)
+                    d.ellipse([nx - 4, ny - 4, nx + 4, ny + 4], fill=(*accent, 235))
+                    gd.ellipse([nx - 7, ny - 7, nx + 7, ny + 7], fill=(*accent, 145))
+                    f_w = self._get_font("bold", int(22 * min(1.6, s)))
+                    self._draw_word_with_opt_icon(
+                        img, d, nx, ny - int(18 * min(1.5, s)), wobj["word"], f_w, (*done_tint, 225),
+                        shadow_a=185, glow_draw=gd, glow_col=(*accent, 120), glow_img=glow_layer
+                    )
                 else:
-                    f_w = self._get_font("reg", int(20 * s))
-                    self._draw_word_with_opt_icon(img, d, nx, ny - 4, wobj["word"], f_w, (205, 215, 235, 130), shadow_a=135)
-            return img
+                    f_w = self._get_font("reg", int(18 * min(1.6, s)))
+                    self._draw_word_with_opt_icon(img, d, nx, ny - int(16 * min(1.5, s)), wobj["word"], f_w, (215, 224, 240, 128), shadow_a=135)
 
-        # ---- 6d. NATIVE DESIGN (1:1 Verci iMessage conversation thread: grey bubble + stacked iOS blue bubbles) ----
+            glow_blur = glow_layer.filter(ImageFilter.GaussianBlur(radius=6))
+            return Image.alpha_composite(glow_blur, img)
+
+        # ---- 6d. NATIVE DESIGN (Apple Maps widget + iOS Lock Screen + stacked iMessage bubbles from video) ----
         if style == "Native Design":
-            l_u = _ease_out_back(min(1.0, max(0.0, (eff_pos - curr_line["time"]) / 0.22)))
-            card_w = min(W - 80, int(520 * s))
-            bx0 = (W - card_w) // 2
-            bx1 = bx0 + card_w
-            f_chat = self._get_font("reg", int(20 * s))
-            f_chat_b = self._get_font("bold", int(21 * s))
-            self._draw_centered_with_shadow(d, int(H * 0.22), "Today  11:22", f_sm, (175, 185, 205, 165))
-
-            cy_cur = int(H * 0.29)
-            # Older incoming grey bubble (idx - 2 or idx - 1)
-            in_line = lyrics[idx - 2]["text"] if idx >= 2 else (prev_text or "")
-            if in_line:
-                pt = in_line[:44]
-                tw, th = self._measure_text(d, pt, f_chat)
-                bw = min(card_w - 40, tw + 30)
-                bh = th + 18
-                d.rounded_rectangle([bx0, cy_cur, bx0 + bw, cy_cur + bh], radius=17, fill=(44, 44, 48, 240))
-                d.text((bx0 + 15, cy_cur + 8), pt, font=self._safe_font(f_chat, pt), fill=(242, 242, 247, 235))
-                cy_cur += bh + 12
-
-            # Previous line blue bubble if >= 2 lines in
-            if idx >= 2 and prev_text:
-                pt2 = prev_text[:44]
-                tw_p, th_p = self._measure_text(d, pt2, f_chat)
-                bw_p = min(card_w - 30, tw_p + 30)
-                bh_p = th_p + 18
-                d.rounded_rectangle([bx1 - bw_p, cy_cur, bx1, cy_cur + bh_p], radius=17, fill=(10, 132, 255, 225))
-                d.text((bx1 - bw_p + 15, cy_cur + 8), pt2, font=self._safe_font(f_chat, pt2), fill=(255, 255, 255, 235))
-                cy_cur += bh_p + 8
-
-            # Active outgoing iOS blue bubble (word-by-word reveal)
-            shown_txt = " ".join(w["word"] for w in words[: max(1, w_idx + 1)]) if w_idx >= 0 else curr_line["text"]
-            shown_txt = shown_txt[:46]
-            tw2, th2 = self._measure_text(d, shown_txt, f_chat_b)
-            bw2 = min(card_w - 20, tw2 + 32)
-            bh2 = th2 + 20
-            pop_dy = int(12 * (1.0 - l_u))
-            d.rounded_rectangle([bx1 - bw2, cy_cur + pop_dy, bx1, cy_cur + bh2 + pop_dy], radius=17, fill=(10, 132, 255, 252))
-            d.text((bx1 - bw2 + 16, cy_cur + 9 + pop_dy), shown_txt, font=self._safe_font(f_chat_b, shown_txt), fill=(255, 255, 255, 255))
-            cy_cur += bh2 + 8
-
-            if next_text:
-                nt = next_text[:44]
-                tw3, th3 = self._measure_text(d, nt, f_chat)
-                bw3 = min(card_w - 40, tw3 + 30)
-                bh3 = th3 + 18
-                d.rounded_rectangle([bx1 - bw3, cy_cur, bx1, cy_cur + bh3], radius=17, fill=(10, 132, 255, 110))
-                d.text((bx1 - bw3 + 15, cy_cur + 8), nt, font=self._safe_font(f_chat, nt), fill=(235, 244, 255, 175))
-            return img
+            return self._render_native_design_scene(
+                img, d, lyrics, idx, w_idx, w_u, eff_pos, anim_t, title, artist,
+                lock_screen=False, preview_text=next_text
+            )
 
         # ---- 7. APPLE DESIGN ----
         if style == "Apple Design":
@@ -2779,7 +3737,7 @@ class SyncedLyricsOverlay:
             pulse_a = int(115 + 35 * (0.5 + 0.5 * math.sin(anim_t * 2.5)))
             d.rounded_rectangle([72, int(H * 0.24), W - 72, int(H * 0.76)], radius=28, fill=(18, 20, 30, 215), outline=(*accent, pulse_a), width=1)
             if prev_text:
-                self._draw_centered_with_shadow(d, int(H * 0.30) + glide_y // 2, prev_text[:62], f_sub, (165, 175, 195, int(125 + 25 * (1.0 - l_u))))
+                self._draw_centered_with_shadow(d, int(H * 0.30) + glide_y // 2, prev_text[:62], f_sub, (165, 175, 195, int(125 + 25 * (1.0 - l_u))), canvas_img=img)
             self._draw_word_line_kinetic(
                 img, d, int(H * 0.50) + glide_y, words, max(0, w_idx), w_u, eff_pos,
                 self._get_font("bold", int(38 * s)), f_emj,
@@ -2787,7 +3745,7 @@ class SyncedLyricsOverlay:
                 accent_rgb=accent, show_icons=False, wave_amp=2.0, active_lift=6.0, active_pop=False, anim_t=anim_t
             )
             if next_text:
-                self._draw_centered_with_shadow(d, int(H * 0.65) + glide_y // 2, next_text[:62], f_sub, (185, 195, 215, 165))
+                self._draw_centered_with_shadow(d, int(H * 0.65) + glide_y // 2, next_text[:62], f_sub, (185, 195, 215, 165), canvas_img=img)
             return img
 
         # ---- 8. MINIMAL ----

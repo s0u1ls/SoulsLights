@@ -42,6 +42,7 @@ DEFAULT_CONFIG = {
         "click_through": True,
         "pos_x": None,
         "pos_y": None,
+        "script_mode": "Auto",                # Auto, Native, Romanized
         "player_preference": "Music Apps First"
     },
 

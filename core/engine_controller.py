@@ -2,6 +2,7 @@ import time
 from engine.ambient_glow import AmbientGlowEngine
 from engine.album_backdrop import AlbumBackdropEngine
 from engine.synced_lyrics import SyncedLyricsOverlay
+from core.mobile_server import MobileCompanionServer
 
 
 class EngineController:
@@ -13,6 +14,7 @@ class EngineController:
         self.ambient_engine = AmbientGlowEngine(config_manager)
         self.backdrop_engine = AlbumBackdropEngine(config_manager)
         self.lyrics_engine = SyncedLyricsOverlay(config_manager, media_monitor)
+        self.mobile_server = MobileCompanionServer(config_manager, self, media_monitor)
 
     def start_ambient(self):
         self.ambient_engine.reload_from_config()

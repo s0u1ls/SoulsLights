@@ -1,0 +1,16 @@
+{
+  "name": "SoulsLights",
+  "short_name": "SoulsLights",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#07060d",
+  "theme_color": "#07060d",
+  "icons": [
+    {
+      "src": "../logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

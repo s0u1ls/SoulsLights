@@ -4,6 +4,8 @@ from PyInstaller.utils.hooks import collect_all
 datas = [
     ('assets/app_icon.png', 'assets'),
     ('assets/SoulsLights.icns', 'assets'),
+    ('mobile', 'mobile'),
+    ('core/_token_hashes.json', 'core'),
 ]
 binaries = []
 hiddenimports = [

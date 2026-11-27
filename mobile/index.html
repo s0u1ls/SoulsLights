@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SoulsLights">
+  <meta name="theme-color" content="#07060d">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="../logo.png">
+  <title>SoulsLights — iPad & Mobile</title>
+  <style>
+    :root { --c1:#6366F1; --c2:#EC4899; --c3:#8B5CF6; --accent:#EC4899; }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+    html, body {
+      margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#07060d; color:#f8fafc;
+      font-family:-apple-system, BlinkMacSystemFont, "SF Pro Display", "Malayalam Sangam MN", "Tamil Sangam MN", "Kohinoor Devanagari", "Segoe UI", sans-serif;
+    }
+    .backdrop {
+      position:fixed; inset:-18%; z-index:0; pointer-events:none;
+      filter:blur(76px) saturate(1.35); opacity:0.62; transition:opacity .6s ease;
+    }
+    .blob {
+      position:absolute; border-radius:50%; width:58vw; height:58vw; max-width:680px; max-height:680px;
+      animation:drift 16s ease-in-out infinite alternate; transition:background 1.2s ease;
+    }
+    .blob.b1 { left:6%; top:8%; background:radial-gradient(circle, var(--c1), transparent 70%); }
+    .blob.b2 { right:4%; bottom:10%; background:radial-gradient(circle, var(--c2), transparent 70%); animation-delay:-6s; }
+    .blob.b3 { left:32%; top:38%; background:radial-gradient(circle, var(--c3), transparent 72%); animation-delay:-11s; opacity:.7; }
+    @keyframes drift { 0%{transform:translate(0,0) scale(1)} 100%{transform:translate(5vw,-4vh) scale(1.14)} }
+
+    .edge-glow {
+      position:fixed; inset:0; z-index:2; pointer-events:none; border-radius:22px;
+      box-shadow:
+        inset 0 0 28px 4px color-mix(in srgb, var(--c1) 70%, transparent),
+        inset 0 0 58px 8px color-mix(in srgb, var(--c2) 55%, transparent);
+      transition:opacity .5s ease, box-shadow .8s ease;
+    }
+    .edge-glow.off { opacity:0; }
+
+    #stage {
+      position:fixed; inset:0; z-index:3;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      padding:max(22px, env(safe-area-inset-top)) 24px max(120px, env(safe-area-inset-bottom));
+      text-align:center; cursor:pointer;
+    }
+    .lyric-wrap { max-width:min(92vw, 960px); transition:transform .38s cubic-bezier(.22,1.25,.36,1); }
+    .lyric-line {
+      font-size:clamp(28px, 5.2vw, 56px); font-weight:800; line-height:1.24; letter-spacing:-0.02em;
+      display:flex; flex-wrap:wrap; justify-content:center; gap:.22em .3em; text-shadow:0 6px 26px rgba(0,0,0,.58);
+    }
+    .word {
+      display:inline-flex; align-items:center; gap:.16em;
+      transition:transform .22s cubic-bezier(.22,1.35,.36,1), color .18s ease, opacity .18s ease, filter .18s ease;
+    }
+    .word.todo { color:rgba(215,224,240,.42); transform:scale(.97); }
+    .word.done { color:color-mix(in srgb, #fff 65%, var(--accent)); opacity:.94; }
+    .word.act { color:#fff; transform:translateY(-4px) scale(1.09); filter:drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 85%, white)); }
+    .sub-whisper {
+      margin-top:22px; font-size:clamp(14px, 2.2vw, 20px); color:rgba(226,232,244,.58);
+      background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.09);
+      padding:7px 16px; border-radius:999px; backdrop-filter:blur(12px);
+      max-width:84vw; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .prev-ghost { margin-bottom:18px; font-size:clamp(15px, 2.3vw, 22px); color:rgba(215,224,240,.42); font-weight:600; }
+
+    /* Native Design */
+    .native-box { width:min(90vw, 430px); display:flex; flex-direction:column; gap:10px; text-align:left; }
+    .native-time { text-align:center; font-size:13px; color:rgba(215,224,240,.68); margin-bottom:2px; }
+    .map-card { border-radius:20px; overflow:hidden; background:rgba(24,26,33,.92); border:1px solid rgba(255,255,255,.14); box-shadow:0 18px 42px rgba(0,0,0,.45); }
+    .map-art {
+      height:82px; position:relative; display:flex; align-items:center; justify-content:center;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(44,92,66,.65) 0 36px, transparent 37px),
+        linear-gradient(12deg, transparent 47%, rgba(72,82,98,.42) 48%, transparent 50%),
+        linear-gradient(102deg, transparent 32%, rgba(72,82,98,.38) 33%, transparent 35%),
+        linear-gradient(135deg, #192b22, #171b22);
+    }
+    .map-ring { width:62px; height:42px; border-radius:50%; border:2px solid rgba(165,176,194,.72); display:flex; align-items:center; justify-content:center; background:rgba(28,56,40,.55); }
+    .map-dot { width:11px; height:11px; border-radius:50%; background:#38bdf8; border:2px solid #fff; box-shadow:0 0 0 6px rgba(10,132,255,.35); }
+    .map-foot { padding:10px 16px 12px; }
+    .map-kicker { font-size:11px; color:rgba(175,185,205,.75); }
+    .map-title { font-size:17px; font-weight:700; color:#f8fafc; margin:2px 0; }
+    .map-loc { font-size:12px; color:rgba(185,195,212,.72); }
+    .imsg-stack { display:flex; flex-direction:column; align-items:flex-end; gap:7px; }
+    .imsg {
+      max-width:86%; padding:9px 15px; border-radius:18px; font-size:16px; font-weight:600;
+      background:linear-gradient(180deg, #1b95ff, #0077ff); color:#fff; box-shadow:0 8px 20px rgba(0,118,255,.25); position:relative;
+    }
+    .imsg.old { opacity:.86; font-weight:500; background:#0c7ef8; }
+    .imsg.tail::after { content:""; position:absolute; right:-4px; bottom:0; width:14px; height:14px; background:#0077ff; border-bottom-left-radius:12px; clip-path:polygon(0 0, 100% 100%, 0 100%); }
+
+    /* Visual stack */
+    .vis-stack { display:flex; flex-direction:column; align-items:center; gap:10px; }
+    .vis-item { font-weight:700; transition:all .2s ease; }
+    .vis-prev { font-size:clamp(20px, 3vw, 30px); color:rgba(215,224,240,.55); }
+    .vis-act { font-size:clamp(36px, 6.2vw, 66px); color:#fff; filter:drop-shadow(0 0 20px var(--accent)); }
+    .vis-next { font-size:clamp(18px, 2.7vw, 26px); color:rgba(215,224,240,.45); }
+
+    .idle-dots { display:flex; gap:12px; margin-bottom:16px; }
+    .idle-dots span { width:12px; height:12px; border-radius:50%; background:#fff; animation:bounce 1.3s infinite ease-in-out; box-shadow:0 0 14px var(--accent); }
+    .idle-dots span:nth-child(2){animation-delay:.2s} .idle-dots span:nth-child(3){animation-delay:.4s}
+    @keyframes bounce { 0%,80%,100%{transform:translateY(0) scale(.82); opacity:.5} 40%{transform:translateY(-9px) scale(1.12); opacity:1} }
+
+    /* HUD */
+    #hud {
+      position:fixed; left:50%; bottom:max(14px, env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:10;
+      width:min(94vw, 720px); background:rgba(16,14,28,.74); border:1px solid rgba(216,180,254,.24);
+      border-radius:22px; padding:12px 14px; backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+      box-shadow:0 16px 40px rgba(0,0,0,.5); transition:opacity .28s ease, transform .28s ease;
+    }
+    #hud.hidden { opacity:0; pointer-events:none; transform:translate(-50%, 18px); }
+    .hud-top { display:flex; align-items:center; gap:12px; }
+    .art { width:46px; height:46px; border-radius:10px; object-fit:cover; background:rgba(255,255,255,.08); flex-shrink:0; }
+    .meta { flex:1; min-width:0; }
+    .m-title { font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .m-artist { font-size:12px; color:rgba(203,213,225,.72); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ctrl-btns { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .btn {
+      border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.08); color:#fff;
+      border-radius:999px; height:34px; min-width:34px; padding:0 11px; font-size:12px; font-weight:600; cursor:pointer;
+    }
+    .btn.primary { background:linear-gradient(135deg, #7c3aed, #a855f7); border-color:rgba(233,213,255,.4); }
+    .btn.spotify { background:#1DB954; border-color:rgba(255,255,255,.28); color:#041309; font-weight:700; }
+    .prog-row { display:flex; align-items:center; gap:8px; margin-top:8px; font-size:11px; color:rgba(203,213,225,.7); }
+    .prog-bar { flex:1; height:4px; background:rgba(255,255,255,.14); border-radius:99px; overflow:hidden; }
+    .prog-fill { height:100%; width:0%; background:linear-gradient(90deg, var(--c1), var(--c2)); }
+    .chips { display:flex; gap:6px; overflow-x:auto; padding-top:9px; scrollbar-width:none; }
+    .chips::-webkit-scrollbar { display:none; }
+    .chip {
+      flex:0 0 auto; font-size:11px; font-weight:600; padding:5px 10px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.13); background:rgba(255,255,255,.06); color:#e2e8f0; cursor:pointer;
+    }
+    .chip.active { background:linear-gradient(135deg, #7c3aed, #a855f7); border-color:rgba(233,213,255,.5); color:#fff; }
+
+    /* Spotify Setup Modal */
+    #spModal {
+      position:fixed; inset:0; z-index:30; background:rgba(5,4,10,.78); backdrop-filter:blur(16px);
+      display:none; align-items:center; justify-content:center; padding:20px;
+    }
+    #spModal.open { display:flex; }
+    .sp-card {
+      width:min(92vw, 440px); background:rgba(22,19,36,.96); border:1px solid rgba(216,180,254,.28);
+      border-radius:22px; padding:20px; box-shadow:0 24px 60px rgba(0,0,0,.65); text-align:left;
+    }
+    .sp-card h3 { margin:0 0 8px; font-size:18px; }
+    .sp-card p { margin:0 0 12px; font-size:12.5px; line-height:1.5; color:#cbd5e1; }
+    .sp-card code { background:rgba(255,255,255,.09); padding:3px 6px; border-radius:6px; font-size:11.5px; word-break:break-all; }
+    .sp-input {
+      width:100%; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.18);
+      background:rgba(0,0,0,.35); color:#fff; font-size:13px; margin:8px 0 12px; outline:none; user-select:text;
+    }
+    .sp-actions { display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+  <div class="backdrop" id="backdrop">
+    <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+  </div>
+  <div class="edge-glow" id="edgeGlow"></div>
+  <div id="stage"></div>
+
+  <div id="hud">
+    <div class="hud-top">
+      <img id="artImg" class="art" alt="">
+      <div class="meta">
+        <div class="m-title" id="mTitle">SoulsLights</div>
+        <div class="m-artist" id="mArtist">Connecting...</div>
+      </div>
+      <div class="ctrl-btns">
+        <button class="btn" onclick="sendCtrl('previous')" title="Previous">⏮</button>
+        <button class="btn primary" id="playBtn" onclick="sendCtrl('play_pause')" title="Play/Pause">⏯</button>
+        <button class="btn" onclick="sendCtrl('next')" title="Next">⏭</button>
+        <button class="btn" onclick="toggleGlow()" id="glowBtn">Glow</button>
+        <button class="btn spotify" id="spBtn" onclick="openSpotifyModal()">Spotify</button>
+      </div>
+    </div>
+    <div class="prog-row">
+      <span id="tPos">0:00</span>
+      <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+      <span id="tDur">0:00</span>
+    </div>
+    <div class="chips" id="styleChips"></div>
+    <div class="chips" id="scriptChips"></div>
+  </div>
+
+  <div id="spModal" onclick="if(event.target===this) closeSpotifyModal()">
+    <div class="sp-card">
+      <h3>Spotify Anywhere Mode</h3>
+      <p>Play music on any device without being on the same Wi-Fi as your PC. Enter your free <b>Spotify Developer Client ID</b> once and set its Redirect URI to:</p>
+      <p><code id="redirUri"></code> <button class="chip" onclick="copyRedir()">Copy URI</button></p>
+      <input class="sp-input" id="spClientInput" placeholder="Paste Spotify Client ID (32-char hex)">
+      <div class="sp-actions">
+        <button class="btn" onclick="disconnectSpotify()" id="spDiscBtn" style="display:none">Use PC Wi-Fi</button>
+        <button class="btn" onclick="closeSpotifyModal()">Cancel</button>
+        <button class="btn spotify" onclick="startSpotifyPKCE()">Connect Spotify</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const stage = document.getElementById("stage");
+const hud = document.getElementById("hud");
+const STYLES = [
+  "Fisheye Visual", "Native Design", "Web", "Constellation",
+  "Visual", "Branches", "Codestyle Visual", "Flashbang Visual",
+  "Ship", "Apple Design", "Minimal"
+];
+const ICON_MAP = {
+  love:"❤️", loved:"❤️", heart:"💓", broken:"💔", fire:"🔥", burn:"🔥", burning:"🔥",
+  star:"⭐", stars:"✨", shine:"✨", magic:"✨", moon:"🌙", night:"🌙", midnight:"🌙",
+  sun:"☀️", morning:"🌅", light:"💡", lights:"💡", flash:"📸", shootin:"📸",
+  rain:"🌧️", storm:"⛈️", thunder:"⚡", water:"💧", ocean:"🌊", sea:"🌊", sky:"☁️",
+  cloud:"☁️", fly:"🕊️", wings:"🪶", angel:"👼", devil:"😈", ghost:"👻", dream:"💭",
+  dreams:"💭", eyes:"👁️", look:"👀", music:"🎵", song:"🎵", sing:"🎤", dance:"💃",
+  dancing:"💃", party:"🎉", wine:"🍷", kiss:"💋", smile:"😊", cry:"💧", rose:"🌹",
+  flower:"🌸", wood:"🌳", wind:"💨", snow:"❄️", ice:"🧊", time:"⏳", world:"🌍",
+  city:"🏙️", road:"🛣️", car:"🚗", cars:"🚗", shoes:"👠", run:"🏃", home:"🏠",
+  floors:"🪵", crown:"👑", diamond:"💎", diamonds:"💎", money:"💵", phone:"📱",
+  pyar:"❤️", mohabbat:"❤️", ishq:"❤️", dil:"💓", zindagi:"✨", chaand:"🌙", raat:"🌙",
+  barish:"🌧️", khwab:"💭", sneham:"❤️", mazha:"🌧️", nila:"🌙", kaalam:"⏳",
+  "സ്നേഹം":"❤️", "മഴ":"🌧️", "നിലാവ്":"🌙", "കാലം":"⏳",
+  "प्यार":"❤️", "मोहब्बत":"❤️", "दिल":"💓", "चाँद":"🌙", "बारिश":"🌧️"
+};
+
+let state = {
+  title:"SoulsLights", artist:"", source:"", status:"Idle", is_playing:false,
+  position_sec:0, duration_sec:0, colors:["#6366F1","#EC4899","#8B5CF6"],
+  accent:"#EC4899", lyrics_style: localStorage.getItem("sl_style") || "Fisheye Visual",
+  script_mode: localStorage.getItem("sl_script") || "Auto",
+  glow_enabled: localStorage.getItem("sl_glow") !== "0",
+  backdrop_mode:"Desktop Layer", lyrics:[], styles:STYLES, lyrics_status:"Idle"
+};
+let lastPollAt = performance.now();
+let lastArtKey = "";
+let spLastTrackKey = "";
+let spLyricsCache = {};
+
+const isLocalHost = ["192.168.", "10.", "172.", "127.0.0.1", "localhost"].some(p => location.hostname.startsWith(p));
+let mode = localStorage.getItem("sl_access_token") ? "spotify" : (isLocalHost ? "local" : "spotify");
+
+stage.addEventListener("click", () => hud.classList.toggle("hidden"));
+function fmtTime(s){ s=Math.max(0,Math.floor(s||0)); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
+function esc(s){ return String(s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function wordIcon(w){
+  const k = String(w||"").toLowerCase().replace(/[^a-z\u0900-\u0d7f]/g,"");
+  return ICON_MAP[k] || ICON_MAP[k.replace(/s$/,"")] || ICON_MAP[k.replace(/ing$/,"")] || "";
+}
+
+// ---- Lightweight Indic Script Detector & Romanizer for Standalone Mode ----
+function detectScript(txt){
+  let ml=0, hi=0, ta=0, lat=0;
+  for (const ch of (txt||"")) {
+    const o = ch.codePointAt(0);
+    if (o>=0x0D00 && o<=0x0D7F) ml++;
+    else if (o>=0x0900 && o<=0x097F) hi++;
+    else if (o>=0x0B80 && o<=0x0BFF) ta++;
+    else if ((o>=65 && o<=90)||(o>=97 && o<=122)) lat++;
+  }
+  if (ml >= 4 && ml >= hi && ml >= ta) return "malayalam";
+  if (hi >= 4 && hi >= ml && hi >= ta) return "hindi";
+  if (ta >= 4 && ta >= ml && ta >= hi) return "tamil";
+  return lat >= 4 ? "roman" : "roman";
+}
+const DV_V={"\u0905":"a","\u0906":"aa","\u0907":"i","\u0908":"ee","\u0909":"u","\u090a":"oo","\u090f":"e","\u0910":"ai","\u0913":"o","\u0914":"au"};
+const DV_M={"\u093e":"aa","\u093f":"i","\u0940":"ee","\u0941":"u","\u0942":"oo","\u0947":"e","\u0948":"ai","\u094b":"o","\u094c":"au"};
+const DV_C={"\u0915":"k","\u0916":"kh","\u0917":"g","\u0918":"gh","\u091a":"ch","\u091b":"chh","\u091c":"j","\u091d":"jh","\u091f":"t","\u0920":"th","\u0921":"d","\u0922":"dh","\u0923":"n","\u0924":"t","\u0925":"th","\u0926":"d","\u0927":"dh","\u0928":"n","\u092a":"p","\u092b":"ph","\u092c":"b","\u092d":"bh","\u092e":"m","\u092f":"y","\u0930":"r","\u0932":"l","\u0935":"v","\u0936":"sh","\u0937":"sh","\u0938":"s","\u0939":"h","\u095b":"z","\u095e":"f"};
+const ML_V={"\u0d05":"a","\u0d06":"aa","\u0d07":"i","\u0d08":"ee","\u0d09":"u","\u0d0a":"oo","\u0d0e":"e","\u0d0f":"ee","\u0d10":"ai","\u0d12":"o","\u0d13":"oo","\u0d14":"au"};
+const ML_M={"\u0d3e":"aa","\u0d3f":"i","\u0d40":"ee","\u0d41":"u","\u0d42":"oo","\u0d46":"e","\u0d47":"ee","\u0d48":"ai","\u0d4a":"o","\u0d4b":"oo","\u0d4c":"au","\u0d57":"au"};
+const ML_C={"\u0d15":"k","\u0d16":"kh","\u0d17":"g","\u0d18":"gh","\u0d1a":"ch","\u0d1c":"j","\u0d1e":"nj","\u0d1f":"t","\u0d21":"d","\u0d23":"n","\u0d24":"th","\u0d26":"d","\u0d27":"dh","\u0d28":"n","\u0d2a":"p","\u0d2b":"ph","\u0d2c":"b","\u0d2d":"bh","\u0d2e":"m","\u0d2f":"y","\u0d30":"r","\u0d31":"r","\u0d32":"l","\u0d33":"l","\u0d34":"zh","\u0d35":"v","\u0d36":"sh","\u0d37":"sh","\u0d38":"s","\u0d39":"h","\u0d7a":"n","\u0d7b":"n","\u0d7c":"r","\u0d7d":"l","\u0d7e":"l"};
+const TA_V={"\u0b85":"a","\u0b86":"aa","\u0b87":"i","\u0b88":"ee","\u0b89":"u","\u0b8a":"oo","\u0b8e":"e","\u0b8f":"ee","\u0b90":"ai","\u0b92":"o","\u0b93":"oo","\u0b94":"au"};
+const TA_M={"\u0bbe":"aa","\u0bbf":"i","\u0bc0":"ee","\u0bc1":"u","\u0bc2":"oo","\u0bc6":"e","\u0bc7":"ee","\u0bc8":"ai","\u0bca":"o","\u0bcb":"oo","\u0bcc":"au","\u0bd7":"au"};
+const TA_C={"\u0b95":"k","\u0b99":"ng","\u0b9a":"s","\u0b9c":"j","\u0b9e":"nj","\u0b9f":"t","\u0ba3":"n","\u0ba4":"th","\u0ba8":"n","\u0ba9":"n","\u0baa":"p","\u0bae":"m","\u0baf":"y","\u0bb0":"r","\u0bb1":"r","\u0bb2":"l","\u0bb3":"l","\u0bb4":"zh","\u0bb5":"v","\u0bb6":"sh","\u0bb7":"sh","\u0bb8":"s","\u0bb9":"h"};
+function romanizeWord(w){
+  let out="", i=0;
+  while(i<w.length){
+    const c=w[i], nx=w[i+1]||"";
+    if(DV_V[c]||ML_V[c]||TA_V[c]){ out+=(DV_V[c]||ML_V[c]||TA_V[c]); i++; }
+    else if(DV_C[c]||ML_C[c]||TA_C[c]){
+      out+=(DV_C[c]||ML_C[c]||TA_C[c]);
+      if(nx==="\u094d"||nx==="\u0d4d"||nx==="\u0bcd"){ i+=2; }
+      else if(DV_M[nx]||ML_M[nx]||TA_M[nx]){ out+=(DV_M[nx]||ML_M[nx]||TA_M[nx]); i+=2; }
+      else { if(i<w.length-1) out+="a"; i++; }
+    } else if(c==="\u0902"||c==="\u0d02"||c==="\u0b82"){ out+="m"; i++; }
+    else if(DV_M[c]||ML_M[c]||TA_M[c]||c==="\u094d"||c==="\u0d4d"||c==="\u0bcd"||c==="\u093c"){ i++; }
+    else { out+=c; i++; }
+  }
+  return out;
+}
+function romanizeText(t){ return String(t||"").split(/(\s+)/).map(p=>p.trim()?romanizeWord(p):p).join(""); }
+
+// ---- Spotify PKCE Auth ----
+function openSpotifyModal(){
+  document.getElementById("redirUri").textContent = location.origin + location.pathname;
+  document.getElementById("spClientInput").value = localStorage.getItem("sl_client_id") || "";
+  document.getElementById("spDiscBtn").style.display = isLocalHost && localStorage.getItem("sl_access_token") ? "inline-block" : "none";
+  document.getElementById("spModal").classList.add("open");
+}
+function closeSpotifyModal(){ document.getElementById("spModal").classList.remove("open"); }
+function copyRedir(){ navigator.clipboard?.writeText(location.origin + location.pathname); }
+function disconnectSpotify(){
+  localStorage.removeItem("sl_access_token"); localStorage.removeItem("sl_refresh_token");
+  mode = "local"; closeSpotifyModal(); pollState();
+}
+
+async function sha256B64(plain){
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(plain));
+  return btoa(String.fromCharCode(...new Uint8Array(d))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+async function startSpotifyPKCE(){
+  const cid = document.getElementById("spClientInput").value.trim();
+  if(!cid) return alert("Paste your Spotify Client ID first.");
+  localStorage.setItem("sl_client_id", cid);
+  const verifier = Array.from(crypto.getRandomValues(new Uint8Array(48)), b=>("0"+b.toString(16)).slice(-2)).join("");
+  localStorage.setItem("sl_pkce_verifier", verifier);
+  const challenge = await sha256B64(verifier);
+  const redir = location.origin + location.pathname;
+  const params = new URLSearchParams({
+    response_type:"code", client_id:cid, redirect_uri:redir,
+    code_challenge_method:"S256", code_challenge:challenge,
+    scope:"user-read-playback-state user-modify-playback-state user-read-currently-playing"
+  });
+  location.href = "https://accounts.spotify.com/authorize?" + params.toString();
+}
+async function handleAuthCallback(){
+  const p = new URLSearchParams(location.search);
+  const code = p.get("code");
+  if(!code) return;
+  const cid = localStorage.getItem("sl_client_id"), ver = localStorage.getItem("sl_pkce_verifier");
+  if(!cid || !ver) return;
+  const body = new URLSearchParams({
+    client_id:cid, grant_type:"authorization_code", code,
+    redirect_uri: location.origin + location.pathname, code_verifier: ver
+  });
+  const r = await fetch("https://accounts.spotify.com/api/token", {
+    method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"}, body
+  });
+  const tok = await r.json();
+  if(tok.access_token){
+    localStorage.setItem("sl_access_token", tok.access_token);
+    if(tok.refresh_token) localStorage.setItem("sl_refresh_token", tok.refresh_token);
+    localStorage.setItem("sl_expires_at", String(Date.now() + (tok.expires_in||3600)*1000));
+    mode = "spotify";
+    history.replaceState({}, "", location.pathname);
+  }
+}
+async function getSpotifyToken(){
+  const exp = Number(localStorage.getItem("sl_expires_at")||0);
+  const tok = localStorage.getItem("sl_access_token");
+  if(tok && Date.now() < exp - 60000) return tok;
+  const ref = localStorage.getItem("sl_refresh_token"), cid = localStorage.getItem("sl_client_id");
+  if(!ref || !cid) return null;
+  const r = await fetch("https://accounts.spotify.com/api/token", {
+    method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"},
+    body: new URLSearchParams({client_id:cid, grant_type:"refresh_token", refresh_token:ref})
+  });
+  const d = await r.json();
+  if(d.access_token){
+    localStorage.setItem("sl_access_token", d.access_token);
+    if(d.refresh_token) localStorage.setItem("sl_refresh_token", d.refresh_token);
+    localStorage.setItem("sl_expires_at", String(Date.now() + (d.expires_in||3600)*1000));
+    return d.access_token;
+  }
+  return null;
+}
+
+function extractImageColors(url){
+  const img = new Image(); img.crossOrigin = "anonymous";
+  img.onload = () => {
+    try {
+      const c = document.createElement("canvas"); c.width=12; c.height=12;
+      const ctx = c.getContext("2d"); ctx.drawImage(img,0,0,12,12);
+      const data = ctx.getImageData(0,0,12,12).data;
+      const pts = [0, 4*35, 4*90, 4*125].map(i => {
+        const r=Math.min(255,Math.round(data[i]*1.15)), g=Math.min(255,Math.round(data[i+1]*1.15)), b=Math.min(255,Math.round(data[i+2]*1.15));
+        return `rgb(${r},${g},${b})`;
+      });
+      state.colors = pts; state.accent = pts[1]; applyTheme();
+    } catch(e){}
+  };
+  img.src = url;
+}
+
+function parseLrc(lrc){
+  const raw = [];
+  for(const line of String(lrc||"").split(/\r?\n/)){
+    const matches = [...line.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)];
+    if(!matches.length) continue;
+    const txt = line.replace(/\[[^\]]+\]/g,"").trim();
+    if(!txt) continue;
+    for(const m of matches) raw.push({time: Number(m[1])*60 + Number(m[2]), text: txt});
+  }
+  raw.sort((a,b)=>a.time-b.time);
+  return raw.map((ln, idx)=>{
+    const nextT = idx+1 < raw.length ? raw[idx+1].time : ln.time + 4.0;
+    const end = Math.max(ln.time + 0.5, Math.min(ln.time + 7.5, nextT - 0.1));
+    const ws = ln.text.split(/\s+/).filter(Boolean);
+    const dur = Math.max(0.3, end - ln.time);
+    const words = ws.map((w, wi)=>({
+      word: w, icon: wordIcon(w),
+      start: ln.time + (wi/Math.max(1,ws.length))*dur,
+      end: ln.time + ((wi+1)/Math.max(1,ws.length))*dur
+    }));
+    return {time: ln.time, end, text: ln.text, words};
+  });
+}
+
+async function fetchLrclib(title, artist, album, dur){
+  const sm = state.script_mode || "Auto";
+  const key = `${artist}-${title}-${sm}`;
+  if(spLyricsCache[key]) return spLyricsCache[key];
+  const cleanT = title.replace(/\s*[\(\[](?:from\s+[^\)\]]+|official[^\)\]]+|remaster[^\)\]]+)[\)\]]|\s*-\s*from\s+.*/ig,"").trim() || title;
+  const cleanA = (artist||"").split(",")[0].trim();
+  const q = new URLSearchParams({track_name: cleanT, artist_name: cleanA});
+  try {
+    const r = await fetch("https://lrclib.net/api/search?" + q.toString());
+    const arr = await r.json();
+    if(Array.isArray(arr)){
+      const synced = arr.filter(x => x.syncedLyrics);
+      synced.sort((a,b)=>{
+        const sa = detectScript(a.syncedLyrics), sb = detectScript(b.syncedLyrics);
+        const pa = (sm==="Native" && sa!=="roman") ? -20 : (sm==="Romanized" && sa==="roman" ? -20 : 0);
+        const pb = (sm==="Native" && sb!=="roman") ? -20 : (sm==="Romanized" && sb==="roman" ? -20 : 0);
+        return (Math.abs((a.duration||dur)-dur)+pa) - (Math.abs((b.duration||dur)-dur)+pb);
+      });
+      if(synced.length){
+        let lines = parseLrc(synced[0].syncedLyrics);
+        if(sm==="Romanized" && detectScript(lines.slice(0,6).map(x=>x.text).join(" ")) !== "roman"){
+          lines = lines.map(ln=>({...ln, text:romanizeText(ln.text), words:ln.words.map(w=>({...w, word:romanizeWord(w.word)}))}));
+        }
+        spLyricsCache[key] = lines;
+        return lines;
+      }
+    }
+  } catch(e){}
+  return [];
+}
+
+function applyTheme(){
+  const cols = state.colors || ["#6366F1","#EC4899","#8B5CF6"];
+  document.documentElement.style.setProperty("--c1", cols[0] || "#6366F1");
+  document.documentElement.style.setProperty("--c2", cols[1] || cols[0] || "#EC4899");
+  document.documentElement.style.setProperty("--c3", cols[2] || cols[1] || "#8B5CF6");
+  document.documentElement.style.setProperty("--accent", state.accent || cols[1] || "#EC4899");
+  document.getElementById("edgeGlow").className = "edge-glow" + (state.glow_enabled ? "" : " off");
+  document.getElementById("backdrop").style.opacity = state.backdrop_mode === "Off" ? "0.18" : "0.66";
+}
+
+function buildChips(){
+  document.getElementById("styleChips").innerHTML = STYLES.map(st =>
+    `<button class="chip ${st===state.lyrics_style?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_style','${esc(st)}')">${esc(st)}</button>`
+  ).join("");
+  document.getElementById("scriptChips").innerHTML = [
+    ["Auto","Script: Auto"],["Native","Script: Native"],["Romanized","Script: Romanized"]
+  ].map(([k,lbl]) =>
+    `<button class="chip ${k===state.script_mode?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_script_mode','${k}')">${lbl}</button>`
+  ).join("") + `<button class="chip" onclick="event.stopPropagation(); sendCtrl('refresh_lyrics')">↻ Refresh</button>`;
+}
+
+async function sendCtrl(action, value){
+  if(mode === "local"){
+    await fetch("/api/control", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({action,value})}).catch(()=>{});
+    setTimeout(pollState, 120);
+    return;
+  }
+  if(action === "set_style"){ state.lyrics_style = value; localStorage.setItem("sl_style", value); buildChips(); return; }
+  if(action === "set_script_mode"){ state.script_mode = value; localStorage.setItem("sl_script", value); spLastTrackKey=""; buildChips(); pollState(); return; }
+  if(action === "toggle_glow"){ state.glow_enabled = !state.glow_enabled; localStorage.setItem("sl_glow", state.glow_enabled?"1":"0"); applyTheme(); return; }
+  if(action === "refresh_lyrics"){ spLyricsCache={}; spLastTrackKey=""; pollState(); return; }
+  const tok = await getSpotifyToken();
+  if(!tok) return openSpotifyModal();
+  const ep = action==="play_pause" ? (state.is_playing?"pause":"play") : (action==="next"?"next":"previous");
+  const meth = (action==="play_pause") ? "PUT" : "POST";
+  await fetch(`https://api.spotify.com/v1/me/player/${ep}`, {method:meth, headers:{Authorization:`Bearer ${tok}`}}).catch(()=>{});
+  setTimeout(pollState, 250);
+}
+function toggleGlow(){ sendCtrl("toggle_glow"); }
+
+async function pollState(){
+  if(mode === "local"){
+    try {
+      const r = await fetch("/api/state", {cache:"no-store"});
+      if(!r.ok) return;
+      state = await r.json(); lastPollAt = performance.now();
+      applyTheme();
+      document.getElementById("mTitle").textContent = state.title || "No Active Music";
+      document.getElementById("mArtist").textContent = (state.artist||"") + (state.source?` • ${state.source}`:"");
+      document.getElementById("playBtn").textContent = state.is_playing ? "⏸" : "▶";
+      const ak = `${state.title}|${state.artist}|${state.has_art}`;
+      if(ak !== lastArtKey){ lastArtKey = ak; document.getElementById("artImg").src = state.has_art ? `/api/art?t=${Date.now()}` : ""; }
+      buildChips();
+    } catch(e){}
+    return;
+  }
+  const tok = await getSpotifyToken();
+  if(!tok){
+    document.getElementById("mTitle").textContent = "Connect Spotify for Anywhere Mode";
+    document.getElementById("mArtist").textContent = "Tap the green Spotify button ->";
+    buildChips();
+    return;
+  }
+  try {
+    const r = await fetch("https://api.spotify.com/v1/me/player", {headers:{Authorization:`Bearer ${tok}`}});
+    if(r.status === 204){
+      state.status = "Idle"; state.is_playing = false; state.title = "Play a song in Spotify"; state.artist = "Spotify Connect Ready"; state.lyrics = [];
+      document.getElementById("mTitle").textContent = state.title;
+      document.getElementById("mArtist").textContent = state.artist;
+      return;
+    }
+    if(!r.ok) return;
+    const p = await r.json();
+    if(!p || !p.item) return;
+    const item = p.item;
+    const title = item.name || "Unknown";
+    const artist = (item.artists||[]).map(a=>a.name).join(", ");
+    const album = item.album?.name || "";
+    const artUrl = item.album?.images?.[0]?.url || "";
+    state.title = title; state.artist = artist; state.album = album; state.source = "Spotify";
+    state.is_playing = !!p.is_playing; state.status = p.is_playing ? "Playing" : "Paused";
+    state.position_sec = (p.progress_ms || 0) / 1000.0;
+    state.duration_sec = (item.duration_ms || 0) / 1000.0;
+    lastPollAt = performance.now();
+
+    document.getElementById("mTitle").textContent = title;
+    document.getElementById("mArtist").textContent = `${artist} • Spotify`;
+    document.getElementById("playBtn").textContent = state.is_playing ? "⏸" : "▶";
+    if(artUrl && artUrl !== lastArtKey){
+      lastArtKey = artUrl;
+      document.getElementById("artImg").src = artUrl;
+      extractImageColors(artUrl);
+    }
+    const tk = `${artist}-${title}-${state.script_mode}`;
+    if(tk !== spLastTrackKey){
+      spLastTrackKey = tk;
+      state.lyrics_status = "Searching lyrics...";
+      state.lyrics = await fetchLrclib(title, artist, album, state.duration_sec);
+      state.lyrics_status = state.lyrics.length ? "Synced" : "No synced lyrics";
+    }
+    buildChips();
+  } catch(e){}
+}
+
+function getLivePos(){
+  let p = state.position_sec || 0;
+  if(state.is_playing) p += (performance.now() - lastPollAt)/1000.0;
+  if(state.duration_sec > 0) p = Math.min(state.duration_sec, p);
+  return Math.max(0, p + (state.offset_sec || 0));
+}
+function lineTiltDeg(tk, idx){
+  let h = 2166136261;
+  for(let i=0;i<tk.length;i++){ h ^= tk.charCodeAt(i); h = Math.imul(h, 16777619); }
+  const x = Math.abs(Math.sin((idx+1)*73.13 + (h&65535)));
+  if(x >= 0.28 + 0.01*(Math.abs(h)%25)) return 0;
+  return ((Math.floor(x*1000)%2===0)?1:-1) * (3.8 + Math.abs(Math.cos(idx*19.7))*4.2);
+}
+
+function renderFrame(){
+  requestAnimationFrame(renderFrame);
+  const pos = getLivePos(), dur = state.duration_sec || 0;
+  document.getElementById("tPos").textContent = fmtTime(pos);
+  document.getElementById("tDur").textContent = fmtTime(dur);
+  document.getElementById("progFill").style.width = dur>0 ? Math.min(100,(pos/dur)*100)+"%" : "0%";
+
+  const lyrics = state.lyrics || [];
+  if(!lyrics.length || pos < lyrics[0].time - 1.8){
+    stage.innerHTML = `<div class="idle-dots"><span></span><span></span><span></span></div>
+      <div class="sub-whisper">${esc(state.status==="Idle" ? "Play music in Spotify or Apple Music" : (state.lyrics_status||state.title))}</div>`;
+    return;
+  }
+  let idx = 0; for(let i=0;i<lyrics.length;i++){ if(lyrics[i].time<=pos) idx=i; else break; }
+  const cur = lyrics[idx], words = cur.words || [];
+  let wIdx = 0; for(let wi=0;wi<words.length;wi++){ if(words[wi].start<=pos) wIdx=wi; else break; }
+  const style = state.lyrics_style || "Fisheye Visual", showIcons = style.includes("Visual");
+
+  if(style === "Native Design"){
+    const block = Math.floor(idx/4), anchorIdx = block*4;
+    const loc = block%2===0 ? "Apple Park, Cupertino" : "Alamo Square, San Francisco";
+    const aw = lyrics[anchorIdx]?.words || [];
+    const anchorTxt = (idx===anchorIdx) ? aw.slice(0,wIdx+1).map(w=>w.word).join(" ")||cur.text : (lyrics[anchorIdx]?.text||state.title);
+    let bubbles = "";
+    if(idx > anchorIdx){
+      for(let bi=Math.max(anchorIdx+1, idx-2); bi<=idx; bi++){
+        const isA = bi===idx, txt = isA ? words.slice(0,wIdx+1).map(w=>w.word).join(" ") : lyrics[bi].text;
+        bubbles += `<div class="imsg ${isA?'tail':'old'}">${esc(txt)}</div>`;
+      }
+    }
+    stage.innerHTML = `<div class="native-box">
+      <div class="native-time">Today ${new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</div>
+      <div class="map-card"><div class="map-art"><div class="map-ring"><div class="map-dot"></div></div></div>
+        <div class="map-foot"><div class="map-kicker">♪ Lyrics</div><div class="map-title">${esc(anchorTxt)}</div><div class="map-loc">⌖ ${loc}</div></div>
+      </div><div class="imsg-stack">${bubbles}</div></div>`;
+    return;
+  }
+  if(style === "Visual" && words.length){
+    const pw = wIdx>0 ? words[wIdx-1].word : "", aw = words[wIdx]?.word||cur.text, ai = words[wIdx]?.icon ? `${words[wIdx].icon} ` : "", nw = wIdx+1<words.length ? words[wIdx+1].word : "";
+    stage.innerHTML = `<div class="vis-stack">${pw?`<div class="vis-item vis-prev">${esc(pw)}</div>`:""}<div class="vis-item vis-act">${esc(ai+aw)}</div>${nw?`<div class="vis-item vis-next">${esc(nw)}</div>`:""}</div>`;
+    return;
+  }
+  const prevTxt = idx>0?lyrics[idx-1].text:"", nextTxt = idx+1<lyrics.length?lyrics[idx+1].text:"";
+  const tilt = style.startsWith("Fisheye") ? lineTiltDeg(`${state.artist}-${state.title}`, idx) : 0;
+  const wordHtml = words.map((w,wi)=>{
+    const cls = wi<wIdx ? "done" : (wi===wIdx ? "act" : "todo");
+    const ico = (showIcons && w.icon) ? `<span>${w.icon}</span>` : "";
+    return `<span class="word ${cls}">${esc(w.word)}${ico}</span>`;
+  }).join("");
+  stage.innerHTML = `<div class="lyric-wrap" style="transform:rotate(${tilt.toFixed(2)}deg)">
+    ${prevTxt&&!style.startsWith("Fisheye")?`<div class="prev-ghost">${esc(prevTxt)}</div>`:""}
+    <div class="lyric-line">${wordHtml||esc(cur.text)}</div>
+    ${nextTxt?`<div class="sub-whisper" style="margin-inline:auto">${esc(nextTxt)}</div>`:""}
+  </div>`;
+}
+
+handleAuthCallback().then(()=>{
+  applyTheme(); buildChips(); pollState();
+  setInterval(pollState, mode==="local" ? 350 : 1200);
+  requestAnimationFrame(renderFrame);
+});
+</script>
+</body>
+</html>
