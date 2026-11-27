@@ -236,6 +236,21 @@ class AdminHandler(BaseHTTPRequestHandler):
                 conn.close()
             return self._send_json(200, {"ok": True})
 
+        if path == "/api/token_status":
+            th = str(body.get("token_hash", "")).strip().lower()
+            if not th:
+                return self._send_json(200, {"ok": True, "revoked": False})
+            with _DB_LOCK:
+                conn = _db()
+                rows = conn.execute("SELECT token, revoked FROM tokens").fetchall()
+                conn.close()
+            for r in rows:
+                hx = hashlib.sha256(("SL_SALT_v1:" + str(r["token"]).upper()).encode("utf-8")).hexdigest()
+                if hx == th:
+                    rev = bool(r["revoked"])
+                    return self._send_json(200, {"ok": not rev, "revoked": rev})
+            return self._send_json(200, {"ok": True, "revoked": False})
+
         if path == "/api/activate":
             tok = str(body.get("token", "")).strip().upper()
             mid = str(body.get("machine_id", "")).strip()[:32]

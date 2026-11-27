@@ -68,9 +68,45 @@ class LicenseManager:
             if not data.get("activated"):
                 return False
             th = data.get("token_hash", "")
-            if th == self.master_hash or th in self.valid_hashes or data.get("remote_verified"):
-                return data.get("machine_id") == get_machine_id()
-            return False
+            mid = get_machine_id()
+            if data.get("machine_id") != mid:
+                return False
+            if th != self.master_hash and th not in self.valid_hashes and not data.get("remote_verified"):
+                return False
+            # Check live server for revocation on non-master tokens
+            api_url = self._get_api_url()
+            if api_url and th and th != self.master_hash:
+                try:
+                    body = json.dumps({"token_hash": th, "machine_id": mid}).encode("utf-8")
+                    req = urllib.request.Request(
+                        f"{api_url}/api/token_status",
+                        data=body,
+                        headers={"Content-Type": "application/json", "User-Agent": f"SoulsLights/{APP_VERSION}"},
+                        method="POST",
+                    )
+                    resp = urllib.request.urlopen(req, timeout=4, context=_SSL_CTX) if _SSL_CTX else urllib.request.urlopen(req, timeout=4)
+                    with resp:
+                        res = json.loads(resp.read().decode("utf-8"))
+                    if res.get("revoked"):
+                        try:
+                            os.remove(self.license_path)
+                        except Exception:
+                            pass
+                        return False
+                except urllib.error.HTTPError as he:
+                    try:
+                        err_res = json.loads(he.read().decode("utf-8"))
+                        if err_res.get("revoked"):
+                            try:
+                                os.remove(self.license_path)
+                            except Exception:
+                                pass
+                            return False
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+            return True
         except Exception:
             return False
 
@@ -136,10 +172,11 @@ class LicenseManager:
                     err_res = json.loads(he.read().decode("utf-8"))
                     return False, err_res.get("error", "Invalid or already used token.")
                 except Exception:
-                    pass
+                    return False, f"Activation server error ({he.code})."
             except Exception:
-                pass
-        if is_master or (th in self.valid_hashes):
+                if not is_master:
+                    return False, "Could not reach activation server. Check your internet connection."
+        if is_master or (not api_url and th in self.valid_hashes):
             return True, "Token valid! Enter your name to continue."
         return False, "Invalid activation token. Check your code and try again."
 
@@ -182,13 +219,13 @@ class LicenseManager:
                     err_res = json.loads(he.read().decode("utf-8"))
                     return False, err_res.get("error", "Invalid or already used token.")
                 except Exception:
-                    pass
+                    return False, f"Activation server error ({he.code})."
             except Exception:
-                # Fall through to local hash validation when server is unreachable
-                pass
+                if not is_master:
+                    return False, "Could not reach activation server. Check your internet connection."
 
-        # 2. Local hash verification (7282 master + 100 generated 10-char tokens)
-        if is_master or (th in self.valid_hashes):
+        # 2. Local hash verification (7282 master offline, or local-only mode)
+        if is_master or (not api_url and th in self.valid_hashes):
             self._save_license(norm, is_master, False, uname)
             return True, "Master token verified!" if is_master else "Token verified! Welcome to SoulsLights."
         return False, "Invalid activation token. Check your code and try again."

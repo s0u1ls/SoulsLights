@@ -53,6 +53,21 @@ export default {
       return json({ ok: true });
     }
 
+    if (url.pathname === "/api/token_status" && request.method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      const th = String(body.token_hash || "").trim().toLowerCase();
+      if (!th) return json({ ok: true, revoked: false });
+      const tokens = JSON.parse((await kv.get("tokens")) || "{}");
+      for (const [k, rec] of Object.entries(tokens)) {
+        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("SL_SALT_v1:" + k.toUpperCase()));
+        const hx = Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+        if (hx === th) {
+          return json({ ok: !rec.revoked, revoked: !!rec.revoked });
+        }
+      }
+      return json({ ok: true, revoked: false });
+    }
+
     if (url.pathname === "/api/activate" && request.method === "POST") {
       const body = await request.json().catch(() => ({}));
       const tok = String(body.token || "").trim().toUpperCase();
