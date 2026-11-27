@@ -293,7 +293,7 @@ function delStore(k){
 }
 
 const isLocalHost = ["192.168.", "10.", "172.", "127.0.0.1", "localhost"].some(p => location.hostname.startsWith(p));
-let mode = (getStore("sl_refresh_token") || getStore("sl_access_token")) ? "spotify" : (isLocalHost ? "local" : "spotify");
+let mode = isLocalHost ? "local" : "spotify";
 
 stage.addEventListener("click", () => hud.classList.toggle("hidden"));
 function fmtTime(s){ s=Math.max(0,Math.floor(s||0)); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
@@ -465,21 +465,30 @@ async function fetchLrclib(title, artist, album, dur){
   const sm = state.script_mode || "Auto";
   const key = `${artist}-${title}-${sm}`;
   if(spLyricsCache[key]) return spLyricsCache[key];
-  const cleanT = title.replace(/\s*[\(\[](?:from\s+[^\)\]]+|official[^\)\]]+|remaster[^\)\]]+)[\)\]]|\s*-\s*from\s+.*/ig,"").trim() || title;
+  const cleanT = title
+    .replace(/\s*[\(\[].*?[\)\]]/g, "")
+    .replace(/\s*-\s*from\s+.*/ig, "")
+    .replace(/\s+(?:feat\.?|ft\.?)\s+.*/ig, "")
+    .trim() || title;
   const cleanA = (artist||"").split(",")[0].trim();
-  const q = new URLSearchParams({track_name: cleanT, artist_name: cleanA});
-  try {
-    const r = await fetch("https://lrclib.net/api/search?" + q.toString());
-    const arr = await r.json();
-    if(Array.isArray(arr)){
-      const synced = arr.filter(x => x.syncedLyrics);
-      synced.sort((a,b)=>{
-        const sa = detectScript(a.syncedLyrics), sb = detectScript(b.syncedLyrics);
-        const pa = (sm==="Native" && sa!=="roman") ? -20 : (sm==="Romanized" && sa==="roman" ? -20 : 0);
-        const pb = (sm==="Native" && sb!=="roman") ? -20 : (sm==="Romanized" && sb==="roman" ? -20 : 0);
-        return (Math.abs((a.duration||dur)-dur)+pa) - (Math.abs((b.duration||dur)-dur)+pb);
-      });
-      if(synced.length){
+  const urls = [
+    "https://lrclib.net/api/search?" + new URLSearchParams({track_name: cleanT, artist_name: cleanA}).toString(),
+    "https://lrclib.net/api/search?" + new URLSearchParams({q: `${cleanT} ${cleanA}`.trim()}).toString(),
+    "https://lrclib.net/api/search?" + new URLSearchParams({q: cleanT}).toString(),
+  ];
+  for(const u of urls){
+    try {
+      const r = await fetch(u);
+      const arr = await r.json();
+      if(Array.isArray(arr) && arr.length){
+        const synced = arr.filter(x => x.syncedLyrics);
+        if(!synced.length) continue;
+        synced.sort((a,b)=>{
+          const sa = detectScript(a.syncedLyrics), sb = detectScript(b.syncedLyrics);
+          const pa = (sm==="Native" && sa!=="roman") ? -20 : (sm==="Romanized" && sa==="roman" ? -20 : 0);
+          const pb = (sm==="Native" && sb!=="roman") ? -20 : (sm==="Romanized" && sb==="roman" ? -20 : 0);
+          return (Math.abs((a.duration||dur)-dur)+pa) - (Math.abs((b.duration||dur)-dur)+pb);
+        });
         let lines = parseLrc(synced[0].syncedLyrics);
         if(sm==="Romanized" && detectScript(lines.slice(0,6).map(x=>x.text).join(" ")) !== "roman"){
           lines = lines.map(ln=>({...ln, text:romanizeText(ln.text), words:ln.words.map(w=>({...w, word:romanizeWord(w.word)}))}));
@@ -487,8 +496,8 @@ async function fetchLrclib(title, artist, album, dur){
         spLyricsCache[key] = lines;
         return lines;
       }
-    }
-  } catch(e){}
+    } catch(e){}
+  }
   return [];
 }
 
@@ -602,11 +611,18 @@ async function pollState(){
     return;
   }
   try {
-    let r = await fetch("https://api.spotify.com/v1/me/player", {headers:{Authorization:`Bearer ${tok}`}});
+    let r = await fetch("https://api.spotify.com/v1/me/player?additional_types=track", {headers:{Authorization:`Bearer ${tok}`}});
     if(r.status === 401){
       tok = await getSpotifyToken(true);
-      if(!tok) return;
-      r = await fetch("https://api.spotify.com/v1/me/player", {headers:{Authorization:`Bearer ${tok}`}});
+      if(!tok){
+        document.getElementById("mTitle").textContent = "Spotify Session Expired";
+        document.getElementById("mArtist").textContent = "Tap the green Spotify button to reconnect";
+        return;
+      }
+      r = await fetch("https://api.spotify.com/v1/me/player?additional_types=track", {headers:{Authorization:`Bearer ${tok}`}});
+    }
+    if(r.status === 204){
+      r = await fetch("https://api.spotify.com/v1/me/player/currently-playing?additional_types=track", {headers:{Authorization:`Bearer ${tok}`}});
     }
     if(r.status === 204){
       state.status = "Idle"; state.is_playing = false; state.title = "Play a song in Spotify"; state.artist = "Spotify Connect Ready"; state.lyrics = [];
@@ -614,7 +630,10 @@ async function pollState(){
       document.getElementById("mArtist").textContent = state.artist;
       return;
     }
-    if(!r.ok) return;
+    if(!r.ok){
+      document.getElementById("mArtist").textContent = `Spotify status ${r.status} — tap Spotify`;
+      return;
+    }
     const p = await r.json();
     if(!p || !p.item) return;
     const item = p.item;
