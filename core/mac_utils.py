@@ -330,9 +330,9 @@ class MacOverlayWindow:
             return 0
         if self.role == "desktop" and HAS_QUARTZ:
             try:
-                return int(Quartz.CGWindowLevelForKey(Quartz.kCGDesktopIconWindowLevelKey)) - 1
+                return int(Quartz.CGWindowLevelForKey(Quartz.kCGDesktopIconWindowLevelKey)) + 1
             except Exception:
-                return int(AppKit.kCGDesktopWindowLevel) + 1
+                return int(AppKit.kCGDesktopWindowLevel) + 20
         if self.role == "cinema":
             return int(AppKit.NSFloatingWindowLevel)
         if self.role == "glow":
@@ -468,7 +468,7 @@ class MacOverlayWindow:
                         layer.setMagnificationFilter_(Quartz.kCAFilterLinear)
                         layer.setContentsGravity_(Quartz.kCAGravityResize)
                     layer.setContents_(cg_img)
-                    layer.setOpacity_(max(0.0, min(1.0, alpha_byte / 255.0)))
+                    layer.setOpacity_(1.0 if opaque_rgbx else max(0.0, min(1.0, alpha_byte / 255.0)))
                     Quartz.CATransaction.commit()
                 else:
                     layer.setContents_(cg_img)

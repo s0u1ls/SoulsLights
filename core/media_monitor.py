@@ -3,6 +3,7 @@ import ctypes
 import io
 import json
 import os
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -15,6 +16,16 @@ import colorsys
 from PIL import Image
 
 from core.platform_utils import IS_MAC, IS_WIN, get_app_data_dir
+
+try:
+    import certifi
+    _SSL_CTX = ssl.create_default_context(cafile=certifi.where())
+except Exception:
+    _SSL_CTX = ssl.create_default_context()
+
+
+def _urlopen(req_or_url, timeout: float = 3.5):
+    return urllib.request.urlopen(req_or_url, timeout=timeout, context=_SSL_CTX)
 
 MUSIC_APP_HINTS = (
     "spotify", "applemusic", "itunes", "music", "tidal",
@@ -500,7 +511,7 @@ class MediaMonitor:
         if url:
             try:
                 req = urllib.request.Request(url, headers={"User-Agent": "SoulsLights/2.2"})
-                with urllib.request.urlopen(req, timeout=3.5) as resp:
+                with _urlopen(req, timeout=3.5) as resp:
                     img = Image.open(io.BytesIO(resp.read())).convert("RGB")
             except Exception:
                 img = None
@@ -537,13 +548,13 @@ class MediaMonitor:
                     f"https://itunes.apple.com/search?{q}",
                     headers={"User-Agent": "SoulsLights/2.2"},
                 )
-                with urllib.request.urlopen(req, timeout=3.5) as resp:
+                with _urlopen(req, timeout=3.5) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
                 results = data.get("results") or []
                 if results:
                     aw = (results[0].get("artworkUrl100") or "").replace("100x100", "600x600")
                     if aw:
-                        with urllib.request.urlopen(aw, timeout=3.5) as r2:
+                        with _urlopen(aw, timeout=3.5) as r2:
                             img = Image.open(io.BytesIO(r2.read())).convert("RGB")
             except Exception:
                 img = None
