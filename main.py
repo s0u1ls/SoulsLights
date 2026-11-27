@@ -274,6 +274,21 @@ def main():
 
         _write_instance_meta(dashboard.get_native_hwnd())
         media_mon.start()
+
+        def _watch_revocation():
+            while running_flag[0]:
+                time.sleep(35.0)
+                if not running_flag[0]:
+                    break
+                try:
+                    if not license_mgr.is_activated():
+                        log("License revoked on server; exiting SoulsLights.")
+                        dashboard.enqueue_ui(clean_exit)
+                        break
+                except Exception:
+                    pass
+
+        threading.Thread(target=_watch_revocation, daemon=True).start()
         engine_ctrl.apply_media_state(media_mon.current_info)
 
         engine_ctrl.sync_state(
