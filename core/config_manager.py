@@ -17,7 +17,7 @@ DEFAULT_CONFIG = {
         "glow_intensity": 1.35,          # 0.0 to 3.0
         "thickness": "normal",           # subtle, normal, thick, immersive
         "gradient_mode": "Multi Colors", # Multi Colors (2+), 1 Color
-        "animation_mode": "Water Drop",  # Water Drop, Liquid Flow, Beat Pulse, Breathing, Static
+        "animation_mode": "Water Drop",  # Water Drop, Liquid Flow, Aurora Wave, Neon Prism, Beat Pulse, Breathing, Static
         "override_album_color": False,   # True = fixed custom colors, False = album art sync
         "color_1": "#6366F1",
         "color_2": "#EC4899",
@@ -27,7 +27,7 @@ DEFAULT_CONFIG = {
         "show_over_fullscreen": True,
         "audio_reactive": True,
         "album_backdrop": "Desktop Layer",  # Desktop Layer, Cinema Stage, Off
-        "backdrop_style": "2-Blob Aura",    # 2-Blob Aura, Video Reel
+        "backdrop_style": "2-Blob Aura",    # 2-Blob Aura, Video Reel, Music Video
         "backdrop_darkness": 0.34,          # 0.15 to 1.0 (higher = richer brighter cover)
         "backdrop_blur": 7.5                # 0.0 (sharp) to 12.0 (ultra soft)
     },
@@ -35,6 +35,7 @@ DEFAULT_CONFIG = {
     # Synced Lyrics Overlay Engine (Verci)
     "lyrics": {
         "style": "Fisheye Visual",
+        "fisheye_effect": "Auto Mix",        # Auto Mix, Prism Split, Vortex Spin, Elastic Dome, Hyperwave, Shockwave, 3D Vault
         "auto_sync_colors": True,
         "custom_accent_color": "#EC4899",
         "custom_text_color": "#FFFFFF",
@@ -46,6 +47,15 @@ DEFAULT_CONFIG = {
         "pos_y": None,
         "script_mode": "Auto",                # Auto, Native, Romanized
         "player_preference": "Music Apps First"
+    },
+
+    # Optional Spotify OAuth (for track sync + Music Video backdrop)
+    "spotify": {
+        "client_id": "",
+        "access_token": "",
+        "refresh_token": "",
+        "expires_at": 0,
+        "user_name": "",
     },
 
     # System Preferences

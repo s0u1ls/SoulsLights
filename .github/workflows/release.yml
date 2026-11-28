@@ -31,14 +31,28 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller
 
-      - name: Build SoulsLights.exe
+      - name: Ensure Inno Setup 6
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup -y
+          }
+
+      - name: Build SoulsLights Setup & Portable ZIP
         run: python build_exe.py
 
-      - name: Upload Windows EXE
+      - name: Print SHA-256 Checksums
+        shell: pwsh
+        run: |
+          Get-FileHash dist\SoulsLights-Setup.exe, dist\SoulsLights-Windows-Portable.zip, dist\SoulsLights\SoulsLights.exe -Algorithm SHA256 | Format-Table -AutoSize
+
+      - name: Upload Windows Installer & Portable
         uses: actions/upload-artifact@v4
         with:
           name: SoulsLights-Windows-EXE
-          path: dist/SoulsLights.exe
+          path: |
+            dist/SoulsLights-Setup.exe
+            dist/SoulsLights-Windows-Portable.zip
 
   build-macos:
     runs-on: macos-latest

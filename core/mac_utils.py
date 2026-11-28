@@ -333,6 +333,11 @@ class MacOverlayWindow:
                 return int(Quartz.CGWindowLevelForKey(Quartz.kCGDesktopIconWindowLevelKey)) + 1
             except Exception:
                 return int(AppKit.kCGDesktopWindowLevel) + 20
+        if self.role == "desktop_lyrics" and HAS_QUARTZ:
+            try:
+                return int(Quartz.CGWindowLevelForKey(Quartz.kCGDesktopIconWindowLevelKey)) + 2
+            except Exception:
+                return int(AppKit.kCGDesktopWindowLevel) + 21
         if self.role == "cinema":
             return int(AppKit.NSFloatingWindowLevel)
         if self.role == "glow":
@@ -397,6 +402,8 @@ class MacOverlayWindow:
         def _do():
             if self._nswindow and not self._disposed:
                 self._nswindow.setLevel_(self._window_level())
+                if self.visible:
+                    self._nswindow.orderFrontRegardless()
         run_on_main(_do)
 
     def set_click_through(self, enable: bool):

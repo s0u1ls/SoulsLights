@@ -236,7 +236,7 @@ def main():
                 return
 
         pref = config_mgr.config.get("lyrics", {}).get("player_preference", "Music Apps First")
-        media_mon = MediaMonitor(player_preference=pref)
+        media_mon = MediaMonitor(player_preference=pref, config_manager=config_mgr)
         engine_ctrl = EngineController(config_mgr, media_mon)
 
         def clean_exit():

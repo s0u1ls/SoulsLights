@@ -14,6 +14,8 @@ hiddenimports = [
     'Foundation',
     'AppKit',
     'Quartz',
+    'AVFoundation',
+    'CoreMedia',
     'core.mac_utils',
     'core.platform_utils',
 ]

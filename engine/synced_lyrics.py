@@ -34,11 +34,13 @@ if IS_WIN:
     from ctypes import wintypes
     from core.win32_utils import (
         user32, kernel32, LayeredSurface, SystemAudioMeter,
+        is_foreground_fullscreen,
         enable_high_res_timer, disable_high_res_timer,
         WNDCLASSEXW, WNDPROC, RECT,
         WS_POPUP, WS_VISIBLE, WS_EX_LAYERED, WS_EX_TRANSPARENT,
         WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_NOACTIVATE,
-        GWL_EXSTYLE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_NOACTIVATE, SWP_FRAMECHANGED,
+        GWL_EXSTYLE, SW_HIDE, SW_SHOWNOACTIVATE,
+        SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_NOACTIVATE, SWP_FRAMECHANGED,
         HWND_TOPMOST, HWND_BOTTOM, WM_CLOSE, WM_LBUTTONDOWN, WM_NCLBUTTONDOWN, HTCAPTION
     )
 else:
@@ -205,78 +207,100 @@ WORD_VISUALS = {
     "bye": "👋", "hello": "👋", "hey": "👋",
 
     # Hindi / Hinglish lyric visuals (Romanized + Devanagari)
-    "pyar": "❤️", "pyaar": "❤️", "mohabbat": "❤️", "ishq": "❤️", "prem": "❤️", "chahat": "💘", "ashiqui": "❤️", "aashiqui": "❤️",
-    "dil": "💓", "dharkan": "💓", "dhadkan": "💓", "jaan": "💖", "jaanu": "💖", "sanam": "❤️", "mehboob": "❤️", "dilbar": "💖",
-    "humsafar": "🫂", "saath": "🤝", "yaar": "🫂", "dost": "🫂", "dosti": "🫂", "zindagi": "✨", "jeevan": "✨", "duniya": "🌍",
-    "jahan": "🌍", "chaand": "🌙", "chand": "🌙", "chandni": "🌙", "raat": "🌙", "raatein": "🌙", "subah": "🌅", "sawera": "🌅", "bhor": "🌅",
-    "sham": "🌇", "shaam": "🌇", "suraj": "☀️", "dhoop": "☀️", "chhaon": "☁️", "roshni": "💡", "ujala": "💡", "noor": "✨",
-    "andhera": "🌑", "sitara": "⭐", "sitare": "✨", "taare": "✨", "taara": "⭐", "deepak": "🪔", "diya": "🪔", "chiraag": "🪔",
-    "barish": "🌧️", "baarish": "🌧️", "barsaat": "🌧️", "sawan": "🌧️", "saawan": "🌧️", "badal": "☁️", "baadal": "☁️",
-    "aasmaan": "☁️", "aasman": "☁️", "falak": "🌌", "zameen": "🌍", "paani": "💧", "pani": "💧", "nadi": "🌊",
-    "samundar": "🌊", "lehar": "🌊", "kinaara": "🏖️", "kashti": "⛵", "aankhein": "👀", "aankh": "👁️", "nazar": "👀",
-    "nigaah": "👀", "chehra": "✨", "khwab": "💭", "khwaab": "💭", "sapna": "💭", "sapne": "💭", "yaad": "🎞️", "yaadein": "🎞️",
-    "aansu": "💧", "ashq": "💧", "rona": "💧", "muskaan": "😊", "hasi": "😄", "khushi": "😊", "gham": "😔", "dard": "🩹", "zakhm": "🩹",
-    "aag": "🔥", "shola": "🔥", "hawa": "💨", "toofan": "⛈️", "bijli": "⚡", "barf": "❄️",
-    "phool": "🌸", "gul": "🌹", "gulab": "🌹", "kali": "🌷", "bagh": "🌿", "titali": "🦋", "titli": "🦋", "parinda": "🕊️", "pankh": "🪶",
-    "waqt": "⏳", "pal": "⏳", "lamha": "⏳", "lamhe": "⏳", "intezar": "⏳", "safar": "🛣️", "raasta": "🛣️", "manzil": "🏔️",
-    "geet": "🎵", "sangeet": "🎶", "dhun": "🎶", "awaaz": "🎙️", "khamoshi": "🤫", "shor": "📢", "nach": "💃", "naach": "💃",
-    "nasha": "🍾", "sharab": "🍷", "jaam": "🥂", "rang": "🎨", "gulabi": "🩷", "neela": "💙", "kaala": "🖤", "safed": "🤍",
-    "sona": "✨", "chandi": "🪙", "heera": "💎", "moti": "💎", "taaj": "👑", "raja": "👑", "rani": "👑",
-    "vaada": "🤞", "kasam": "🤞", "duaa": "🙏", "dua": "🙏", "shukriya": "🙏", "alvida": "👋", "deewana": "💘", "ajnabi": "👤",
-    "प्यार": "❤️", "मोहब्बत": "❤️", "इश्क": "❤️", "इश्क़": "❤️", "दिल": "💓", "धड़कन": "💓", "जान": "💖", "सनम": "❤️",
-    "महबूब": "❤️", "हमसफ़र": "🫂", "दोस्त": "🫂", "यार": "🫂", "ज़िंदगी": "✨", "जिंदगी": "✨", "दुनिया": "🌍",
-    "चाँद": "🌙", "चांद": "🌙", "चांदनी": "🌙", "रात": "🌙", "रातें": "🌙", "सुबह": "🌅", "सवेरा": "🌅", "शाम": "🌇",
-    "सूरज": "☀️", "धूप": "☀️", "रोशनी": "💡", "उजाला": "💡", "नूर": "✨", "अंधेरा": "🌑", "तारे": "✨", "तारा": "⭐", "सितारा": "⭐",
-    "बारिश": "🌧️", "बरसात": "🌧️", "सावन": "🌧️", "बादल": "☁️", "आसमान": "☁️", "ज़मीन": "🌍", "पानी": "💧", "नदी": "🌊", "लहर": "🌊", "किनारा": "🏖️", "कश्ती": "⛵",
-    "आँखें": "👀", "आंखें": "👀", "नज़र": "👀", "चेहरा": "✨", "ख्वाब": "💭", "सपना": "💭", "सपने": "💭", "याद": "🎞️", "यादें": "🎞️",
-    "आँसू": "💧", "आंसू": "💧", "मुस्कान": "😊", "हँसी": "😄", "खुशी": "😊", "दर्द": "🩹", "ग़म": "😔",
-    "आग": "🔥", "हवा": "💨", "तूफ़ान": "⛈️", "बिजली": "⚡", "फूल": "🌸", "गुलाब": "🌹", "तितली": "🦋", "पंछी": "🕊️", "पंख": "🪶",
-    "वक़्त": "⏳", "वक्त": "⏳", "पल": "⏳", "लम्हा": "⏳", "इंतज़ार": "⏳", "सफर": "🛣️", "सफ़र": "🛣️", "रास्ता": "🛣️", "मंज़िल": "🏔️",
-    "गीत": "🎵", "संगीत": "🎶", "धुन": "🎶", "आवाज़": "🎙️", "ख़ामोशी": "🤫", "नशा": "🍾", "जाम": "🥂", "रंग": "🎨",
-    "सोना": "✨", "हीरा": "💎", "ताज": "👑", "राजा": "👑", "रानी": "👑", "वादा": "🤞", "दुआ": "🙏", "अलविदा": "👋", "दीवाना": "💘", "दीया": "🪔",
+    "pyar": "❤️", "pyaar": "❤️", "mohabbat": "❤️", "ishq": "❤️", "prem": "❤️", "chahat": "💘", "chaahat": "💘", "ashiqui": "❤️", "aashiqui": "❤️",
+    "dil": "💓", "dharkan": "💓", "dhadkan": "💓", "dhadkane": "💓", "jaan": "💖", "jaanu": "💖", "sanam": "❤️", "mehboob": "❤️", "mehbooba": "❤️", "dilbar": "💖",
+    "dildar": "💖", "dilruba": "💘", "humsafar": "🫂", "hamdard": "🫂", "saath": "🤝", "saathi": "🫂", "yaar": "🫂", "yaari": "🫂", "dost": "🫂", "dosti": "🫂",
+    "zindagi": "✨", "jeevan": "✨", "duniya": "🌍", "jahan": "🌍", "jahaan": "🌍", "jannat": "✨", "swarg": "☁️", "rooh": "✨", "saans": "🌬️", "saanson": "🌬️",
+    "chaand": "🌙", "chand": "🌙", "chandni": "🌙", "chaandni": "🌙", "chanda": "🌙", "raat": "🌙", "raatein": "🌙", "shab": "🌙", "subah": "🌅", "sawera": "🌅", "bhor": "🌅", "fajar": "🌅",
+    "sham": "🌇", "shaam": "🌇", "saanjh": "🌇", "suraj": "☀️", "dhoop": "☀️", "chhaon": "☁️", "roshni": "💡", "ujala": "💡", "ujaala": "💡", "noor": "✨", "noorani": "✨",
+    "andhera": "🌑", "sitara": "⭐", "sitare": "✨", "sitaron": "✨", "taare": "✨", "taara": "⭐", "jugnu": "✨", "deepak": "🪔", "diya": "🪔", "chiraag": "🪔", "chirag": "🪔", "shama": "🕯️", "parwana": "🦋",
+    "barish": "🌧️", "baarish": "🌧️", "baarishein": "🌧️", "barsaat": "🌧️", "sawan": "🌧️", "saawan": "🌧️", "rimjhim": "🌧️", "boond": "💧", "boondein": "💧", "katra": "💧", "badal": "☁️", "baadal": "☁️", "ghata": "☁️",
+    "aasmaan": "☁️", "aasman": "☁️", "falak": "🌌", "zameen": "🌍", "mitti": "🌿", "paani": "💧", "pani": "💧", "nadi": "🌊", "jheel": "🏞️",
+    "samundar": "🌊", "lehar": "🌊", "kinaara": "🏖️", "kashti": "⛵", "aankhein": "👀", "aankh": "👁️", "aankhon": "👀", "naina": "👀", "naino": "👀", "nazar": "👀", "nazara": "🌅", "nazaare": "🌅",
+    "nigaah": "👀", "nigahein": "👀", "palkein": "👁️", "palkon": "👁️", "kajal": "👁️", "surma": "👁️", "bindiya": "✨", "jhumka": "✨", "zulf": "🌬️", "zulfein": "🌬️", "chehra": "✨", "hoth": "💋", "lab": "💋", "labon": "💋",
+    "khwab": "💭", "khwaab": "💭", "khwabon": "💭", "sapna": "💭", "sapne": "💭", "yaad": "🎞️", "yaadein": "🎞️", "khayal": "💭",
+    "aansu": "💧", "ashq": "💧", "rona": "💧", "muskaan": "😊", "muskurana": "😊", "hasi": "😄", "khushi": "😊", "jashn": "🎉", "mubarak": "🎉", "mehfil": "🪩", "mahfil": "🪩",
+    "gham": "😔", "dard": "🩹", "zakhm": "🩹", "marham": "🩹", "tanhai": "🥀", "judai": "💔", "hijr": "💔", "bewafa": "💔", "wafa": "🤞", "akela": "🥀", "akele": "🥀", "khamosh": "🤫", "khamoshi": "🤫",
+    "aag": "🔥", "shola": "🔥", "dhuan": "💨", "hawa": "💨", "hawaa": "💨", "toofan": "⛈️", "bijli": "⚡", "barf": "❄️", "fiza": "🍃", "bahaar": "🌸", "bahara": "🌸", "gulshan": "🌺", "chaman": "🌺",
+    "phool": "🌸", "gul": "🌹", "gulab": "🌹", "kali": "🌷", "bagh": "🌿", "khushboo": "🌸", "titali": "🦋", "titli": "🦋", "parinda": "🕊️", "bulbul": "🐦", "koyal": "🐦", "pankh": "🪶", "parwaaz": "🕊️", "udna": "🕊️", "patang": "🪁",
+    "waqt": "⏳", "pal": "⏳", "lamha": "⏳", "lamhe": "⏳", "intezar": "⏳", "safar": "🛣️", "musafir": "🧳", "raahi": "🚶", "raasta": "🛣️", "gali": "🛣️", "galiyaan": "🛣️", "manzil": "🏔️", "karvaan": "🧳",
+    "geet": "🎵", "nagma": "🎵", "tarana": "🎶", "sangeet": "🎶", "sargam": "🎶", "dhun": "🎶", "taal": "🥁", "awaaz": "🎙️", "shor": "📢", "nach": "💃", "naach": "💃", "payal": "🔔", "ghungroo": "🔔",
+    "nasha": "🍾", "maikhana": "🍷", "sharab": "🍷", "jaam": "🥂", "saaki": "🍷", "zeher": "☣️", "rang": "🎨", "rangreza": "🎨", "gulabi": "🩷", "neela": "💙", "kaala": "🖤", "safed": "🤍", "laal": "❤️", "mehendi": "🌿",
+    "sona": "✨", "chandi": "🪙", "heera": "💎", "moti": "💎", "taaj": "👑", "raja": "👑", "rani": "👑", "choodi": "💍", "kangna": "💍",
+    "vaada": "🤞", "kasam": "🤞", "duaa": "🙏", "dua": "🙏", "ibadat": "🙏", "sajda": "🙏", "mannat": "🙏", "arzi": "🙏", "shukriya": "🙏", "alvida": "👋",
+    "deewana": "💘", "deewani": "💘", "diwana": "💘", "mastani": "💃", "mastana": "🕺", "fitoor": "🌀", "junoon": "🔥", "sukoon": "😌", "sakoon": "😌", "suroor": "✨", "saroor": "✨", "ishqbaazi": "💘",
+    "jadu": "🪄", "jaadu": "🪄", "miracle": "🌟", "tasveer": "🖼️", "aaina": "🪞", "darpan": "🪞", "sheesha": "🪞", "khat": "✉️", "pegham": "✉️", "alfaaz": "💬", "lafz": "💬", "shayari": "📜", "shayar": "📜", "khanjar": "🗡️", "teer": "💘", "nishaani": "🎗️", "qismat": "🍀", "naseeb": "🍀", "takdir": "🌠",
+    "प्यार": "❤️", "मोहब्बत": "❤️", "इश्क": "❤️", "इश्क़": "❤️", "दिल": "💓", "धड़कन": "💓", "जान": "💖", "सनम": "❤️", "रूह": "✨", "सुकून": "😌", "जुनून": "🔥", "फ़ितूर": "🌀",
+    "महबूब": "❤️", "हमसफ़र": "🫂", "दोस्त": "🫂", "यार": "🫂", "यारी": "🫂", "ज़िंदगी": "✨", "जिंदगी": "✨", "दुनिया": "🌍", "जन्नत": "✨", "साँस": "🌬️", "साँसें": "🌬️",
+    "चाँद": "🌙", "चांद": "🌙", "चांदनी": "🌙", "रात": "🌙", "रातें": "🌙", "सुबह": "🌅", "सवेरा": "🌅", "शाम": "🌇", "जुगनू": "✨", "शमा": "🕯️", "परवाना": "🦋",
+    "सूरज": "☀️", "धूप": "☀️", "रोशनी": "💡", "उजाला": "💡", "नूर": "✨", "अंधेरा": "🌑", "तारे": "✨", "तारा": "⭐", "सितारा": "⭐", "सितारे": "✨",
+    "बारिश": "🌧️", "बरसात": "🌧️", "सावन": "🌧️", "रिमझिम": "🌧️", "बूँद": "💧", "बादल": "☁️", "आसमान": "☁️", "ज़मीन": "🌍", "पानी": "💧", "नदी": "🌊", "लहर": "🌊", "किनारा": "🏖️", "कश्ती": "⛵",
+    "आँखें": "👀", "आंखें": "👀", "नैन": "👀", "नयना": "👀", "नज़र": "👀", "काजल": "👁️", "ज़ुल्फ़": "🌬️", "चेहरा": "✨", "होंठ": "💋", "ख्वाब": "💭", "सपना": "💭", "सपने": "💭", "याद": "🎞️", "यादें": "🎞️",
+    "आँसू": "💧", "आंसू": "💧", "मुस्कान": "😊", "हँसी": "😄", "खुशी": "😊", "जश्न": "🎉", "महफ़िल": "🪩", "दर्द": "🩹", "ग़म": "😔", "तन्हाई": "🥀", "जुदाई": "💔", "बेवफ़ा": "💔",
+    "आग": "🔥", "हवा": "💨", "तूफ़ान": "⛈️", "बिजली": "⚡", "बर्फ़": "❄️", "फूल": "🌸", "गुलाब": "🌹", "ख़ुशबू": "🌸", "तितली": "🦋", "पंछी": "🕊️", "पंख": "🪶",
+    "वक़्त": "⏳", "वक्त": "⏳", "पल": "⏳", "लम्हा": "⏳", "इंतज़ार": "⏳", "सफर": "🛣️", "सफ़र": "🛣️", "मुसाफ़िर": "🧳", "रास्ता": "🛣️", "मंज़िल": "🏔️",
+    "गीत": "🎵", "संगीत": "🎶", "सरगम": "🎶", "धुन": "🎶", "आवाज़": "🎙️", "ख़ामोशी": "🤫", "नशा": "🍾", "जाम": "🥂", "रंग": "🎨", "पायल": "🔔", "मेहंदी": "🌿",
+    "सोना": "✨", "हीरा": "💎", "ताज": "👑", "राजा": "👑", "रानी": "👑", "वादा": "🤞", "दुआ": "🙏", "इबादत": "🙏", "सजदा": "🙏", "अलविदा": "👋", "दीवाना": "💘", "दीया": "🪔", "क़िस्मत": "🍀",
 
     # Malayalam / Manglish lyric visuals (Romanized + Malayalam Unicode)
-    "sneham": "❤️", "sneeham": "❤️", "pranayam": "❤️", "ishtam": "❤️", "premam": "❤️", "anuraagam": "💖",
-    "hridayam": "💓", "nenjam": "💓", "uyir": "✨", "jeevan": "✨", "jeevitham": "✨", "aathmaavu": "✨",
-    "mazha": "🌧️", "mazhai": "🌧️", "mazhakkaalam": "🌧️", "kaattu": "💨", "kattu": "💨", "thennal": "🍃",
-    "kadal": "🌊", "thira": "🌊", "puzha": "🌊", "nadi": "🌊", "theeram": "🏖️", "thoni": "⛵", "kappal": "🚢",
-    "nila": "🌙", "nilaavu": "🌙", "nilavu": "🌙", "ambili": "🌙", "chandran": "🌙", "raathri": "🌙", "rathri": "🌙", "ravu": "🌙",
-    "pakal": "☀️", "suryan": "☀️", "veyil": "☀️", "prabhatham": "🌅", "pulari": "🌅", "sandhya": "🌇", "sayam": "🌇",
-    "velicham": "💡", "prakasham": "✨", "irul": "🌑", "niram": "🎨", "varnam": "🎨",
-    "nakshathram": "⭐", "tharam": "⭐", "tharakam": "✨", "akasham": "☁️", "aakaasham": "☁️", "megham": "☁️", "manju": "❄️",
-    "minnal": "⚡", "idi": "⛈️", "minnaminni": "✨", "kanneer": "💧", "kannu": "👀", "mizhi": "👀", "mizhikal": "👀",
-    "chiri": "😊", "punchiri": "😊", "mukhams": "✨", "swapnam": "💭", "kinaavu": "💭", "kinavu": "💭",
-    "ormakal": "🎞️", "orma": "🎞️", "poovu": "🌸", "pookkal": "🌸", "malar": "🌺", "poomaram": "🌳", "mullappoo": "🌸",
-    "thee": "🔥", "agni": "🔥", "kaalam": "⏳", "kalam": "⏳", "samayam": "⏳", "neram": "⏳", "yathra": "🛣️", "vazhi": "🛣️",
-    "paattu": "🎵", "pattu": "🎵", "sangeetham": "🎶", "ragam": "🎶", "thalam": "🥁", "chenda": "🥁", "veena": "🎻",
-    "kuyil": "🐦", "kili": "🐦", "pakshi": "🕊️", "thumbi": "🦋", "mayil": "🦚", "chiraku": "🪶",
-    "thozhan": "🫂", "sakhi": "🫂", "koottu": "🫂", "veedu": "🏠", "kudil": "🏡", "vaathil": "🚪", "janala": "🪟", "kannadi": "🪞",
-    "mutthu": "💎", "swarnam": "✨", "velli": "🪙", "rajavu": "👑", "rani": "👑", "shanthi": "🕊️", "prarthana": "🙏", "daivam": "✨",
-    "സ്നേഹം": "❤️", "പ്രണയം": "❤️", "ഇഷ്ടം": "❤️", "ഹൃദയം": "💓", "നെഞ്ച്": "💓", "ജീവൻ": "✨", "ജീവിതം": "✨",
-    "മഴ": "🌧️", "നിലാവ്": "🌙", "നിലാ": "🌙", "അമ്പിളി": "🌙", "രാത്രി": "🌙", "രാവ്": "🌙", "ചന്ദ്രൻ": "🌙",
-    "സൂര്യൻ": "☀️", "വെയിൽ": "☀️", "പകൽ": "☀️", "പുലരി": "🌅", "സന്ധ്യ": "🌇", "വെളിച്ചം": "💡", "ഇരുൾ": "🌑",
-    "നക്ഷത്രം": "⭐", "താരം": "⭐", "മിന്നാമിന്നി": "✨", "ആകാശം": "☁️", "മേഘം": "☁️", "മഞ്ഞ്": "❄️",
-    "കാറ്റ്": "💨", "തെന്നൽ": "🍃", "മിന്നൽ": "⚡", "ഇടി": "⛈️", "കടൽ": "🌊", "തിര": "🌊", "പുഴ": "🌊", "തീരം": "🏖️", "തോണി": "⛵",
-    "മിഴി": "👀", "മിഴികൾ": "👀", "കണ്ണ്": "👀", "കണ്ണീർ": "💧", "ചിരി": "😊", "പുഞ്ചിരി": "😊",
-    "സ്വപ്നം": "💭", "കിനാവ്": "💭", "ഓർമ്മ": "🎞️", "ഓർമ്മകൾ": "🎞️", "പൂവ്": "🌸", "പൂക്കൾ": "🌸", "മലർ": "🌺", "പൂമരം": "🌳",
-    "തീ": "🔥", "കാലം": "⏳", "സമയം": "⏳", "നേരം": "⏳", "ലോകം": "🌍", "യാത്ര": "🛣️", "വഴി": "🛣️",
-    "പാട്ട്": "🎵", "സംഗീതം": "🎶", "രാഗം": "🎶", "താളം": "🥁", "കുയിൽ": "🐦", "കിളി": "🐦", "തുമ്പി": "🦋", "മയിൽ": "🦚", "ചിറക്": "🪶",
-    "വീട്": "🏠", "വാതിൽ": "🚪", "ജനാല": "🪟", "കണ്ണാടി": "🪞", "സ്വർണ്ണം": "✨", "മുത്ത്": "💎", "രാജാവ്": "👑", "ശാന്തി": "🕊️", "പ്രാർത്ഥന": "🙏",
+    "sneham": "❤️", "sneeham": "❤️", "pranayam": "❤️", "pranayini": "❤️", "ishtam": "❤️", "premam": "❤️", "premathin": "❤️", "anuraagam": "💖", "moham": "💘",
+    "hridayam": "💓", "hridayame": "💓", "nenjam": "💓", "nenjile": "💓", "nenjil": "💓", "karal": "💓", "khalb": "💓", "manam": "💓", "manassu": "💓", "ullam": "💓",
+    "uyir": "✨", "uyire": "✨", "uyirin": "✨", "jeevan": "✨", "jeevitham": "✨", "aathmaavu": "✨", "aathma": "✨",
+    "mazha": "🌧️", "peyyum": "🌧️", "thoovanam": "🌧️", "mazhakkaalam": "🌧️", "mazhanool": "🌧️", "mazhaththulli": "💧", "maari": "🌧️",
+    "kaattu": "💨", "kattu": "💨", "poonkaattu": "🍃", "thennal": "🍃", "kulir": "❄️", "thanuppu": "❄️",
+    "kadal": "🌊", "kadalolam": "🌊", "thira": "🌊", "thirayum": "🌊", "puzha": "🌊", "puzhayoram": "🌊", "nadi": "🌊", "theeram": "🏖️", "thoni": "⛵", "vallam": "⛵", "kappal": "🚢", "saagarame": "🌊",
+    "nila": "🌙", "nilaavu": "🌙", "nilavu": "🌙", "nilave": "🌙", "nilavil": "🌙", "vennila": "🌙", "ambili": "🌙", "chandran": "🌙", "raathri": "🌙", "rathri": "🌙", "ravu": "🌙", "raavu": "🌙", "paathira": "🌙",
+    "pakal": "☀️", "suryan": "☀️", "sooryan": "☀️", "veyil": "☀️", "ilaveyil": "☀️", "venal": "☀️", "prabhatham": "🌅", "pulari": "🌅", "pular": "🌅", "udayam": "🌅", "sandhya": "🌇", "sayam": "🌇",
+    "velicham": "💡", "vilakku": "🪔", "prakasham": "✨", "oli": "✨", "irul": "🌑", "niram": "🎨", "varnam": "🎨", "chuvappu": "❤️", "neela": "💙",
+    "nakshathram": "⭐", "nakshathrangal": "✨", "tharam": "⭐", "tharakam": "✨", "akasham": "☁️", "aakaasham": "☁️", "megham": "☁️", "meghangal": "☁️", "kaarmukil": "⛈️", "manju": "❄️",
+    "minnal": "⚡", "idi": "⛈️", "minnaminni": "✨", "minnaminungu": "✨", "kanneer": "💧", "kanneeru": "💧", "kannuneer": "💧", "thulli": "💧",
+    "kannu": "👀", "mizhi": "👀", "mizhikal": "👀", "mizhikalil": "👀", "mizhiyoram": "👀",
+    "chiri": "😊", "chirikkum": "😊", "punchiri": "😊", "mukhams": "✨", "mukham": "✨", "sundari": "💖", "azhak": "✨", "azhaku": "✨",
+    "swapnam": "💭", "kinaavu": "💭", "kinavu": "💭", "chinthakal": "💭", "ormakal": "🎞️", "ormmakal": "🎞️", "orma": "🎞️",
+    "poovu": "🌸", "pookkal": "🌸", "poovukal": "🌸", "malar": "🌺", "malare": "🌺", "poomaram": "🌳", "poomala": "💐", "mullappoo": "🌸", "panineer": "🌹", "thaamarapoo": "🪷", "mandaram": "🌺", "pankajam": "🪷", "ithal": "🌸",
+    "thee": "🔥", "theeyum": "🔥", "agni": "🔥", "eriyum": "🔥", "kaalam": "⏳", "kalam": "⏳", "samayam": "⏳", "neram": "⏳", "yathra": "🛣️", "vazhi": "🛣️", "vazhiyoram": "🛣️", "kaathirippu": "⏳", "viraham": "💔", "nombaram": "🩹",
+    "paattu": "🎵", "pattu": "🎵", "gaanam": "🎵", "paadum": "🎤", "sangeetham": "🎶", "ragam": "🎶", "raagam": "🎶", "thalam": "🥁", "thaalam": "🥁", "chenda": "🥁", "melam": "🥁", "veena": "🎻", "tharattu": "🎶",
+    "kuyil": "🐦", "kuyile": "🐦", "kili": "🐦", "kunjikili": "🐦", "pakshi": "🕊️", "thumbi": "🦋", "mayil": "🦚", "mayile": "🦚", "chiraku": "🪶",
+    "thozhan": "🫂", "thozha": "🫂", "sakhi": "🫂", "koottu": "🫂", "koottukari": "🫂", "kanmani": "💖", "kanmaniye": "💖", "priyane": "💖", "madhuram": "🍯", "then": "🍯",
+    "veedu": "🏠", "poomukham": "🏡", "kudil": "🏡", "vaathil": "🚪", "janala": "🪟", "kannadi": "🪞", "kannaadi": "🪞", "kottaram": "🏰", "ambalam": "🛕", "nilappanthal": "🎊",
+    "mutthu": "💎", "muthu": "💎", "manimuthu": "💎", "rathnam": "💎", "swarnam": "✨", "velli": "🪙", "rajavu": "👑", "rani": "👑",
+    "aaghosham": "🎉", "onam": "🌼", "vishu": "🌼", "pooram": "🎉", "kalyanam": "💒", "kudukku": "🔔", "maayavi": "🪄", "maya": "🌀", "athishayam": "🌟",
+    "shanthi": "🕊️", "santhosham": "😊", "sukham": "😌", "prarthana": "🙏", "daivam": "✨", "deivam": "✨", "anugraham": "🙏", "swargam": "✨", "nandi": "🙏", "raktham": "🩸", "maranam": "🥀",
+    "സ്നേഹം": "❤️", "പ്രണയം": "❤️", "പ്രണയിനി": "❤️", "ഇഷ്ടം": "❤️", "ഹൃദയം": "💓", "നെഞ്ച്": "💓", "മനസ്സ്": "💓", "കൽബ്": "💓", "ജീവൻ": "✨", "ജീവിതം": "✨", "ഉയിർ": "✨", "ഉയിരേ": "✨",
+    "മഴ": "🌧️", "മഴത്തുള്ളി": "💧", "തൂവാനം": "🌧️", "നിലാവ്": "🌙", "നിലാ": "🌙", "നിലാവേ": "🌙", "വെണ്ണിലാ": "🌙", "അമ്പിളി": "🌙", "രാത്രി": "🌙", "രാവ്": "🌙", "ചന്ദ്രൻ": "🌙",
+    "സൂര്യൻ": "☀️", "വെയിൽ": "☀️", "പകൽ": "☀️", "പുലരി": "🌅", "പുലർകാലം": "🌅", "ഉദയം": "🌅", "സന്ധ്യ": "🌇", "വെളിച്ചം": "💡", "വിളക്ക്": "🪔", "ഇരുൾ": "🌑",
+    "നക്ഷത്രം": "⭐", "താരം": "⭐", "മിന്നാമിന്നി": "✨", "ആകാശം": "☁️", "മേഘം": "☁️", "മഞ്ഞ്": "❄️", "മഞ്ഞുതുള്ളി": "❄️", "കുളിർ": "❄️",
+    "കാറ്റ്": "💨", "പൂങ്കാറ്റ്": "🍃", "തെന്നൽ": "🍃", "മിന്നൽ": "⚡", "ഇടി": "⛈️", "കടൽ": "🌊", "തിര": "🌊", "പുഴ": "🌊", "തീരം": "🏖️", "തോണി": "⛵",
+    "മിഴി": "👀", "മിഴികൾ": "👀", "കണ്ണ്": "👀", "കണ്ണീർ": "💧", "കണ്ണുനീർ": "💧", "ചിരി": "😊", "പുഞ്ചിരി": "😊", "ചുണ്ട്": "💋", "മൊഴി": "💬",
+    "സ്വപ്നം": "💭", "കിനാവ്": "💭", "ഓർമ്മ": "🎞️", "ഓർമ്മകൾ": "🎞️", "കഥ": "📖", "കവിത": "📜", "വിരഹം": "💔", "ദുഃഖം": "😔", "സന്തോഷം": "😊",
+    "പൂവ്": "🌸", "പൂക്കൾ": "🌸", "പൂമാല": "💐", "മലർ": "🌺", "പൂമരം": "🌳", "പൂമുഖം": "🏡", "മധുരം": "🍯", "തേൻ": "🍯",
+    "തീ": "🔥", "കാലം": "⏳", "സമയം": "⏳", "നേരം": "⏳", "ലോകം": "🌍", "യാത്ര": "🛣️", "വഴി": "🛣️", "സ്വർഗ്ഗം": "✨",
+    "പാട്ട്": "🎵", "സംഗീതം": "🎶", "രാഗം": "🎶", "താളം": "🥁", "താരാട്ട്": "🎶", "കുയിൽ": "🐦", "കിളി": "🐦", "തുമ്പി": "🦋", "മയിൽ": "🦚", "ചിറക്": "🪶",
+    "വീട്": "🏠", "വാതിൽ": "🚪", "ജനാല": "🪟", "കണ്ണാടി": "🪞", "സ്വർണ്ണം": "✨", "മുത്ത്": "💎", "രാജാവ്": "👑", "ശാന്തി": "🕊️", "പ്രാർത്ഥന": "🙏", "ആഘോഷം": "🎉",
 
     # Tamil / Tanglish lyric visuals (Romanized + Tamil Unicode)
-    "kaadhal": "❤️", "kadhal": "❤️", "anbu": "💖", "paasam": "🫂", "idhayam": "💓", "nenjam": "💓", "uyir": "✨", "aathma": "✨",
-    "mazhai": "🌧️", "nilaa": "🌙", "nila": "🌙", "nilavu": "🌙", "chandran": "🌙", "iravu": "🌙", "pagal": "☀️", "sooriyan": "☀️",
-    "kaalai": "🌅", "maalai": "🌇", "vaanam": "☁️", "megam": "☁️", "minnal": "⚡", "idi": "⛈️", "kaatru": "💨", "thendral": "🍃",
-    "kadal": "🌊", "alai": "🌊", "nadhi": "🌊", "malar": "🌺", "poo": "🌸", "pookkal": "🌸", "roja": "🌹",
-    "thee": "🔥", "neruppu": "🔥", "kann": "👁️", "kangal": "👀", "kanneer": "💧", "sirippu": "😊", "punnagai": "😊",
-    "kanavu": "💭", "ninaivu": "🎞️", "ulagam": "🌍", "payanam": "🛣️", "vazhi": "🛣️", "paattu": "🎵", "isai": "🎶",
-    "thangam": "✨", "velli": "🪙", "vairam": "💎", "raja": "👑", "rani": "👑", "veedu": "🏠", "natchathiram": "⭐",
-    "காதல்": "❤️", "அன்பு": "💖", "பாசம்": "🫂", "இதயம்": "💓", "நெஞ்சம்": "💓", "உயிர்": "✨", "மழை": "🌧️",
-    "நிலா": "🌙", "நிலவு": "🌙", "சந்திரன்": "🌙", "சூரியன்": "☀️", "இரவு": "🌙", "பகல்": "☀️", "காலை": "🌅", "மாலை": "🌇",
-    "வானம்": "☁️", "மேகம்": "☁️", "மின்னல்": "⚡", "இடி": "⛈️", "காற்று": "💨", "தென்றல்": "🍃", "கடல்": "🌊", "அலை": "🌊", "நதி": "🌊",
-    "மலர்": "🌺", "பூ": "🌸", "பூக்கள்": "🌸", "ரோஜா": "🌹", "தீ": "🔥", "நெருப்பு": "🔥", "கண்": "👁️", "கண்கள்": "👀", "கண்ணீர்": "💧",
-    "சிரிப்பு": "😊", "புன்னகை": "😊", "கனவு": "💭", "நினைவு": "🎞️", "உலகம்": "🌍", "பயணம்": "🛣️", "வழி": "🛣️",
-    "பாட்டு": "🎵", "இசை": "🎶", "தங்கம்": "✨", "வைரம்": "💎", "ராஜா": "👑", "ராணி": "👑", "வீடு": "🏠", "நட்சத்திரம்": "⭐",
+    "kaadhal": "❤️", "kadhal": "❤️", "kaathal": "❤️", "kaadhalan": "💘", "kaadhali": "💘", "kaadhalil": "❤️", "aasai": "💘", "anbu": "💖", "anbe": "💖", "paasam": "🫂",
+    "idhayam": "💓", "nenjam": "💓", "nenjil": "💓", "nenjukkul": "💓", "manasu": "💓", "uyire": "✨", "ennuyire": "✨", "aathma": "✨",
+    "azhage": "✨", "azhagu": "✨", "azhagi": "💖", "penne": "👩", "kanna": "💖", "kannamma": "💖", "chellam": "💖", "ennavale": "💖", "vaseegara": "✨",
+    "mazhai": "🌧️", "mazhaiyil": "🌧️", "saaral": "🌦️", "nilaa": "🌙", "nilave": "🌙", "pagal": "☀️", "sooriyan": "☀️",
+    "kaalai": "🌅", "maalai": "🌇", "andhi": "🌇", "vidiyal": "🌅", "vaanam": "☁️", "vaanavil": "🌈", "megam": "☁️", "minnal": "⚡", "idi": "⛈️", "puyal": "⛈️",
+    "kaatru": "💨", "kaatrodu": "💨", "poongaatru": "🍃", "thendral": "🍃", "suvaasam": "🌬️",
+    "kadal": "🌊", "kadaloram": "🏖️", "alai": "🌊", "nadhi": "🌊", "aruvi": "🌊", "malligai": "🌸", "poo": "🌸", "roja": "🌹", "mullai": "🌸", "thaamarai": "🪷", "sembaruthi": "🌺",
+    "neruppu": "🔥", "erimalai": "🌋", "kann": "👁️", "kan": "👁️", "kangal": "👀", "vizhi": "👀", "vizhigal": "👀", "sirippu": "😊", "punnagai": "😊", "mutham": "💋", "mounam": "🤫", "nisaptham": "🤫",
+    "kanavu": "💭", "kanaa": "💭", "ninaivu": "🎞️", "ninaivugal": "🎞️", "ulagam": "🌍", "boomi": "🌍", "payanam": "🛣️", "kaathiruppen": "⏳", "thanimai": "🥀",
+    "isai": "🎶", "paadal": "🎵", "osai": "🔊", "thangam": "✨", "vairam": "💎", "mutham": "💋", "raja": "👑", "natchathiram": "⭐", "vinmeen": "🌟",
+    "nanba": "🫂", "nanban": "🫂", "machan": "🫂", "thozha": "🫂", "thozhi": "🫂", "vaazhkai": "✨", "aanandham": "😊", "magizhchi": "😊", "santhosam": "😊", "sogam": "😔", "vali": "🩹",
+    "paravai": "🕊️", "siragu": "🪶", "vannam": "🎨", "vanna": "🎨", "kalyanam": "💒", "thaali": "💍", "pottu": "✨", "kovil": "🛕", "koil": "🛕", "vetri": "🏆", "athisayam": "🌟", "maayam": "🪄",
+    "காதல்": "❤️", "காதலி": "💘", "ஆசை": "💘", "அன்பு": "💖", "அன்பே": "💖", "பாசம்": "🫂", "இதயம்": "💓", "நெஞ்சம்": "💓", "நெஞ்சில்": "💓", "மனசு": "💓", "உயிர்": "✨", "உயிரே": "✨",
+    "அழகு": "✨", "அழகே": "✨", "கண்மணி": "💖", "பெண்ணே": "👩", "செல்லம்": "💖", "மழை": "🌧️", "தூவானம்": "🌧️", "சாரல்": "🌦️",
+    "நிலா": "🌙", "நிலவு": "🌙", "வெண்ணிலா": "🌙", "சந்திரன்": "🌙", "சூரியன்": "☀️", "இரவு": "🌙", "பகல்": "☀️", "காலை": "🌅", "மாலை": "🌇", "விடியல்": "🌅",
+    "வானம்": "☁️", "வானவில்": "🌈", "மேகம்": "☁️", "மின்னல்": "⚡", "இடி": "⛈️", "புயல்": "⛈️", "காற்று": "💨", "தென்றல்": "🍃", "பூங்காற்று": "🍃",
+    "கடல்": "🌊", "அலை": "🌊", "நதி": "🌊", "அருவி": "🌊", "மலர்": "🌺", "பூ": "🌸", "பூக்கள்": "🌸", "ரோஜா": "🌹", "முல்லை": "🌸", "தாமரை": "🪷", "மல்லிகை": "🌸",
+    "தீ": "🔥", "நெருப்பு": "🔥", "கண்": "👁️", "கண்கள்": "👀", "விழி": "👀", "விழிகள்": "👀", "கண்ணீர்": "💧",
+    "சிரிப்பு": "😊", "புன்னகை": "😊", "முத்தம்": "💋", "மௌனம்": "🤫", "கனவு": "💭", "நினைவு": "🎞️", "நினைவுகள்": "🎞️", "உலகம்": "🌍", "பூமி": "🌍", "பயணம்": "🛣️", "வழி": "🛣️",
+    "பாட்டு": "🎵", "பாடல்": "🎵", "இசை": "🎶", "தங்கம்": "✨", "வைரம்": "💎", "முத்து": "💎", "ராஜா": "👑", "ராணி": "👑", "வீடு": "🏠", "நட்சத்திரம்": "⭐", "விண்மீன்": "🌟",
+    "நண்பா": "🫂", "நண்பன்": "🫂", "மச்சான்": "🫂", "தோழா": "🫂", "வாழ்க்கை": "✨", "சந்தோஷம்": "😊", "மகிழ்ச்சி": "😊", "சோகம்": "😔", "வலி": "🩹", "தனிமை": "🥀",
+    "மயில்": "🦚", "குயில்": "🐦", "பறவை": "🕊️", "சிறகு": "🪶", "வண்ணம்": "🎨", "கல்யாணம்": "💒", "வெற்றி": "🏆", "விளக்கு": "🪔", "பனி": "❄️", "காலம்": "⏳",
 
     # Extra high-frequency English pop/R&B/rap/indie words for dense expressive Visual lyrics
     "feel": "💫", "feeling": "💫", "mood": "✨", "vibe": "✨", "vibes": "✨", "aura": "✨", "glowup": "✨",
@@ -367,6 +391,17 @@ def _word_icon(word: str):
         for suf in ("less", "ness", "ful", "ment", "ous"):
             if bare_ascii.endswith(suf) and len(bare_ascii) > len(suf) + 3:
                 cands.append(bare_ascii[:-len(suf)])
+        # Hindi / Malayalam / Tamil Romanized common inflections (plurals, case markers, vocatives)
+        for ind_suf in (
+            "kalil", "kalude", "kale", "galil", "galai", "gal", "kal",
+            "inte", "inde", "ude", "ode", "odu", "yodu", "yil", "il",
+            "iyan", "iyaan", "iyum", "um", "ein", "on", "aan", "aa", "ai", "ae", "ey",
+        ):
+            if bare_ascii.endswith(ind_suf) and len(bare_ascii) > len(ind_suf) + 2:
+                st = bare_ascii[:-len(ind_suf)]
+                cands.extend([st, st + "a", st + "u", st + "i"])
+                if st.endswith("y") and len(st) > 3:
+                    cands.append(st[:-1])
         if bare_ascii.startswith("un") and len(bare_ascii) > 5:
             cands.append(bare_ascii[2:])
         for c in cands:
@@ -374,7 +409,20 @@ def _word_icon(word: str):
             if hit:
                 return hit
     bare_uni = re.sub(r"[^\w\u0900-\u0963\u0966-\u0D7F\u200C\u200D]", "", low)
-    return WORD_VISUALS.get(bare_uni)
+    if not bare_uni:
+        return None
+    hit = WORD_VISUALS.get(bare_uni)
+    if hit:
+        return hit
+    # Common native-script inflections in Malayalam/Tamil/Hindi
+    for u_suf in ("കൾ", "കൾക്ക്", "യിൽ", "ിൽ", "ന്റെ", "യുടെ", "ോടെ", "ോട്", "ഉം", "കൾ",
+                  "கள்", "களை", "களில்", "ில்", "இல்", "உம்", "ஆய்", "ஓடு", "க்காக",
+                  "ों", "ओं", "एं", "याँ", "ियां", "ो"):
+        if bare_uni.endswith(u_suf) and len(bare_uni) > len(u_suf) + 1:
+            hit = WORD_VISUALS.get(bare_uni[:-len(u_suf)])
+            if hit:
+                return hit
+    return None
 
 
 _INSTRUMENTAL_LINE_RE = re.compile(r"^[\s\u2669-\u266f\U0001f3b5\U0001f3b6\u2022\u00b7\u2026\.\-\u2014\u2013~_*|/\\()\[\]]+$")
@@ -722,8 +770,8 @@ def _lerp_color(c1, c2, u: float):
     return tuple(int(c1[i] + (c2[i] - c1[i]) * u) for i in range(len(c1)))
 
 
-def _build_fisheye_mesh(w: int, h: int, k_strength: float, zoom_base: float = 0.72):
-    """Builds a spherical barrel fisheye warp grid (Image.Transform.MESH) in pixel coordinates."""
+def _build_fisheye_mesh(w: int, h: int, k_strength: float, zoom_base: float = 0.72, twist_rad: float = 0.0, wave_amp: float = 0.0, wave_phase: float = 0.0):
+    """Builds a spherical barrel fisheye warp grid (Image.Transform.MESH) with optional 3D twist & hyperwave."""
     nx, ny = 12, 6
     cx, cy = w * 0.5, h * 0.5
     rx, ry = max(1.0, w * 0.5), max(1.0, h * 0.5)
@@ -734,7 +782,14 @@ def _build_fisheye_mesh(w: int, h: int, k_strength: float, zoom_base: float = 0.
         ny_n = (dy_px - cy) / ry
         r2 = nx_n * nx_n + ny_n * ny_n
         factor = zoom_base + k_strength * r2
-        return cx + nx_n * factor * rx, cy + ny_n * factor * ry
+        if wave_amp > 0.0:
+            factor += wave_amp * math.sin(nx_n * 3.8 + ny_n * 2.1 + wave_phase)
+        ux, uy = nx_n * factor, ny_n * factor
+        if abs(twist_rad) > 1e-3:
+            ang = twist_rad * (1.0 - min(1.0, r2 * 0.65))
+            ca, sa = math.cos(ang), math.sin(ang)
+            ux, uy = ux * ca - uy * sa, ux * sa + uy * ca
+        return cx + ux * rx, cy + uy * ry
 
     mesh = []
     for j in range(ny):
@@ -1410,9 +1465,10 @@ class LyricsFetcher:
 class SyncedLyricsOverlay:
     """Standalone Verci Lyrics Engine: spherical MESH Fisheye warp + full-screen random Constellation + kinetic styles."""
 
-    def __init__(self, config_manager=None, media_monitor=None):
+    def __init__(self, config_manager=None, media_monitor=None, backdrop_engine=None):
         self.cfg_mgr = config_manager
         self.media_mon = media_monitor
+        self.backdrop_engine = backdrop_engine
         self.fetcher = LyricsFetcher()
 
         mons = get_monitors()
@@ -1441,6 +1497,7 @@ class SyncedLyricsOverlay:
 
         # Settings
         self.style = "Fisheye Visual"
+        self.fisheye_effect = "Auto Mix"
         self.auto_sync_colors = True
         self.accent_color = (236, 72, 153)
         self.secondary_color = (99, 102, 241)
@@ -1484,6 +1541,7 @@ class SyncedLyricsOverlay:
         with self._lock:
             st = v.get("style", "Fisheye Visual")
             self.style = "Fisheye Visual" if st == "Neon Noir" else st
+            self.fisheye_effect = str(v.get("fisheye_effect", "Auto Mix"))
             self.auto_sync_colors = bool(v.get("auto_sync_colors", True))
             self.custom_accent = _hex_to_rgb(v.get("custom_accent_color", "#EC4899"))
             self.text_color = _hex_to_rgb(v.get("custom_text_color", "#FFFFFF"), (255, 255, 255))
@@ -1544,6 +1602,11 @@ class SyncedLyricsOverlay:
             if style_name == "Neon Noir":
                 style_name = "Fisheye Visual"
             self.style = style_name
+            self._dirty_style = True
+
+    def set_fisheye_effect(self, effect_name: str):
+        with self._lock:
+            self.fisheye_effect = str(effect_name or "Auto Mix")
             self._dirty_style = True
 
     def set_font(self, font_name: str):
@@ -1640,18 +1703,57 @@ class SyncedLyricsOverlay:
                 daemon=True
             ).start()
 
+    def _backdrop_mode(self) -> str:
+        if self.cfg_mgr:
+            return str(self.cfg_mgr.config.get("ambient", {}).get("album_backdrop", "Desktop Layer"))
+        return "Desktop Layer"
+
+    def _desired_mac_role(self, style_name: str = None) -> str:
+        st = style_name or self.style
+        bd_mode = self._backdrop_mode()
+        if bd_mode == "Cinema Stage":
+            return "cinema"
+        if st == "Constellation":
+            return "desktop_lyrics"
+        return "lyrics"
+
     def _z_anchor(self):
         if not IS_WIN:
             return None
-        bd_mode = "Desktop Layer"
-        if self.cfg_mgr:
-            bd_mode = self.cfg_mgr.config.get("ambient", {}).get("album_backdrop", "Desktop Layer")
-        return HWND_TOPMOST if bd_mode == "Cinema Stage" else HWND_BOTTOM
+        return HWND_TOPMOST if self._backdrop_mode() == "Cinema Stage" else HWND_BOTTOM
+
+    def _sync_desktop_z_order(self, style_name: str = None):
+        st = style_name or self.style
+        bd_mode = self._backdrop_mode()
+        if not IS_WIN:
+            if self.mac_win:
+                want_role = self._desired_mac_role(st)
+                if self.mac_win.role != want_role:
+                    self.mac_win.set_role(want_role)
+            return
+        if not self.hwnd:
+            return
+        try:
+            want_top = (bd_mode == "Cinema Stage")
+            cur_ex = user32.GetWindowLongPtrW(self.hwnd, GWL_EXSTYLE)
+            is_cur_top = bool(cur_ex & WS_EX_TOPMOST)
+            if want_top != is_cur_top:
+                nxt_ex = (cur_ex | WS_EX_TOPMOST) if want_top else (cur_ex & ~WS_EX_TOPMOST)
+                user32.SetWindowLongPtrW(self.hwnd, GWL_EXSTYLE, nxt_ex)
+            z_anc = HWND_TOPMOST if want_top else HWND_BOTTOM
+            user32.SetWindowPos(self.hwnd, z_anc, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | (SWP_FRAMECHANGED if want_top != is_cur_top else 0))
+            if (not want_top) and self.backdrop_engine:
+                for bd_hwnd in list(getattr(self.backdrop_engine, "_hwnds", []) or []):
+                    if bd_hwnd:
+                        user32.SetWindowPos(bd_hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+        except Exception:
+            pass
 
     def _apply_ex_style(self, hwnd, click_through):
         if not IS_WIN:
             if self.mac_win:
                 self.mac_win.set_click_through(click_through)
+                self._sync_desktop_z_order(self.style)
             return
         try:
             z_anc = self._z_anchor()
@@ -1668,6 +1770,10 @@ class SyncedLyricsOverlay:
                 style &= ~WS_EX_TOPMOST
             user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, style)
             user32.SetWindowPos(hwnd, z_anc, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED)
+            if (not is_top) and self.backdrop_engine:
+                for bd_hwnd in list(getattr(self.backdrop_engine, "_hwnds", []) or []):
+                    if bd_hwnd:
+                        user32.SetWindowPos(bd_hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
         except Exception:
             pass
 
@@ -1765,14 +1871,17 @@ class SyncedLyricsOverlay:
         self._safe_font_cache[skey] = font
         return font
 
-    def _get_warp_mesh(self, w: int, h: int, k_strength: float, zoom_base: float = 0.78):
+    def _get_warp_mesh(self, w: int, h: int, k_strength: float, zoom_base: float = 0.78, twist_rad: float = 0.0, wave_amp: float = 0.0, wave_phase: float = 0.0):
         qk = round(k_strength * 50.0) / 50.0
         qz = round(zoom_base, 2)
-        key = (w, h, qk, qz)
+        qt = round(twist_rad, 3)
+        if wave_amp > 0.0:
+            return _build_fisheye_mesh(w, h, qk, zoom_base=qz, twist_rad=qt, wave_amp=wave_amp, wave_phase=wave_phase)
+        key = (w, h, qk, qz, qt)
         mesh = self._mesh_cache.get(key)
         if mesh is None:
-            mesh = _build_fisheye_mesh(w, h, qk, zoom_base=qz)
-            if len(self._mesh_cache) > 24:
+            mesh = _build_fisheye_mesh(w, h, qk, zoom_base=qz, twist_rad=qt)
+            if len(self._mesh_cache) > 48:
                 self._mesh_cache.clear()
             self._mesh_cache[key] = mesh
         return mesh
@@ -1891,7 +2000,8 @@ class SyncedLyricsOverlay:
         return best_pt
 
     def _get_line_constellation_pts(self, line_idx: int, line_words, W: int, H: int):
-        """Places all words of a line at random non-overlapping positions across the screen."""
+        """Places all words of a line at random non-overlapping positions across the screen
+        while also penalizing trajectories that cut straight behind another word's text box."""
         cache_key = ("line", line_idx, W, H, round(self.font_scale, 2))
         cached = self._constellation_nodes.get(cache_key)
         if cached is not None:
@@ -1900,7 +2010,16 @@ class SyncedLyricsOverlay:
         rng = random.Random(self._constellation_seed * 131 + line_idx * 7919 + 42)
         f_max = self._get_font("bold", int(52 * self.font_scale))
         draw = self._full_draw
-        placed = []  # list of (cx, cy, half_w, half_h)
+        placed = []  # list of [cx, cy, hw, hh, x_lo, x_hi, y_lo, y_hi]
+        star_dy = 20.0 * self.font_scale
+
+        def _seg_dist(ax, ay, bx, by, px, py):
+            vx, vy = bx - ax, by - ay
+            len2 = vx * vx + vy * vy
+            if len2 < 1e-4:
+                return math.hypot(px - ax, py - ay)
+            t = max(0.0, min(1.0, ((px - ax) * vx + (py - ay) * vy) / len2))
+            return math.hypot(px - (ax + t * vx), py - (ay + t * vy))
 
         for wobj in line_words:
             txt = re.sub(r'[\(\)\[\]]', '', wobj["word"]).strip() or wobj["word"]
@@ -1909,12 +2028,12 @@ class SyncedLyricsOverlay:
             else:
                 tw, th = len(txt) * 28, 52
             hw = max(84, tw * 0.56 + 44)
-            hh = max(58, th * 0.56 + 48)
+            hh = max(62, th * 0.60 + 50)
 
             x_lo = int(min(W * 0.42, max(120, hw + 24)))
             x_hi = int(max(x_lo + 20, W - max(120, hw + 24)))
-            y_lo = int(min(H * 0.40, max(95, hh + 28)))
-            y_hi = int(max(y_lo + 20, H - max(95, hh + 28)))
+            y_lo = int(min(H * 0.40, max(105, hh + 30)))
+            y_hi = int(max(y_lo + 20, H - max(105, hh + 30)))
 
             best_pt = (rng.randint(x_lo, x_hi), rng.randint(y_lo, y_hi))
             best_score = -1e12
@@ -1926,15 +2045,23 @@ class SyncedLyricsOverlay:
                     break
                 ov_area = 0.0
                 min_edge_gap = 1e9
+                beam_pen = 0.0
                 for px, py, phw, phh, *_ in placed:
                     ox = (hw + phw + 18) - abs(cx - px)
-                    oy = (hh + phh + 14) - abs(cy - py)
+                    oy = (hh + phh + 16) - abs(cy - py)
                     if ox > 0 and oy > 0:
                         ov_area += ox * oy
                     gap = math.hypot(cx - px, cy - py) - (hw + phw) * 0.5
                     if gap < min_edge_gap:
                         min_edge_gap = gap
-                score = (-1e6 * ov_area) + min_edge_gap
+                # Penalize beam from previous star cutting behind earlier placed words
+                prev_x, prev_y = placed[-1][0], placed[-1][1] + star_dy
+                cur_sy = cy + star_dy
+                for px, py, phw, phh, *_ in placed[:-1]:
+                    d_seg = _seg_dist(prev_x, prev_y, cx, cur_sy, px, py - 10.0)
+                    if d_seg < max(36.0, phh * 0.58):
+                        beam_pen += (max(36.0, phh * 0.58) - d_seg) * 35.0
+                score = (-1e6 * ov_area) - beam_pen + min_edge_gap
                 if score > best_score:
                     best_score = score
                     best_pt = (cx, cy)
@@ -1947,7 +2074,7 @@ class SyncedLyricsOverlay:
                 for j in range(i + 1, len(placed)):
                     xj, yj, hwj, hhj, xlo_j, xhi_j, ylo_j, yhi_j = placed[j]
                     ox = (hwi + hwj + 16) - abs(xi - xj)
-                    oy = (hhi + hhj + 14) - abs(yi - yj)
+                    oy = (hhi + hhj + 16) - abs(yi - yj)
                     if ox > 0 and oy > 0:
                         moved = True
                         if ox < oy:
@@ -1996,7 +2123,9 @@ class SyncedLyricsOverlay:
 
         self.OVERLAY_W, self.OVERLAY_H = w0, h0
         if IS_WIN:
-            ex_style = WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE
+            ex_style = WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE
+            if self._backdrop_mode() == "Cinema Stage":
+                ex_style |= WS_EX_TOPMOST
             if eff_ct:
                 ex_style |= WS_EX_TRANSPARENT
 
@@ -2010,6 +2139,7 @@ class SyncedLyricsOverlay:
                 audio.dispose()
                 self.running = False
                 return
+            self._apply_ex_style(self.hwnd, eff_ct)
             msg = wintypes.MSG()
         else:
             def _on_mac_dragged(nx, ny):
@@ -2024,7 +2154,7 @@ class SyncedLyricsOverlay:
                         self.cfg_mgr.save_config()
 
             self.mac_win = MacOverlayWindow(
-                x0, y0, w0, h0, role="lyrics", click_through=eff_ct, on_move=_on_mac_dragged
+                x0, y0, w0, h0, role=self._desired_mac_role(self.style), click_through=eff_ct, on_move=_on_mac_dragged
             )
             self.mac_win.set_visible(True)
             msg = None
@@ -2032,6 +2162,8 @@ class SyncedLyricsOverlay:
         surf = LayeredSurface(w0, h0)
         last_render_sig = None
         curr_is_fs = is_fs_mode
+        last_z_sync = 0.0
+        win_hidden_fs = False
         target_dt = 1.0 / 60.0
         next_frame = time.perf_counter() + target_dt
 
@@ -2064,6 +2196,7 @@ class SyncedLyricsOverlay:
                     if self._dirty_font or not self._font_cache:
                         self._ensure_fonts()
                     style = self.style
+                    fe_eff = self.fisheye_effect
                     accent = self.accent_color if self.auto_sync_colors else self.custom_accent
                     sec = self.secondary_color if self.auto_sync_colors else self.custom_accent
                     text_col = self.text_color
@@ -2108,13 +2241,36 @@ class SyncedLyricsOverlay:
                     self.OVERLAY_W, self.OVERLAY_H = nw, nh
                     if IS_WIN:
                         user32.SetWindowPos(self.hwnd, self._z_anchor(), nx, ny, nw, nh, SWP_NOACTIVATE)
+                        self._sync_desktop_z_order(style)
                     elif self.mac_win:
                         self.mac_win.set_geometry(nx, ny, nw, nh)
+                        self._sync_desktop_z_order(style)
                     surf = LayeredSurface(nw, nh)
                     surf.clear_surface()
                     self._full_canvas = None
                     self._prev_dirty_rect = None
                     last_render_sig = None
+
+                now_z = time.perf_counter()
+                if dirty_style or (now_z - last_z_sync >= 0.45):
+                    last_z_sync = now_z
+                    self._sync_desktop_z_order(style)
+                    if IS_WIN and self.hwnd:
+                        hide_const = False
+                        if want_fs and self._backdrop_mode() != "Cinema Stage":
+                            ig = {self.hwnd}
+                            if self.backdrop_engine:
+                                ig.update(getattr(self.backdrop_engine, "_hwnds", []) or [])
+                            hide_const = is_foreground_fullscreen(self._mon, ig)
+                        if hide_const != win_hidden_fs:
+                            win_hidden_fs = hide_const
+                            user32.ShowWindow(self.hwnd, SW_HIDE if hide_const else SW_SHOWNOACTIVATE)
+                            if not hide_const:
+                                self._sync_desktop_z_order(style)
+                if win_hidden_fs:
+                    time.sleep(0.08)
+                    next_frame = time.perf_counter() + target_dt
+                    continue
 
                 win_x, win_y = (self._mon["x"], self._mon["y"]) if curr_is_fs else self._get_center_pos()
 
@@ -2132,7 +2288,7 @@ class SyncedLyricsOverlay:
                 is_playing = (status == "Playing" and bool(title) and title not in _NO_MEDIA_TITLES)
                 anim_tick = int(round(anim_t * 60.0)) if is_playing else (int(anim_t * 4) if not ct else 0)
                 sig = (
-                    style, idx, w_idx, g_idx, anim_tick, status, title,
+                    style, fe_eff, idx, w_idx, g_idx, anim_tick, status, title,
                     accent, text_col, ct, dirty_style, len(lyrics_snap), l_status_snap
                 )
 
@@ -3077,12 +3233,13 @@ class SyncedLyricsOverlay:
     def _render_fisheye(
         self, lyrics, idx, w_idx, w_u, eff_pos, anim_t, accent, sec, text_col, show_icons
     ):
-        """Premium Fisheye dome: bigger canvas, chromatic aberration on active word, snappier spring bounce,
-        1.4× scale pop, radial beat-pulse halo, frosted upcoming whisper, stronger barrel warp."""
+        """Premium Fisheye dome with selectable optical effects: Prism Split, Vortex Spin,
+        Elastic Dome, Hyperwave, Shockwave, 3D Vault, and Auto Mix."""
         W, H = self.OVERLAY_W, self.OVERLAY_H
         # Larger dome for more breathing room (scales smoothly with large font_scale up to 2.8x)
         LW, LH = min(1080, W - 20), min(580, H - 16)
         s = self.font_scale
+        fe_pref = getattr(self, "fisheye_effect", "Auto Mix") or "Auto Mix"
 
         curr_line = lyrics[idx]
         next_text = lyrics[idx + 1]["text"] if idx + 1 < len(lyrics) else ""
@@ -3107,14 +3264,29 @@ class SyncedLyricsOverlay:
         for ch_s in (self.current_track_key or "default"):
             track_seed = ((track_seed * 131) + ord(ch_s)) & 0xFFFFFFFF
         rng = random.Random((idx * 73856093) ^ track_seed ^ 0x4F1E)
-        trans_mode = rng.choice((
-            "swipe_left", "swipe_right", "swipe_up", "swipe_down",
-            "diagonal_left", "diagonal_right", "zoom_burst", "split_merge"
-        ))
-        warp_base_k = rng.choice((0.52, 0.60, 0.68))
+
+        preset_map = {
+            "Prism Split": "prism_split",
+            "Vortex Spin": "vortex_spin",
+            "Elastic Dome": "elastic_dome",
+            "Hyperwave": "hyperwave",
+            "Shockwave": "shockwave",
+            "3D Vault": "vault_flip",
+        }
+        if fe_pref in preset_map:
+            trans_mode = preset_map[fe_pref]
+        else:
+            trans_mode = rng.choice((
+                "swipe_left", "swipe_right", "swipe_up", "swipe_down",
+                "diagonal_left", "diagonal_right", "zoom_burst", "split_merge",
+                "vortex_spin", "vault_flip", "hyperwave", "prism_split",
+                "shockwave", "elastic_dome",
+            ))
+
+        warp_base_k = 0.72 if trans_mode == "elastic_dome" else rng.choice((0.52, 0.60, 0.68))
 
         # Per-song tilt affinity + per-line chance for sung phrases to tilt organically in 3D lens
-        tilt_prob = 0.28 + 0.01 * (track_seed % 25)  # 28%..52% depending on song personality
+        tilt_prob = 0.30 + 0.01 * (track_seed % 25)
         has_sustained_tilt = (rng.random() < tilt_prob)
         steady_tilt = (rng.choice((-1, 1)) * rng.uniform(3.8, 8.2)) if has_sustained_tilt else 0.0
 
@@ -3126,6 +3298,12 @@ class SyncedLyricsOverlay:
         dx_in, dy_in, tilt_deg = 0, 0, steady_tilt
         zoom_scale = 1.0
         split_dx = 0
+        twist_rad = 0.0
+        wave_amp = 0.0
+        wave_phase = 0.0
+        vault_sy = 1.0
+        row_spread = 0.0
+
         if trans_mode == "swipe_left":
             dx_in = int(260 * rem)
         elif trans_mode == "swipe_right":
@@ -3144,6 +3322,22 @@ class SyncedLyricsOverlay:
             zoom_scale = max(0.52, 0.58 + 0.42 * line_u)
         elif trans_mode == "split_merge":
             split_dx = int(155 * rem)
+        elif trans_mode == "vortex_spin":
+            spin_dir = -1.0 if (idx % 2 == 0) else 1.0
+            twist_rad = spin_dir * 0.34 * max(0.0, rem)
+            tilt_deg = steady_tilt + spin_dir * 12.0 * max(0.0, rem)
+            zoom_scale = max(0.58, 0.65 + 0.35 * line_u)
+        elif trans_mode == "vault_flip":
+            vault_sy = max(0.32, min(1.12, 0.36 + 0.64 * line_u))
+            dy_in = int(42 * rem)
+        elif trans_mode == "hyperwave":
+            wave_amp = 0.046 + 0.048 * self._audio_bloom
+            wave_phase = anim_t * 4.4
+        elif trans_mode == "elastic_dome":
+            row_spread = 0.14 * rem
+            zoom_scale = max(0.76, 1.0 + 0.14 * abs(rem))
+        elif trans_mode == "shockwave":
+            zoom_scale = 1.0 + 0.08 * max(0.0, 1.0 - w_u * 2.5) + 0.05 * self._audio_bloom
 
         if has_sustained_tilt:
             tilt_deg += 0.85 * math.sin(anim_t * 1.9 + idx) + (steady_tilt * 0.25 * max(0.0, rem))
@@ -3163,8 +3357,12 @@ class SyncedLyricsOverlay:
         self.OVERLAY_W, self.OVERLAY_H = LW, LH
 
         done_tint = _lerp_color(text_col, accent, 0.38) if self.auto_sync_colors else accent
+        n_rows = len(raw_chunks)
         for r_i, (row_words, base_wi) in enumerate(raw_chunks):
-            ry = int(LH * y_slots[r_i]) + dy_in
+            ys = y_slots[r_i]
+            if row_spread > 0.0 and n_rows > 1:
+                ys = ys + (r_i - (n_rows - 1) * 0.5) * row_spread
+            ry = int(LH * max(0.14, min(0.84, ys))) + dy_in
             r_dx = dx_in + (split_dx if (r_i % 2) else -split_dx)
             local_wi = (w_idx - base_wi) if (w_idx >= base_wi and w_idx < base_wi + len(row_words)) else (-2 if w_idx < base_wi else 999)
             row_img = Image.new("RGBA", (LW, LH), (0, 0, 0, 0)) if r_dx != 0 else line_canvas
@@ -3179,8 +3377,8 @@ class SyncedLyricsOverlay:
                 accent_rgb=accent,
                 show_icons=show_icons,
                 glow_layer=None,
-                wave_amp=5.0,
-                active_lift=14.0,
+                wave_amp=8.5 if trans_mode == "hyperwave" else 5.0,
+                active_lift=18.0 if trans_mode == "shockwave" else 14.0,
                 active_pop=True,
                 max_w=LW - 80,
                 anim_t=anim_t,
@@ -3190,10 +3388,9 @@ class SyncedLyricsOverlay:
 
         self.OVERLAY_W, self.OVERLAY_H = saved_w, saved_h
 
-        # Also gently intensify sustain aura near completion of a held slow-cue word in Fisheye
         sustain_hold = max(0.0, (w_u - 0.55) / 0.45) if w_idx >= 0 else 0.0
 
-        # --- Chromatic aberration on active word: red-shifted left, blue-shifted right, white center ---
+        # --- Chromatic aberration on active word (intensified in Prism Split mode) ---
         qcx = glow_q.width // 2
         if words and 0 <= w_idx < len(words):
             cw_txt = words[w_idx]["word"]
@@ -3206,19 +3403,32 @@ class SyncedLyricsOverlay:
                     break
             qy = max(8, min(glow_q.height - th_q - 8,
                             int(glow_q.height * y_slots[row_hit] - (oy_q + th_q * 0.5))))
-            sh_a = int(130 + 100 * max(atk_pulse, sustain_hold * (0.75 + 0.25 * math.sin(anim_t * 3.8))))
+            sh_a = int(130 + 105 * max(atk_pulse, sustain_hold * (0.75 + 0.25 * math.sin(anim_t * 3.8))))
             f_use_q = f_glow_raw if sh_q else f_glow_q
-            ca_r = _lerp_color(accent, (255, 100, 100), 0.6)
-            self._stamp_text(glow_q, qgd, max(4, qcx - tw_q // 2 - 3), qy, cw_txt, f_use_q, (*ca_r, sh_a))
-            ca_b = _lerp_color(sec, (100, 140, 255), 0.5)
-            self._stamp_text(glow_q, qgd, max(4, qcx - tw_q // 2 + 3), qy, cw_txt, f_use_q, (*ca_b, sh_a))
-            self._stamp_text(glow_q, qgd, max(4, qcx - tw_q // 2), qy, cw_txt, f_use_q, (255, 255, 255, int(sh_a * 0.7)))
+            sep_px = int(3 + (5 * max(atk_pulse, 0.35 * self._audio_bloom))) if trans_mode == "prism_split" else 3
+            ca_r = _lerp_color(accent, (255, 85, 110), 0.65)
+            self._stamp_text(glow_q, qgd, max(4, qcx - tw_q // 2 - sep_px), qy, cw_txt, f_use_q, (*ca_r, sh_a))
+            ca_b = _lerp_color(sec, (85, 155, 255), 0.58)
+            self._stamp_text(glow_q, qgd, max(4, qcx - tw_q // 2 + sep_px), qy, cw_txt, f_use_q, (*ca_b, sh_a))
+            self._stamp_text(glow_q, qgd, max(4, qcx - tw_q // 2), qy, cw_txt, f_use_q, (255, 255, 255, int(sh_a * 0.72)))
 
-            # Beat-pulse radial halo around active word area
-            pulse_r = int((tw_q * 0.5 + 18) * (1.0 + 0.25 * atk_pulse))
-            halo_a = int((60 + 80 * atk_pulse))
+            # Beat-pulse radial halo / twin Shockwave ripples around active word area
+            pulse_r = int((tw_q * 0.5 + 18) * (1.0 + 0.28 * atk_pulse))
+            halo_a = int(65 + 88 * atk_pulse)
             qgd.ellipse([qcx - pulse_r, qy - 8, qcx + pulse_r, qy + th_q + 8],
                         outline=(*accent, halo_a), width=2)
+            if trans_mode == "shockwave" or atk_pulse > 0.35:
+                prog_sw = max(0.0, min(1.0, w_u * 1.9))
+                sw_r = int((tw_q * 0.5 + 16) + prog_sw * 42)
+                sw_a = int(max(0, (1.0 - prog_sw) * (155 if trans_mode == "shockwave" else 85)))
+                if sw_a > 8:
+                    qgd.ellipse([qcx - sw_r, qy - int(10 + prog_sw * 14), qcx + sw_r, qy + th_q + int(10 + prog_sw * 14)],
+                                outline=(*sec, sw_a), width=2)
+
+            if trans_mode == "prism_split":
+                flare_a = int(55 + 75 * atk_pulse)
+                qgd.arc([10, 10, glow_q.width - 10, glow_q.height - 10], 200, 250, fill=(*ca_r, flare_a), width=2)
+                qgd.arc([10, 10, glow_q.width - 10, glow_q.height - 10], 20, 70, fill=(*ca_b, flare_a), width=2)
 
         # Frosted upcoming whisper (soft glass row at 28% opacity)
         if next_text:
@@ -3226,22 +3436,28 @@ class SyncedLyricsOverlay:
             tw_n, th_n = self._measure_text(ld, next_text[:48], f_next)
             whisper_x = max(40, (LW - tw_n) // 2)
             whisper_y = int(LH * 0.80) + int(5 * max(0.0, rem))
-            # Frosted pill background
             ld.rounded_rectangle([whisper_x - 16, whisper_y - 6, whisper_x + tw_n + 16, whisper_y + th_n + 6],
-                                  radius=12, fill=(255, 255, 255, 18))
+                                 radius=12, fill=(255, 255, 255, 18))
             self._draw_text_shadow(ld, whisper_x, whisper_y, next_text[:48], f_next,
                                    (215, 220, 235, 120), shadow_alpha=140, canvas_img=line_canvas)
 
-        # Glow blur — slightly stronger radius for bigger canvas
         glow_full = glow_q.filter(ImageFilter.GaussianBlur(radius=3.8)).resize((LW, LH), Image.Resampling.BILINEAR)
         lens_combined = Image.alpha_composite(glow_full, line_canvas)
+
+        if abs(vault_sy - 1.0) > 0.03:
+            nh_v = max(24, int(round(LH * vault_sy)))
+            scaled_v = lens_combined.resize((LW, nh_v), Image.Resampling.BILINEAR)
+            tmp_v = Image.new("RGBA", (LW, LH), (0, 0, 0, 0))
+            tmp_v.paste(scaled_v, (0, (LH - nh_v) // 2))
+            lens_combined = tmp_v
 
         if abs(tilt_deg) > 0.2:
             lens_combined = lens_combined.rotate(tilt_deg, resample=Image.Resampling.BILINEAR)
 
-        # Stronger fisheye warp + audio reactivity
-        warp_k = warp_base_k + 0.09 * atk_pulse + 0.08 * self._audio_bloom + 0.025 * math.sin(anim_t * 2.6)
-        mesh = self._get_warp_mesh(LW, LH, warp_k, zoom_base=0.78)
+        warp_k = warp_base_k + 0.09 * atk_pulse + 0.09 * self._audio_bloom + 0.028 * math.sin(anim_t * 2.6)
+        mesh = self._get_warp_mesh(
+            LW, LH, warp_k, zoom_base=0.78, twist_rad=twist_rad, wave_amp=wave_amp, wave_phase=wave_phase
+        )
         warped = lens_combined.transform((LW, LH), Image.Transform.MESH, mesh, resample=Image.Resampling.BILINEAR)
 
         ox = (W - LW) // 2
@@ -3257,8 +3473,8 @@ class SyncedLyricsOverlay:
             self._prev_dirty_rect = None
 
     def _render_constellation_dirty(self, flat_words, g_idx, eff_pos, anim_t, accent, sec, text_col):
-        """Premium Constellation: 3-star focus (prev · active · next), purely random positions,
-        gradient beam lines, radial burst glow, spark emit, 3-tier starfield. Tight dirty-rect upload."""
+        """Premium Constellation: star-anchored beams below words, zero gray overhang shadow,
+        smooth radial glow behind crisp progress-lit word layer. Tight dirty-rect upload."""
         W, H = self.OVERLAY_W, self.OVERLAY_H
         self._ensure_full_canvases(W, H)
         im = self._full_canvas
@@ -3277,7 +3493,6 @@ class SyncedLyricsOverlay:
             im.paste((0, 0, 0, 0), (0, 0, W, H))
             gl.paste((0, 0, 0, 0), (0, 0, W // 4, H // 4))
 
-        # Show ALL non-bracket words of the current line at random non-overlapping points
         gi_safe = max(0, g_idx if g_idx >= 0 else 0)
         while gi_safe > 0 and flat_words[gi_safe].get("in_brackets"):
             gi_safe -= 1
@@ -3294,18 +3509,18 @@ class SyncedLyricsOverlay:
                 break
 
         def _strip_brackets(txt: str) -> str:
-            """Clean any stray bracket characters."""
             return re.sub(r'[\(\)\[\]]', '', txt).strip()
 
-        # Non-overlapping random positions for the whole line + subtle float
         base_pts = self._get_line_constellation_pts(cur_line_idx, subset, W, H)
         pts = []
+        star_dy = int(20 * s)
+        word_dy = -int(12 * s)
         for (bx, by), wobj in zip(base_pts, subset):
             gi = wobj["g_idx"]
-            ox = 6.5 * math.cos(anim_t * 0.78 + gi * 1.37)
-            oy = 5.0 * math.sin(anim_t * 0.95 + gi * 2.09)
-            px = max(110, min(W - 110, int(bx + ox)))
-            py = max(85, min(H - 85, int(by + oy)))
+            ox = 6.0 * math.cos(anim_t * 0.78 + gi * 1.37)
+            oy = 4.5 * math.sin(anim_t * 0.95 + gi * 2.09)
+            px = max(115, min(W - 115, int(bx + ox)))
+            py = max(95, min(H - 95, int(by + oy)))
             pts.append((px, py, wobj))
 
         trans_u = 1.0
@@ -3316,17 +3531,14 @@ class SyncedLyricsOverlay:
             cur = flat_words[gi_safe]
             dur = max(0.14, cur["end"] - cur["start"])
             elapsed = max(0.0, eff_pos - cur["start"])
-            # Fast pop-in at word start (~0.11s) so active word lands right on beat
             trans_u = _ease_out_cubic(min(1.0, elapsed / min(0.11, dur * 0.45)))
-            # Smooth shooting star glide from previous star to active star (~0.24s)
             shoot_u = _ease_out_cubic(min(1.0, elapsed / min(0.24, dur * 0.70)))
             word_prog = min(1.0, elapsed / dur)
             spark_fire = (0.82 <= word_prog <= 0.98)
 
-        # Dirty-rect bounding box around only the visible stars
         all_xs = [p[0] for p in pts]
         all_ys = [p[1] for p in pts]
-        margin_x, margin_y = 220, 120
+        margin_x, margin_y = 220, 125
         x0 = max(0, min(all_xs) - margin_x) if all_xs else 0
         y0 = max(0, min(all_ys) - margin_y) if all_ys else 0
         x1 = min(W, max(all_xs) + margin_x) if all_xs else W
@@ -3334,7 +3546,7 @@ class SyncedLyricsOverlay:
         if (x1 - x0) > W * 0.52:
             x0, x1 = 0, W
 
-        # --- Layered ambient starfield (3 sizes, staggered twinkle) ---
+        # --- Layer 1: Layered ambient starfield ---
         tier_radii = (1.0, 1.9, 2.8)
         tier_base_alpha = (85, 110, 130)
         for sx, sy, sph, tier in self._bg_stars:
@@ -3346,115 +3558,81 @@ class SyncedLyricsOverlay:
                 sa = int(tier_base_alpha[ti] * tw)
                 d.ellipse([sx - sr, sy - sr, sx + sr, sy + sr], fill=(230, 237, 255, sa))
 
-        # --- Gradient glow beam between consecutive visible stars ---
+        # --- Layer 2: Shooting-star lines connect STAR NODES cleanly below each word ---
         def _draw_gradient_line(draw_obj, xa, ya, xb, yb, col_rgba, widths=(5, 3, 1)):
             for w_px, alpha_mul in zip(widths, (0.25, 0.55, 1.0)):
                 a = int(col_rgba[3] * alpha_mul)
                 draw_obj.line([(xa, ya), (xb, yb)], fill=(*col_rgba[:3], a), width=w_px)
 
         for i in range(len(pts) - 1):
-            x_a, y_a, _ = pts[i]
-            x_b, y_b, _ = pts[i + 1]
+            x_a, y_a = pts[i][0], pts[i][1] + star_dy
+            x_b, y_b = pts[i + 1][0], pts[i + 1][1] + star_dy
             if rel_active >= 0 and i < rel_active - 1:
-                # Already-sung connection in the line — glowing accent beam
                 _draw_gradient_line(d, x_a, y_a, x_b, y_b, (*accent, 165), widths=(5, 2, 1))
                 gd.line([(x_a // 4, y_a // 4), (x_b // 4, y_b // 4)], fill=(*accent, 125), width=2)
             elif rel_active >= 1 and i == rel_active - 1:
-                # Subtle base track
                 d.line([(x_a, y_a), (x_b, y_b)], fill=(180, 195, 225, 48), width=1)
-                # Entire shooting star line glows smoothly from prev -> meteor head (mx, my)
                 mx = x_a + (x_b - x_a) * shoot_u
                 my = y_a + (y_b - y_a) * shoot_u
                 if shoot_u > 0.02:
-                    for w_px, a_val in ((13, 28), (9, 55), (5, 115), (3, 195)):
+                    for w_px, a_val in ((11, 32), (7, 65), (4, 130), (2, 210)):
                         d.line([(x_a, y_a), (int(mx), int(my))], fill=(*accent, a_val), width=w_px)
-                    d.line([(x_a, y_a), (int(mx), int(my))], fill=(255, 250, 230, 230), width=2)
+                    d.line([(x_a, y_a), (int(mx), int(my))], fill=(255, 250, 230, 235), width=2)
                 if shoot_u < 0.98:
-                    d.ellipse([int(mx) - 9, int(my) - 9, int(mx) + 9, int(my) + 9], fill=(*accent, 85))
-                    d.ellipse([int(mx) - 5, int(my) - 5, int(mx) + 5, int(my) + 5], fill=(255, 252, 235, 255))
+                    d.ellipse([int(mx) - 8, int(my) - 8, int(mx) + 8, int(my) + 8], fill=(*accent, 95))
+                    d.ellipse([int(mx) - 4, int(my) - 4, int(mx) + 4, int(my) + 4], fill=(255, 252, 235, 255))
             else:
-                # Upcoming connection in the line — subtle silver guide line
                 _draw_gradient_line(d, x_a, y_a, x_b, y_b, (180, 195, 225, 52), widths=(3, 1))
 
-        # --- Star nodes and words for the entire current line ---
-        done_tint = _lerp_color(text_col, accent, 0.38)
+        # --- Layer 3: Star markers & active word radial glow ---
         for i, (px, py, wobj) in enumerate(pts):
             is_act = (i == rel_active)
             is_done = (rel_active >= 0 and i < rel_active)
             display_word = _strip_brackets(wobj["word"])
-
+            sy_star = py + star_dy
+            wy_txt = py + word_dy
             if is_act:
                 sz = int((32 + 20 * trans_u) * s)
-                alpha = int(175 + 80 * trans_u)
-                f_w = self._get_font("bold", sz)
-
-                self._draw_star(gd, px // 4, (py - int(28 * s)) // 4,
-                                4, (*accent, int(210 * trans_u)), angle_rad=anim_t * 1.3)
-                self._draw_star(d, px, py - int(28 * s),
-                                8, (255, 244, 190, alpha), angle_rad=anim_t * 1.3)
-
-                # Clean letter-hugging glow that intensifies toward the end of the word and breathes gently on long holds
-                end_glow = 0.28 + 0.72 * (word_prog ** 1.35)
+                alpha = int(185 + 70 * trans_u)
+                self._draw_star(gd, px // 4, sy_star // 4, 4, (*accent, int(210 * trans_u)), angle_rad=anim_t * 1.3)
+                self._draw_star(d, px, sy_star, 7.5, (255, 244, 190, alpha), angle_rad=anim_t * 1.3)
+                end_glow = 0.30 + 0.70 * (word_prog ** 1.35)
                 if word_prog >= 0.88:
                     end_glow *= (0.88 + 0.12 * math.sin(anim_t * 3.8))
                 f_gq_raw = self._get_font("bold", max(8, sz // 4))
                 ox_q, oy_q, tw_q, th_q, sh_q, f_gq = self._text_box(gd, display_word, f_gq_raw)
                 qx = int(px // 4 - tw_q * 0.5 - ox_q)
-                qy = int((py + int(6 * s)) // 4 - (oy_q + th_q * 0.5))
+                qy = int(wy_txt // 4 - (oy_q + th_q * 0.5))
                 f_gq_u = f_gq_raw if sh_q else f_gq
                 self._stamp_text(gl, gd, qx, qy, display_word, f_gq_u, (*accent, int(225 * end_glow)))
                 if word_prog > 0.55:
                     warm_a = int(185 * ((word_prog - 0.55) / 0.45))
                     self._stamp_text(gl, gd, qx, qy, display_word, f_gq_u, (255, 250, 225, warm_a))
-
-                base_rgb = _lerp_color((175, 190, 218), accent, 0.35)
-                lit_rgb = _lerp_color((255, 248, 215), (255, 255, 255), trans_u)
-                self._draw_word_with_opt_icon(
-                    im, d, px, py + int(6 * s), display_word, f_w,
-                    (*base_rgb, int(alpha * 0.80)),
-                    shadow_a=int(230 * trans_u + 150 * (1 - trans_u)),
-                    lit_ratio=word_prog, lit_rgba=(*lit_rgb, alpha)
-                )
-
                 if spark_fire:
                     rng_sp = random.Random(int(anim_t * 24) ^ wobj["g_idx"])
                     for _ in range(7):
                         ang = rng_sp.uniform(0, 2 * math.pi)
-                        dist = rng_sp.uniform(20, 56)
+                        dist = rng_sp.uniform(18, 52)
                         spx = int(px + math.cos(ang) * dist)
-                        spy = int(py + math.sin(ang) * dist)
-                        sa2 = rng_sp.randint(140, 230)
-                        d.ellipse([spx - 2, spy - 2, spx + 2, spy + 2], fill=(*accent, sa2))
-
+                        spy = int(sy_star + math.sin(ang) * dist)
+                        d.ellipse([spx - 2, spy - 2, spx + 2, spy + 2], fill=(*accent, rng_sp.randint(140, 230)))
             elif is_done:
-                # Already-sung word in this line — stays visible in soft accent tint
                 is_prev = (i == rel_active - 1)
-                sz = int((46 - 18 * trans_u) * s) if is_prev else int(26 * s)
-                alpha = int(235 - 40 * trans_u) if is_prev else 190
-                col_rgb = _lerp_color((255, 250, 220), done_tint, trans_u if is_prev else 1.0)
-                f_w = self._get_font("bold", sz)
-                self._draw_star(d, px, py + int(18 * s), 3.6, (*accent, alpha), angle_rad=anim_t * 0.5)
-                self._draw_word_with_opt_icon(im, d, px, py - int(5 * s), display_word, f_w,
-                                              (*col_rgb, alpha), shadow_a=175)
-
+                alpha_s = int(235 - 40 * trans_u) if is_prev else 190
+                self._draw_star(d, px, sy_star, 3.8, (*accent, alpha_s), angle_rad=anim_t * 0.5)
             else:
-                # Upcoming word in this line — visible at its random star point, waiting to be sung
                 is_next = (rel_active >= 0 and i == rel_active + 1)
                 pulse = (0.5 + 0.5 * math.sin(anim_t * 3.2)) if is_next else 0.0
-                alpha = int(145 + 30 * pulse)
-                f_w = self._get_font("reg", int((26 if is_next else 24) * s))
-                d.ellipse([px - 3, py + 15, px + 3, py + 21],
-                          fill=(*sec, int(135 + 55 * pulse)) if is_next else (195, 208, 232, 120))
-                self._draw_word_with_opt_icon(im, d, px, py - int(5 * s), display_word, f_w,
-                                              (210, 220, 238, alpha), shadow_a=145)
+                d.ellipse([px - 3, sy_star - 3, px + 3, sy_star + 3],
+                          fill=(*sec, int(145 + 60 * pulse)) if is_next else (195, 208, 232, 125))
 
-        # --- Composite blurred glow around active word ---
+        # --- Composite blurred colored glow ON TOP of starfield/beams, UNDERNEATH words ---
         if 0 <= rel_active < len(pts):
             ax, ay, _ = pts[rel_active]
             gx0 = max(x0, ax - 240)
-            gy0 = max(y0, ay - 120)
+            gy0 = max(y0, ay - 130)
             gx1 = min(x1, ax + 240)
-            gy1 = min(y1, ay + 120)
+            gy1 = min(y1, ay + 130)
             if gx1 > gx0 and gy1 > gy0:
                 qx0, qy0 = max(0, gx0 // 4), max(0, gy0 // 4)
                 qx1, qy1 = min(W // 4, (gx1 + 3) // 4), min(H // 4, (gy1 + 3) // 4)
@@ -3463,8 +3641,56 @@ class SyncedLyricsOverlay:
                         ImageFilter.GaussianBlur(2.8)
                     ).resize((gx1 - gx0, gy1 - gy0), Image.Resampling.BILINEAR)
                     bg_patch = im.crop((gx0, gy0, gx1, gy1))
-                    im.paste(Image.alpha_composite(g_patch, bg_patch), (gx0, gy0))
+                    im.paste(Image.alpha_composite(bg_patch, g_patch), (gx0, gy0))
 
+        # --- Layer 4: Clean separated word typography (zero black offset drop-shadow over beams!) ---
+        done_tint = _lerp_color(text_col, accent, 0.38)
+        tw_dirty, th_dirty = max(1, x1 - x0), max(1, y1 - y0)
+        txt_layer = Image.new("RGBA", (tw_dirty, th_dirty), (0, 0, 0, 0))
+        td = ImageDraw.Draw(txt_layer)
+        for i, (px, py, wobj) in enumerate(pts):
+            is_act = (i == rel_active)
+            is_done = (rel_active >= 0 and i < rel_active)
+            display_word = _strip_brackets(wobj["word"])
+            lx = px - x0
+            ly = (py + word_dy) - y0
+
+            if is_act:
+                sz = int((32 + 20 * trans_u) * s)
+                alpha = int(195 + 60 * trans_u)
+                f_w = self._get_font("bold", sz)
+                base_rgb = _lerp_color((195, 208, 232), accent, 0.42)
+                lit_rgb = _lerp_color((255, 250, 224), (255, 255, 255), trans_u)
+                # Render active word on an isolated tiny patch and wipe smoothly across its pixel width
+                ox_t, oy_t, ww_t, wh_t, is_sh_t, f_u_t = self._text_box(td, display_word, f_w)
+                if ww_t > 0 and wh_t > 0:
+                    pw_c, ph_c = ww_t + 8, wh_t + 8
+                    base_p = Image.new("RGBA", (pw_c, ph_c), (0, 0, 0, 0))
+                    lit_p = Image.new("RGBA", (pw_c, ph_c), (0, 0, 0, 0))
+                    self._stamp_text(base_p, ImageDraw.Draw(base_p), 4 - (0 if is_sh_t else ox_t), 4 - (0 if is_sh_t else oy_t),
+                                     display_word, f_u_t if not is_sh_t else f_w, (*base_rgb, int(alpha * 0.86)), shadow_alpha=0)
+                    self._stamp_text(lit_p, ImageDraw.Draw(lit_p), 4 - (0 if is_sh_t else ox_t), 4 - (0 if is_sh_t else oy_t),
+                                     display_word, f_u_t if not is_sh_t else f_w, (*lit_rgb, alpha), shadow_alpha=0)
+                    split_x = max(0, min(pw_c, int(round(4 + ww_t * max(0.0, min(1.0, word_prog))))))
+                    combined_p = base_p
+                    if split_x > 0:
+                        combined_p.paste(lit_p.crop((0, 0, split_x, ph_c)), (0, 0))
+                    self._composite_clamped(txt_layer, combined_p, int(lx - ww_t * 0.5 - 4), int(ly - wh_t * 0.5 - 4))
+            elif is_done:
+                is_prev = (i == rel_active - 1)
+                sz = int((46 - 18 * trans_u) * s) if is_prev else int(26 * s)
+                alpha = int(238 - 38 * trans_u) if is_prev else 198
+                col_rgb = _lerp_color((255, 250, 224), done_tint, trans_u if is_prev else 1.0)
+                f_w = self._get_font("bold", sz)
+                self._draw_word_with_opt_icon(txt_layer, td, lx, ly, display_word, f_w, (*col_rgb, alpha), shadow_a=0)
+            else:
+                is_next = (rel_active >= 0 and i == rel_active + 1)
+                pulse = (0.5 + 0.5 * math.sin(anim_t * 3.2)) if is_next else 0.0
+                alpha = int(155 + 32 * pulse)
+                f_w = self._get_font("reg", int((26 if is_next else 24) * s))
+                self._draw_word_with_opt_icon(txt_layer, td, lx, ly, display_word, f_w, (218, 226, 244, alpha), shadow_a=0)
+
+        im.alpha_composite(txt_layer, (x0, y0))
         out = im if (x0 == 0 and y0 == 0 and x1 == W and y1 == H) else im.crop((x0, y0, x1, y1))
         return out, (x0, y0, x1, y1)
 

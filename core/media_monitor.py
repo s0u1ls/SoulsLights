@@ -116,20 +116,22 @@ def _extract_colors_from_pil(img: Image.Image):
 
 
 class MediaMonitor:
-    """Universal media state & album artwork monitor (Windows SMTC + macOS Spotify/Apple Music/Now Playing)."""
+    """Universal media state & album artwork monitor (Windows SMTC + macOS + optional Spotify OAuth API)."""
 
-    def __init__(self, on_update_callback=None, player_preference="Music Apps First"):
+    def __init__(self, on_update_callback=None, player_preference="Music Apps First", config_manager=None):
         self.on_update_callback = on_update_callback
         self.player_preference = player_preference
+        self.cfg_mgr = config_manager
         self.running = False
         self.thread = None
         self.loop = None
         self.manager = None
         self._active_session = None
 
-        # macOS state
+        # macOS / media cache state
         self._mac_active_app = ""
         self._mac_art_cache = {}  # key -> (colors, PIL.Image)
+        self._mv_cache = {}       # (artist, title) -> mp4/m4v url
 
         self._anchor_pos_sec = 0.0
         self._anchor_mono = time.perf_counter()
@@ -150,8 +152,139 @@ class MediaMonitor:
             "progress": 0.0,
             "colors": ["#6366F1", "#EC4899", "#8B5CF6"],
             "thumbnail_img": None,
+            "music_video_url": "",
             "track_changed": False,
         }
+
+    def fetch_music_video_url(self, title: str, artist: str = "") -> str:
+        """Looks up an official 1080p HTTPS music video stream matching title + artist."""
+        clean_t = (title or "").strip()
+        clean_a = (artist or "").split(",")[0].strip()
+        if not clean_t or clean_t in ("No Active Music", "No Media Playing", "Unknown Track"):
+            return ""
+        ck = (clean_a.lower(), clean_t.lower())
+        if ck in self._mv_cache:
+            return self._mv_cache[ck]
+
+        import re as _re
+        t_norm = _re.sub(r"\s*[\(\[].*?[\)\]]", "", clean_t).strip() or clean_t
+        t_toks = [w for w in _re.findall(r"[a-z0-9]+", t_norm.lower()) if len(w) >= 2]
+        a_toks = [w for w in _re.findall(r"[a-z0-9]+", clean_a.lower()) if len(w) >= 2]
+
+        best_url = ""
+        best_score = -1
+        for query in (f"{clean_a} {t_norm}".strip(), t_norm):
+            try:
+                q = urllib.parse.urlencode({"term": query, "entity": "musicVideo", "limit": 6})
+                req = urllib.request.Request(
+                    f"https://itunes.apple.com/search?{q}",
+                    headers={"User-Agent": "SoulsLights/2.3"},
+                )
+                with _urlopen(req, timeout=4.5) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                for item in (data.get("results") or []):
+                    pv = (item.get("previewUrl") or "").strip()
+                    if not pv:
+                        continue
+                    it_t = (item.get("trackName") or "").lower()
+                    it_a = (item.get("artistName") or "").lower()
+                    t_hits = sum(1 for tk in t_toks if tk in it_t)
+                    a_hits = sum(1 for ak in a_toks if ak in it_a)
+                    if t_toks and t_hits == 0:
+                        continue
+                    if a_toks and a_hits == 0:
+                        continue
+                    score = t_hits * 3 + a_hits * 4
+                    if "official" in it_t or t_norm.lower() in it_t:
+                        score += 2
+                    if score > best_score:
+                        best_score = score
+                        best_url = pv
+                if best_url:
+                    break
+            except Exception:
+                continue
+
+        if len(self._mv_cache) > 48:
+            self._mv_cache.clear()
+        self._mv_cache[ck] = best_url
+        return best_url
+
+    def _refresh_spotify_token(self) -> str:
+        if not self.cfg_mgr:
+            return ""
+        sp = self.cfg_mgr.config.get("spotify", {})
+        cid = (sp.get("client_id") or "").strip()
+        tok = (sp.get("access_token") or "").strip()
+        ref = (sp.get("refresh_token") or "").strip()
+        exp = float(sp.get("expires_at") or 0)
+        if tok and time.time() * 1000 < exp - 60000:
+            return tok
+        if not (cid and ref):
+            return ""
+        try:
+            body = urllib.parse.urlencode({
+                "client_id": cid,
+                "grant_type": "refresh_token",
+                "refresh_token": ref,
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                "https://accounts.spotify.com/api/token",
+                data=body,
+                headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "SoulsLights/2.3"},
+                method="POST",
+            )
+            with _urlopen(req, timeout=5.0) as resp:
+                d = json.loads(resp.read().decode("utf-8"))
+            if d.get("access_token"):
+                sp["access_token"] = d["access_token"]
+                if d.get("refresh_token"):
+                    sp["refresh_token"] = d["refresh_token"]
+                sp["expires_at"] = int(time.time() * 1000 + float(d.get("expires_in", 3600)) * 1000)
+                self.cfg_mgr.save_config()
+                return sp["access_token"]
+        except Exception:
+            pass
+        return ""
+
+    def _poll_spotify_web_api(self):
+        tok = self._refresh_spotify_token()
+        if not tok:
+            return None
+        try:
+            req = urllib.request.Request(
+                "https://api.spotify.com/v1/me/player?additional_types=track",
+                headers={"Authorization": f"Bearer {tok}", "User-Agent": "SoulsLights/2.3"},
+            )
+            with _urlopen(req, timeout=4.0) as resp:
+                if resp.status == 204:
+                    return None
+                p = json.loads(resp.read().decode("utf-8"))
+            item = (p or {}).get("item")
+            if not item:
+                return None
+            title = (item.get("name") or "").strip() or "Unknown Track"
+            artist = ", ".join(a.get("name", "") for a in (item.get("artists") or []) if a.get("name")) or "Unknown Artist"
+            album = ((item.get("album") or {}).get("name") or "").strip()
+            imgs = (item.get("album") or {}).get("images") or []
+            art_url = imgs[0].get("url", "") if imgs else ""
+            is_playing = bool(p.get("is_playing", False))
+            pos_sec = float(p.get("progress_ms") or 0) / 1000.0
+            dur_sec = float(item.get("duration_ms") or 0) / 1000.0
+            return {
+                "title": title,
+                "artist": artist,
+                "album": album,
+                "art_url": art_url,
+                "status": "Playing" if is_playing else "Paused",
+                "is_playing": is_playing,
+                "position_sec": pos_sec,
+                "duration_sec": dur_sec,
+                "app_key": "spotify",
+                "source": "Spotify",
+            }
+        except Exception:
+            return None
 
     def set_player_preference(self, pref: str):
         self.player_preference = pref
@@ -206,6 +339,7 @@ class MediaMonitor:
             self.current_info["duration_str"] = "0:00"
             self.current_info["progress"] = 0.0
             self.current_info["thumbnail_img"] = None
+            self.current_info["music_video_url"] = ""
             self.current_info["colors"] = ["#6366F1", "#EC4899", "#8B5CF6"]
             self.current_info["track_changed"] = True
             if self.on_update_callback:
@@ -261,6 +395,17 @@ class MediaMonitor:
         scored.sort(key=lambda item: item[0], reverse=True)
         return scored[0][1]
 
+    def _resolve_mv_async(self, track_sig, title: str, artist: str):
+        def _run():
+            mv_url = self.fetch_music_video_url(title, artist)
+            cur_sig = (self.current_info.get("title", ""), self.current_info.get("artist", ""), self.current_info.get("album", ""))
+            if cur_sig[:2] == track_sig[:2] and mv_url:
+                self.current_info["music_video_url"] = mv_url
+                self.current_info["track_changed"] = False
+                if self.on_update_callback:
+                    self.on_update_callback(dict(self.current_info))
+        threading.Thread(target=_run, daemon=True).start()
+
     async def _poll_loop_win(self):
         from winrt.windows.media.control import GlobalSystemMediaTransportControlsSessionManager as SMTCManager
         try:
@@ -271,6 +416,8 @@ class MediaMonitor:
 
         last_track_sig = None
         last_status = None
+        last_sp_poll = 0.0
+        cached_sp = None
 
         while self.running:
             try:
@@ -337,6 +484,8 @@ class MediaMonitor:
                         colors, thumb_img = await self._extract_colors_and_thumb_win(props)
                         self.current_info["colors"] = colors
                         self.current_info["thumbnail_img"] = thumb_img
+                        self.current_info["music_video_url"] = ""
+                        self._resolve_mv_async(track_sig, title, artist)
 
                     last_status = status_str
                     progress = (live_pos / end_sec) if end_sec > 0 else 0.0
@@ -357,7 +506,44 @@ class MediaMonitor:
                     if self.on_update_callback:
                         self.on_update_callback(dict(self.current_info))
                 else:
-                    last_status, last_track_sig = self._commit_idle_state(last_status)
+                    now_sp = time.perf_counter()
+                    if now_sp - last_sp_poll >= 1.25:
+                        last_sp_poll = now_sp
+                        cached_sp = self._poll_spotify_web_api()
+                    if cached_sp:
+                        trk = cached_sp
+                        title, artist, album = trk["title"], trk["artist"], trk["album"]
+                        status_str, is_playing = trk["status"], trk["is_playing"]
+                        live_pos, end_sec = trk["position_sec"], trk["duration_sec"]
+                        track_sig = (title, artist, album)
+                        track_changed = (track_sig != last_track_sig)
+                        status_changed = (status_str != last_status)
+                        self._anchor_pos_sec = live_pos
+                        self._anchor_mono = time.perf_counter()
+                        self._is_playing = is_playing
+                        self._duration_sec = end_sec
+                        if track_changed:
+                            last_track_sig = track_sig
+                            colors, thumb_img = self._fetch_mac_art_and_colors(trk)
+                            self.current_info["colors"] = colors
+                            self.current_info["thumbnail_img"] = thumb_img
+                            self.current_info["music_video_url"] = ""
+                            self._resolve_mv_async(track_sig, title, artist)
+                        last_status = status_str
+                        progress = (live_pos / end_sec) if end_sec > 0 else 0.0
+                        self.current_info.update({
+                            "title": title, "artist": artist, "album": album,
+                            "source": "Spotify", "status": status_str, "is_playing": is_playing,
+                            "position_sec": live_pos, "duration_sec": end_sec,
+                            "position_str": f"{int(live_pos // 60)}:{int(live_pos % 60):02d}",
+                            "duration_str": f"{int(end_sec // 60)}:{int(end_sec % 60):02d}",
+                            "progress": min(1.0, max(0.0, progress)),
+                            "track_changed": track_changed or status_changed,
+                        })
+                        if self.on_update_callback:
+                            self.on_update_callback(dict(self.current_info))
+                    else:
+                        last_status, last_track_sig = self._commit_idle_state(last_status)
             except Exception:
                 pass
             await asyncio.sleep(0.4)
@@ -586,9 +772,17 @@ class MediaMonitor:
     def _poll_loop_mac(self):
         last_track_sig = None
         last_status = None
+        last_sp_poll = 0.0
+        cached_sp = None
         while self.running:
             try:
                 trk = self._pick_best_mac_track()
+                if not trk:
+                    now_sp = time.perf_counter()
+                    if now_sp - last_sp_poll >= 1.25:
+                        last_sp_poll = now_sp
+                        cached_sp = self._poll_spotify_web_api()
+                    trk = cached_sp
                 if trk:
                     self._mac_active_app = trk["app_key"]
                     title = trk["title"]
@@ -623,6 +817,8 @@ class MediaMonitor:
                         colors, thumb_img = self._fetch_mac_art_and_colors(trk)
                         self.current_info["colors"] = colors
                         self.current_info["thumbnail_img"] = thumb_img
+                        self.current_info["music_video_url"] = ""
+                        self._resolve_mv_async(track_sig, title, artist)
 
                     last_status = status_str
                     progress = (live_pos / end_sec) if end_sec > 0 else 0.0

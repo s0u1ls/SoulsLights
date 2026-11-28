@@ -164,6 +164,46 @@ export default {
       return json({ ok: true });
     }
 
+    if (url.pathname === "/api/music_video" && request.method === "GET") {
+      const title = (url.searchParams.get("title") || "").trim();
+      const artist = (url.searchParams.get("artist") || "").split(",")[0].trim();
+      if (!title) return json({ ok: false, mp4_url: "", youtube_id: "" });
+      let youtube_id = "";
+      let mp4_url = "";
+      try {
+        const itUrl = "https://itunes.apple.com/search?" + new URLSearchParams({
+          term: `${artist} ${title}`.trim(),
+          entity: "musicVideo",
+          limit: "4",
+        }).toString();
+        const ir = await fetch(itUrl, { headers: { "User-Agent": "SoulsLights/2.3" } });
+        if (ir.ok) {
+          const idata = await ir.json();
+          const aToks = artist.toLowerCase().split(/\s+/).filter((x) => x.length >= 2);
+          for (const item of idata.results || []) {
+            if (!item.previewUrl) continue;
+            const ia = String(item.artistName || "").toLowerCase();
+            if (!aToks.length || aToks.some((t) => ia.includes(t))) {
+              mp4_url = item.previewUrl;
+              break;
+            }
+          }
+        }
+      } catch {}
+      try {
+        const ytQ = encodeURIComponent(`${artist} ${title} official music video`.trim());
+        const yr = await fetch(`https://www.youtube.com/results?search_query=${ytQ}`, {
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36", "Accept-Language": "en-US,en;q=0.9" },
+        });
+        if (yr.ok) {
+          const html = await yr.text();
+          const m = html.match(/"videoId"\s*:\s*"([A-Za-z0-9_-]{11})"/);
+          if (m) youtube_id = m[1];
+        }
+      } catch {}
+      return json({ ok: Boolean(mp4_url || youtube_id), mp4_url, youtube_id });
+    }
+
     return json({ ok: false, error: "Not found" }, 404);
   },
 };

@@ -1,13 +1,239 @@
 import os
 import sys
+import hashlib
+import shutil
 import threading
 import time
 import math
 import colorsys
 import traceback
+import urllib.request
 from PIL import Image, ImageDraw, ImageFilter, ImageEnhance, ImageChops
 
 from core.platform_utils import IS_MAC, IS_WIN, get_app_data_dir, get_monitors
+
+try:
+    import certifi
+    import ssl
+    _MV_SSL_CTX = ssl.create_default_context(cafile=certifi.where())
+except Exception:
+    _MV_SSL_CTX = None
+
+
+class _WinMusicVideoDecoder:
+    """Zero-dependency native Windows Media Foundation H.264 -> RGB32 frame decoder."""
+
+    def __init__(self, file_path: str, out_w: int = 640, out_h: int = 360):
+        import uuid
+        self.file_path = file_path
+        self.out_w = out_w
+        self.out_h = out_h
+        self._reader = None
+        self._vw = 0
+        self._vh = 0
+        self._read_fn = None
+        self._lock = threading.Lock()
+
+        class _GUID(ctypes.Structure):
+            _fields_ = [
+                ("Data1", ctypes.c_ulong),
+                ("Data2", ctypes.c_ushort),
+                ("Data3", ctypes.c_ushort),
+                ("Data4", ctypes.c_ubyte * 8),
+            ]
+            def __init__(self, s):
+                u = uuid.UUID(s)
+                super().__init__(u.time_low, u.time_mid, u.time_hi_version, (ctypes.c_ubyte * 8)(*u.bytes[8:]))
+
+        self._GUID = _GUID
+        self._open()
+
+    def _open(self):
+        if not IS_WIN:
+            return
+        self.close()
+        ole32 = ctypes.windll.ole32
+        mfplat = ctypes.windll.mfplat
+        mfrw = ctypes.windll.mfreadwrite
+        ole32.CoInitializeEx(None, 0)
+        mfplat.MFStartup(0x00020070, 0)
+        GUID = self._GUID
+
+        attrs = ctypes.c_void_p()
+        mfplat.MFCreateAttributes(ctypes.byref(attrs), 3)
+        if not attrs.value:
+            return
+        vt_attr = ctypes.cast(ctypes.cast(attrs, ctypes.POINTER(ctypes.c_void_p))[0], ctypes.POINTER(ctypes.c_void_p))
+        set_u32 = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(GUID), ctypes.c_uint32)(vt_attr[21])
+        set_u32(attrs, ctypes.byref(GUID("FB394F3D-CCF1-42EE-BBB3-F9B845D56D81")), 1)
+        set_u32(attrs, ctypes.byref(GUID("0F81DA2C-B537-4672-A8B2-A681B17307A3")), 1)
+        set_u32(attrs, ctypes.byref(GUID("A6A28B0B-1786-45C2-B030-9802AC4FB7B1")), 1)
+
+        reader = ctypes.c_void_p()
+        hr = mfrw.MFCreateSourceReaderFromURL(self.file_path, attrs, ctypes.byref(reader))
+        ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(vt_attr[2])(attrs)
+        if hr != 0 or not reader.value:
+            return
+
+        vt_rdr = ctypes.cast(ctypes.cast(reader, ctypes.POINTER(ctypes.c_void_p))[0], ctypes.POINTER(ctypes.c_void_p))
+        mt = ctypes.c_void_p()
+        mfplat.MFCreateMediaType(ctypes.byref(mt))
+        vt_mt = ctypes.cast(ctypes.cast(mt, ctypes.POINTER(ctypes.c_void_p))[0], ctypes.POINTER(ctypes.c_void_p))
+        set_guid = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(GUID), ctypes.POINTER(GUID))(vt_mt[24])
+        set_guid(mt, ctypes.byref(GUID("48eba18e-f8c9-4687-bf11-0a74c9f96a8f")), ctypes.byref(GUID("73646976-0000-0010-8000-00AA00389B71")))
+        set_guid(mt, ctypes.byref(GUID("f7e34c9a-42e8-4714-b74b-cb29d72c35e5")), ctypes.byref(GUID("00000016-0000-0010-8000-00AA00389B71")))
+        hr_mt = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_void_p)(vt_rdr[7])(reader, 0xFFFFFFFC, None, mt)
+        ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(vt_mt[2])(mt)
+        if hr_mt != 0:
+            ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(vt_rdr[2])(reader)
+            return
+
+        cur_mt = ctypes.c_void_p()
+        ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.c_uint32, ctypes.POINTER(ctypes.c_void_p))(vt_rdr[6])(reader, 0xFFFFFFFC, ctypes.byref(cur_mt))
+        if cur_mt.value:
+            vt_cmt = ctypes.cast(ctypes.cast(cur_mt, ctypes.POINTER(ctypes.c_void_p))[0], ctypes.POINTER(ctypes.c_void_p))
+            fsz = ctypes.c_uint64()
+            ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(GUID), ctypes.POINTER(ctypes.c_uint64))(vt_cmt[8])(
+                cur_mt, ctypes.byref(GUID("1652c33d-d6b2-4012-b834-72030849a37d")), ctypes.byref(fsz)
+            )
+            self._vw = (fsz.value >> 32) & 0xFFFFFFFF
+            self._vh = fsz.value & 0xFFFFFFFF
+            ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(vt_cmt[2])(cur_mt)
+
+        self._reader = reader
+        self._read_fn = ctypes.WINFUNCTYPE(
+            ctypes.c_long, ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32,
+            ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint32),
+            ctypes.POINTER(ctypes.c_int64), ctypes.POINTER(ctypes.c_void_p)
+        )(vt_rdr[9])
+
+    def next_frame(self):
+        with self._lock:
+            if not self._reader or not self._read_fn or self._vw <= 0 or self._vh <= 0:
+                return None
+            for _ in range(3):
+                st_i = ctypes.c_uint32()
+                fl = ctypes.c_uint32()
+                ts = ctypes.c_int64()
+                smp = ctypes.c_void_p()
+                hr = self._read_fn(self._reader, 0xFFFFFFFC, 0, ctypes.byref(st_i), ctypes.byref(fl), ctypes.byref(ts), ctypes.byref(smp))
+                if (fl.value & 2) or hr != 0:
+                    if smp.value:
+                        vt_s = ctypes.cast(ctypes.cast(smp, ctypes.POINTER(ctypes.c_void_p))[0], ctypes.POINTER(ctypes.c_void_p))
+                        ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(vt_s[2])(smp)
+                    self._open()
+                    continue
+                if not smp.value:
+                    continue
+                try:
+                    vt_s = ctypes.cast(ctypes.cast(smp, ctypes.POINTER(ctypes.c_void_p))[0], ctypes.POINTER(ctypes.c_void_p))
+                    buf = ctypes.c_void_p()
+                    hr_b = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p))(vt_s[41])(smp, ctypes.byref(buf))
+                    if hr_b == 0 and buf.value:
+                        try:
+                            vt_b = ctypes.cast(ctypes.cast(buf, ctypes.POINTER(ctypes.c_void_p))[0], ctypes.POINTER(ctypes.c_void_p))
+                            ptr = ctypes.c_void_p()
+                            mlen = ctypes.c_uint32()
+                            clen = ctypes.c_uint32()
+                            if ctypes.WINFUNCTYPE(
+                                ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p),
+                                ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint32)
+                            )(vt_b[3])(buf, ctypes.byref(ptr), ctypes.byref(mlen), ctypes.byref(clen)) == 0:
+                                need = self._vw * self._vh * 4
+                                if ptr.value and clen.value >= need:
+                                    raw = ctypes.string_at(ptr.value, need)
+                                    im = Image.frombytes("RGB", (self._vw, self._vh), raw, "raw", "BGRX")
+                                    im = im.resize((self.out_w, self.out_h), Image.Resampling.BILINEAR)
+                                    ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p)(vt_b[4])(buf)
+                                    return im
+                                ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p)(vt_b[4])(buf)
+                        finally:
+                            vt_b = ctypes.cast(ctypes.cast(buf, ctypes.POINTER(ctypes.c_void_p))[0], ctypes.POINTER(ctypes.c_void_p))
+                            ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(vt_b[2])(buf)
+                finally:
+                    vt_s = ctypes.cast(ctypes.cast(smp, ctypes.POINTER(ctypes.c_void_p))[0], ctypes.POINTER(ctypes.c_void_p))
+                    ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(vt_s[2])(smp)
+            return None
+
+    def close(self):
+        if self._reader:
+            try:
+                vt_rdr = ctypes.cast(ctypes.cast(self._reader, ctypes.POINTER(ctypes.c_void_p))[0], ctypes.POINTER(ctypes.c_void_p))
+                ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(vt_rdr[2])(self._reader)
+            except Exception:
+                pass
+            self._reader = None
+            self._read_fn = None
+
+
+class _MacMusicVideoDecoder:
+    """Zero-subprocess macOS AVFoundation hardware-accelerated frame reader for local .m4v clips."""
+
+    def __init__(self, file_path: str, out_w: int = 640, out_h: int = 360):
+        self.file_path = file_path
+        self.out_w = out_w
+        self.out_h = out_h
+        self._lock = threading.Lock()
+        self._gen = None
+        self._CoreMedia = None
+        self._Quartz = None
+        self._duration = 0.0
+        self._cur_t = 0.0
+        self._open()
+
+    def _open(self):
+        if not IS_MAC:
+            return
+        try:
+            import Foundation
+            import AVFoundation
+            import CoreMedia
+            import Quartz
+            url = Foundation.NSURL.fileURLWithPath_(self.file_path)
+            asset = AVFoundation.AVURLAsset.URLAssetWithURL_options_(url, None)
+            dur_s = float(CoreMedia.CMTimeGetSeconds(asset.duration()))
+            if not (0.1 < dur_s < 36000.0):
+                return
+            gen = AVFoundation.AVAssetImageGenerator.assetImageGeneratorWithAsset_(asset)
+            gen.setAppliesPreferredTrackTransform_(True)
+            gen.setMaximumSize_(Quartz.CGSizeMake(float(self.out_w), float(self.out_h)))
+            gen.setRequestedTimeToleranceBefore_(CoreMedia.CMTimeMake(1, 24))
+            gen.setRequestedTimeToleranceAfter_(CoreMedia.CMTimeMake(1, 24))
+            self._gen = gen
+            self._CoreMedia = CoreMedia
+            self._Quartz = Quartz
+            self._duration = dur_s
+            self._cur_t = 0.0
+        except Exception:
+            self._gen = None
+
+    def next_frame(self):
+        with self._lock:
+            if not self._gen or self._duration <= 0.1:
+                return None
+            try:
+                cm_t = self._CoreMedia.CMTimeMake(int(round(self._cur_t * 240.0)), 240)
+                self._cur_t += 1.0 / 24.0
+                if self._cur_t >= self._duration:
+                    self._cur_t = 0.0
+                cg_img, _actual, _err = self._gen.copyCGImageAtTime_actualTime_error_(cm_t, None, None)
+                if cg_img is None:
+                    return None
+                q = self._Quartz
+                cs = q.CGColorSpaceCreateDeviceRGB()
+                buf = bytearray(self.out_w * self.out_h * 4)
+                binfo = q.kCGBitmapByteOrder32Big | q.kCGImageAlphaNoneSkipLast
+                ctx = q.CGBitmapContextCreate(buf, self.out_w, self.out_h, 8, self.out_w * 4, cs, binfo)
+                if ctx is None:
+                    return None
+                q.CGContextDrawImage(ctx, q.CGRectMake(0.0, 0.0, float(self.out_w), float(self.out_h)), cg_img)
+                return Image.frombytes("RGB", (self.out_w, self.out_h), bytes(buf), "raw", "RGBX")
+            except Exception:
+                return None
+
+    def close(self):
+        with self._lock:
+            self._gen = None
 
 if IS_WIN:
     import ctypes
@@ -99,7 +325,7 @@ def _make_radial_blob(w: int, h: int, rgb: tuple, power: float = 1.85) -> Image.
 
 
 class AlbumBackdropEngine:
-    """Renders a 60 FPS darkened 2-blob or Video Reel animated album backdrop underneath ambient light & lyrics."""
+    """Renders a 60 FPS darkened 2-blob, Video Reel, or Music Video animated backdrop underneath ambient light & lyrics."""
 
     SRC_W = 640
     SRC_H = 360
@@ -112,7 +338,7 @@ class AlbumBackdropEngine:
         self._hwnds = []
 
         self.mode = "Desktop Layer"       # Desktop Layer, Cinema Stage, Off
-        self.backdrop_style = "2-Blob Aura"  # 2-Blob Aura, Video Reel
+        self.backdrop_style = "2-Blob Aura"  # 2-Blob Aura, Video Reel, Music Video
         self.darkness = 0.34              # 0.15 .. 1.0 (brightness multiplier)
         self.blur_radius = 7.5            # 0.0 (sharp) .. 12.0 (soft)
         self.target_displays = "All Displays"
@@ -127,6 +353,15 @@ class AlbumBackdropEngine:
         self._dirty_monitors = False
         self._dirty_mode = True
 
+        # Music Video stream & native decoder state
+        self._mv_url = ""
+        self._mv_local_path = ""
+        self._mv_gen = 0
+        self._mv_decoder = None
+        self._mv_frame = None
+        self._mv_frame_lock = threading.Lock()
+        self._mv_dir = os.path.join(get_app_data_dir(), "mv_cache")
+
         # Pre-baked animated cover art + 2 matching luminous blobs + Video Reel light-leak & grain
         self._base_bg = None
         self._cover_src = None
@@ -139,6 +374,92 @@ class AlbumBackdropEngine:
         self._vig_mul = self._build_vignette_mul()
 
         self.reload_from_config()
+
+    def _download_mv_worker(self, url: str, gen: int):
+        if not url:
+            return
+        try:
+            os.makedirs(self._mv_dir, exist_ok=True)
+            key = hashlib.sha1(url.encode("utf-8")).hexdigest()[:16]
+            out_p = os.path.join(self._mv_dir, f"{key}.m4v")
+            if not os.path.exists(out_p) or os.path.getsize(out_p) < 65536:
+                tmp_p = out_p + ".part"
+                req = urllib.request.Request(url, headers={"User-Agent": "SoulsLights/2.3"})
+                with urllib.request.urlopen(req, timeout=20.0, context=_MV_SSL_CTX) as r, open(tmp_p, "wb") as f:
+                    while self.running and gen == self._mv_gen:
+                        chunk = r.read(65536)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                if gen != self._mv_gen:
+                    try:
+                        os.remove(tmp_p)
+                    except Exception:
+                        pass
+                    return
+                shutil.move(tmp_p, out_p)
+            # Prune cache to keep at most 2 recent videos
+            try:
+                files = sorted(
+                    [os.path.join(self._mv_dir, fn) for fn in os.listdir(self._mv_dir) if fn.endswith(".m4v")],
+                    key=lambda p: os.path.getmtime(p),
+                    reverse=True,
+                )
+                for old_f in files[2:]:
+                    try:
+                        os.remove(old_f)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            if gen == self._mv_gen and os.path.exists(out_p):
+                dec = None
+                if IS_WIN:
+                    dec = _WinMusicVideoDecoder(out_p, self.SRC_W, self.SRC_H)
+                elif IS_MAC:
+                    dec = _MacMusicVideoDecoder(out_p, self.SRC_W, self.SRC_H)
+                if dec is not None:
+                    with self._mv_frame_lock:
+                        if gen == self._mv_gen:
+                            if self._mv_decoder:
+                                self._mv_decoder.close()
+                            self._mv_decoder = dec
+                            self._mv_local_path = out_p
+                            self._mv_frame = None
+                        else:
+                            dec.close()
+        except Exception:
+            pass
+
+    def _clear_mv_decoder(self):
+        with self._mv_frame_lock:
+            if self._mv_decoder:
+                self._mv_decoder.close()
+                self._mv_decoder = None
+            self._mv_local_path = ""
+            self._mv_frame = None
+
+    def update_media_state(self, thumb_img, colors, is_playing: bool, has_media: bool, music_video_url: str = ""):
+        mv_url = (music_video_url or "").strip()
+        start_dl = None
+        with self._lock:
+            art_changed = (thumb_img is not self._thumb_img) or (list(colors or []) != self._colors)
+            self._thumb_img = thumb_img
+            if colors:
+                self._colors = list(colors)
+            self._is_playing = bool(is_playing)
+            self._has_media = bool(has_media)
+            if art_changed:
+                self._dirty_art = True
+            if mv_url != self._mv_url:
+                self._mv_url = mv_url
+                self._mv_gen += 1
+                gen = self._mv_gen
+                start_dl = (mv_url, gen)
+        if start_dl is not None:
+            self._clear_mv_decoder()
+            if start_dl[0]:
+                threading.Thread(target=self._download_mv_worker, args=start_dl, daemon=True).start()
 
     def _build_vignette_mul(self):
         """Builds an RGB corner/edge darkening mask so outer ambient rim pops strongly."""
@@ -365,12 +686,30 @@ class AlbumBackdropEngine:
                 pass
         self._hwnds = []
 
-    def _render_anim_frame(self, t_anim: float, peak: float = 0.0, bloom: float = 0.0, style: str = "2-Blob Aura"):
-        """Composites either 2 fluid album-matched blobs or a Spotify-style Video Reel over the album cover."""
+    def _render_anim_frame(self, t_anim: float, peak: float = 0.0, bloom: float = 0.0, style: str = "2-Blob Aura", darkness: float = 0.34, blur_r: float = 7.5):
+        """Composites 2 fluid blobs, Spotify-style Video Reel, or live Music Video behind lyrics."""
+        if style == "Music Video":
+            mv_raw = None
+            with self._mv_frame_lock:
+                if self._mv_decoder is not None:
+                    if self._is_playing or self._mv_frame is None:
+                        fr = self._mv_decoder.next_frame()
+                        if fr is not None:
+                            self._mv_frame = fr
+                    mv_raw = self._mv_frame
+            if mv_raw is not None:
+                fr = mv_raw
+                if blur_r > 3.5:
+                    fr = fr.filter(ImageFilter.GaussianBlur(radius=min(3.5, (blur_r - 3.5) * 0.42)))
+                lum = max(0.24, min(0.95, darkness * 1.15 + bloom * 0.08))
+                fr = ImageEnhance.Brightness(fr).enhance(lum)
+                fr = ImageEnhance.Color(fr).enhance(1.12)
+                return ImageChops.multiply(fr, self._vig_mul)
+
         if self._base_bg is None:
             return None
 
-        is_reel = (style == "Video Reel")
+        is_reel = (style in ("Video Reel", "Music Video"))
 
         # Animate the album cover with slow Ken-Burns pan + beat-reactive zoom (stronger ping-pong reel loop in Video Reel mode)
         if self._cover_src is not None:
@@ -557,7 +896,27 @@ class AlbumBackdropEngine:
 
                 peak, bloom = audio.sample() if (audio_on and is_playing) else (0.0, 0.0)
                 anim_t += dt * ((1.0 + bloom * 0.9) if is_playing else 0.25)
-                frame_rgb = (self._render_anim_frame(anim_t, peak, bloom, style_str) or dark_bg) if has_media else dark_bg
+                if style_str == "Music Video":
+                    mv_step_ok = (now - getattr(self, "_mv_last_step", 0.0)) >= 0.041
+                    if mv_step_ok:
+                        self._mv_last_step = now
+                    # Reuse cached decoded frame between 24fps video ticks, advancing only on ticks
+                    with self._mv_frame_lock:
+                        has_dec = self._mv_decoder is not None
+                    if not mv_step_ok and has_dec and self._mv_frame is not None:
+                        with self._mv_frame_lock:
+                            mv_raw = self._mv_frame
+                        fr = mv_raw
+                        if blur_r > 3.5:
+                            fr = fr.filter(ImageFilter.GaussianBlur(radius=min(3.5, (blur_r - 3.5) * 0.42)))
+                        lum = max(0.24, min(0.95, darkness * 1.15 + bloom * 0.08))
+                        fr = ImageEnhance.Brightness(fr).enhance(lum)
+                        fr = ImageEnhance.Color(fr).enhance(1.12)
+                        frame_rgb = ImageChops.multiply(fr, self._vig_mul)
+                    else:
+                        frame_rgb = (self._render_anim_frame(anim_t, peak, bloom, style_str, darkness, blur_r) or dark_bg) if has_media else dark_bg
+                else:
+                    frame_rgb = (self._render_anim_frame(anim_t, peak, bloom, style_str, darkness, blur_r) or dark_bg) if has_media else dark_bg
 
                 a_byte = max(0, min(255, int(round(fade_alpha))))
                 for ov in overlays:
@@ -585,5 +944,6 @@ class AlbumBackdropEngine:
                 else:
                     next_frame = now_end + target_dt
         finally:
+            self._clear_mv_decoder()
             self._destroy_windows(overlays)
             audio.dispose()

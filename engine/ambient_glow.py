@@ -315,21 +315,21 @@ class AmbientGlowEngine:
             return base, base
 
         # Concave power-curve falloff eliminates wide milky/hazy Gaussian shoulders while keeping lush edge richness
-        collar_lut = [int(((i / 255.0) ** 1.45) * 255) for i in range(256)]
-        bloom_lut = [int(((i / 255.0) ** 2.15) * 255) for i in range(256)]
+        collar_lut = [int(((i / 255.0) ** 1.38) * 255) for i in range(256)]
+        bloom_lut = [int(((i / 255.0) ** 2.0) * 255) for i in range(256)]
 
         # 2. Tight electric inner plasma collar (half-res padded CDF -> punchy non-hazy edge glow)
-        collar_gain = min(1.85, 0.95 + glow_c * 0.45)
+        collar_gain = min(1.95, 1.02 + glow_c * 0.48)
         collar = _padded_inward_glow(
             hw, hh, corner_r // 2,
             inset=max(0, int(round(collar_in * dpi_s))),
-            blur_r=max(2.2, collar_b * dpi_s * (0.82 + 0.20 * min(1.5, glow_c))),
+            blur_r=max(2.2, collar_b * dpi_s * (0.85 + 0.22 * min(1.5, glow_c))),
             gain=collar_gain,
         ).point(collar_lut).resize((w, h), Image.Resampling.BILINEAR)
 
-        # 3. Clean resting edge halo (half-res, crisp tight falloff fading cleanly by ~35px)
-        rest_bloom_blur = max(3.5, bloom_b * dpi_s * (0.68 + glow_c * 0.24))
-        rest_bloom_gain = min(0.75, 0.24 + glow_c * 0.22)
+        # 3. Clean resting edge halo + soft ambient corner spill
+        rest_bloom_blur = max(3.6, bloom_b * dpi_s * (0.72 + glow_c * 0.26))
+        rest_bloom_gain = min(0.84, 0.28 + glow_c * 0.24)
         bloom_rest = _padded_inward_glow(
             hw, hh, corner_r // 2,
             inset=max(0, int(round(collar_in * dpi_s))),
@@ -340,19 +340,30 @@ class AmbientGlowEngine:
         base = ImageChops.lighter(core_hi, collar)
         base = ImageChops.lighter(base, bloom_rest)
 
+        # Soft rounded-corner radial luminance lift so bezel corners glow lush & balanced
+        if glow_c >= 0.35:
+            cr_map = Image.new("L", (hw, hh), 0)
+            crd = ImageDraw.Draw(cr_map)
+            c_rad = max(24, int(min(hw, hh) * 0.22))
+            c_fill = min(135, int(42 + glow_c * 32))
+            for cx_p, cy_p in ((0, 0), (hw, 0), (0, hh), (hw, hh)):
+                crd.ellipse([cx_p - c_rad, cy_p - c_rad, cx_p + c_rad, cy_p + c_rad], fill=c_fill)
+            cr_map = cr_map.filter(ImageFilter.GaussianBlur(radius=max(6.0, c_rad * 0.42))).resize((w, h), Image.Resampling.BILINEAR)
+            base = ImageChops.lighter(base, ImageChops.darker(cr_map, bloom_rest.point(lambda p: min(255, int(p * 1.45)))))
+
         # 4. Surge mask for beat drops (punchy flare without wide foggy center veil)
         surge_collar = _padded_inward_glow(
             hw, hh, corner_r // 2,
             inset=max(1, int(round((collar_in + 1) * dpi_s))),
-            blur_r=max(3.2, collar_b * 1.45 * dpi_s),
-            gain=2.1,
+            blur_r=max(3.4, collar_b * 1.52 * dpi_s),
+            gain=2.15,
         ).point(collar_lut).resize((w, h), Image.Resampling.BILINEAR)
 
         surge_bloom = _padded_inward_glow(
             hw, hh, corner_r // 2,
             inset=max(1, int(round((collar_in + 2) * dpi_s))),
-            blur_r=max(5.0, rest_bloom_blur * 1.45),
-            gain=min(1.25, rest_bloom_gain + 0.48),
+            blur_r=max(5.2, rest_bloom_blur * 1.52),
+            gain=min(1.32, rest_bloom_gain + 0.52),
         ).point(bloom_lut).resize((w, h), Image.Resampling.BILINEAR)
 
         surge = ImageChops.lighter(core_hi, surge_collar)
@@ -370,9 +381,9 @@ class AmbientGlowEngine:
         return base, surge
 
     def _build_color_frame(self, theta_img, palette, gradient_mode, phase_rad, anim_time, anim_mode, balance, bloom, peak):
-        """Generates vivid N-color cyclic angular plasma RGB texture (and droplet spatial alpha LUT)."""
-        base_boost = 1.06 + bloom * 0.42 + peak * 0.14
-        sat_lift = 1.25 + bloom * 0.35
+        """Generates vivid N-color cyclic angular plasma RGB texture (and droplet/prism spatial alpha LUT)."""
+        base_boost = 1.08 + bloom * 0.48 + peak * 0.16
+        sat_lift = 1.28 + bloom * 0.36
         pal_src = list(palette) if palette else [self.album_c1, self.album_c2]
         if gradient_mode == "1 Color":
             c0 = _boost_and_saturate(pal_src[0], base_boost, sat_lift)
@@ -385,9 +396,11 @@ class AmbientGlowEngine:
 
         wobble_amp = 0.0
         if anim_mode == "Liquid Flow":
-            wobble_amp = 0.16 + bloom * 0.18
+            wobble_amp = 0.22 + bloom * 0.22
+        elif anim_mode == "Aurora Wave":
+            wobble_amp = 0.26 + bloom * 0.24
         elif anim_mode == "Beat Pulse":
-            wobble_amp = 0.12 + bloom * 0.28
+            wobble_amp = 0.14 + bloom * 0.30
 
         gamma = math.log(0.5) / math.log(max(0.08, min(0.92, 1.0 - balance))) if abs(balance - 0.5) > 0.03 else 1.0
 
@@ -395,13 +408,17 @@ class AmbientGlowEngine:
         lut_g = [0] * 256
         lut_b = [0] * 256
         is_drop = (anim_mode == "Water Drop")
-        drop_lut = [255] * 256 if is_drop else None
+        is_prism = (anim_mode == "Neon Prism")
+        is_aurora = (anim_mode == "Aurora Wave")
+        use_spatial = is_drop or is_prism
+        drop_lut = [255] * 256 if use_spatial else None
         two_pi = 2.0 * math.pi
         ahead_span = 0.052
-        tail_span = 0.44 + min(0.18, bloom * 0.18)
+        tail_span = 0.46 + min(0.20, bloom * 0.20)
 
         for i in range(256):
             ang = (i / 256.0) * two_pi
+            drop_val = 0.0
 
             if is_drop:
                 trail = ((phase_rad - ang) % two_pi) / two_pi
@@ -410,21 +427,24 @@ class AmbientGlowEngine:
                     drop_val = (0.5 - 0.5 * math.cos(math.pi * u_head)) ** 1.35
                 elif trail <= tail_span:
                     u_tail = trail / tail_span
-                    drop_val = ((1.0 - u_tail) ** 2.35) * ((0.5 + 0.5 * math.cos(math.pi * u_tail)) ** 0.75)
-                else:
-                    drop_val = 0.0
+                    drop_val = ((1.0 - u_tail) ** 2.25) * ((0.5 + 0.5 * math.cos(math.pi * u_tail)) ** 0.75)
+
+                # Harmonic opposing beat ripple echo on bass kicks
+                if bloom > 0.10:
+                    echo_trail = ((phase_rad + math.pi - ang) % two_pi) / two_pi
+                    if echo_trail <= 0.32:
+                        eu = echo_trail / 0.32
+                        echo_v = ((1.0 - eu) ** 2.4) * min(0.68, (bloom - 0.08) * 0.95)
+                        drop_val = max(drop_val, echo_v)
 
                 if drop_val > 0.0 and bloom > 0.02:
-                    drop_val = min(1.0, drop_val * (0.86 + bloom * 0.36))
+                    drop_val = min(1.0, drop_val * (0.88 + bloom * 0.38))
                 drop_lut[i] = max(0, min(255, int(round(drop_val * 255.0))))
 
-                if trail >= 1.0 - ahead_span:
-                    raw_u = 0.0
-                else:
-                    raw_u = min(1.0, (trail / max(0.25, tail_span)) ** 0.75)
+                raw_u = 0.0 if trail >= 1.0 - ahead_span else min(1.0, (trail / max(0.25, tail_span)) ** 0.75)
                 if gamma != 1.0:
                     raw_u = raw_u ** gamma
-                energy_mul = 1.0 + (drop_val ** 2.2) * (0.14 + bloom * 0.34)
+                energy_mul = 1.0 + (drop_val ** 2.1) * (0.16 + bloom * 0.36)
                 if n_cols <= 2:
                     ca, cb = hot_pal[0], hot_pal[1]
                     mix_u = raw_u
@@ -433,8 +453,36 @@ class AmbientGlowEngine:
                     idx_a = min(n_cols - 2, int(f_pos))
                     ca, cb = hot_pal[idx_a], hot_pal[idx_a + 1]
                     mix_u = f_pos - idx_a
+
+            elif is_prism:
+                # Twin 180-deg counter-balanced high-energy prismatic comet arcs
+                d1 = ((phase_rad - ang) % two_pi) / two_pi
+                d2 = ((phase_rad + math.pi - ang) % two_pi) / two_pi
+                arc1 = ((1.0 - d1 / 0.42) ** 1.75) if d1 <= 0.42 else (0.18 if d1 > 0.94 else 0.0)
+                arc2 = ((1.0 - d2 / 0.42) ** 1.75) if d2 <= 0.42 else (0.18 if d2 > 0.94 else 0.0)
+                drop_val = min(1.0, 0.24 + 0.76 * max(arc1, arc2) * (0.90 + bloom * 0.38))
+                drop_lut[i] = max(0, min(255, int(round(drop_val * 255.0))))
+                flow_ang = (ang - phase_rad * 1.15) % two_pi
+                u_cyc = flow_ang / two_pi
+                if gamma != 1.0:
+                    u_cyc = u_cyc ** gamma
+                f_pos = u_cyc * n_cols
+                idx_a = int(f_pos) % n_cols
+                idx_b = (idx_a + 1) % n_cols
+                ca, cb = hot_pal[idx_a], hot_pal[idx_b]
+                mix_u = f_pos - int(f_pos)
+                energy_mul = 1.0 + max(arc1, arc2) * (0.24 + bloom * 0.32)
+
             else:
-                flow_ang = (ang - phase_rad) % two_pi
+                if anim_mode == "Liquid Flow":
+                    ang_w = ang + 0.30 * math.sin(2.0 * ang - anim_time * 1.25)
+                    flow_ang = (ang_w - phase_rad) % two_pi
+                elif is_aurora:
+                    ang_w = ang + 0.42 * math.sin(2.0 * ang + anim_time * 0.95) * math.cos(ang - anim_time * 0.65)
+                    flow_ang = (ang_w - phase_rad * 0.85) % two_pi
+                else:
+                    flow_ang = (ang - phase_rad) % two_pi
+
                 if n_cols <= 2:
                     mix_u = 0.5 + 0.5 * math.cos(flow_ang)
                     if gamma != 1.0:
@@ -452,12 +500,19 @@ class AmbientGlowEngine:
 
                 energy_mul = 1.0
                 if wobble_amp > 0.0:
-                    w_wave = (
-                        0.55 * math.sin(3.0 * ang + anim_time * 2.3)
-                        + 0.30 * math.sin(6.0 * ang - anim_time * 1.7)
-                        + 0.15 * math.sin(9.0 * ang + anim_time * 3.1)
-                    )
-                    energy_mul = max(0.75, min(1.38, 1.0 + wobble_amp * w_wave))
+                    if is_aurora:
+                        w_wave = (
+                            0.52 * math.sin(2.0 * ang + anim_time * 1.35)
+                            + 0.34 * math.cos(5.0 * ang - anim_time * 2.05)
+                            + 0.14 * math.sin(8.0 * ang + anim_time * 2.8)
+                        )
+                    else:
+                        w_wave = (
+                            0.55 * math.sin(3.0 * ang + anim_time * 2.3)
+                            + 0.30 * math.sin(6.0 * ang - anim_time * 1.7)
+                            + 0.15 * math.sin(9.0 * ang + anim_time * 3.1)
+                        )
+                    energy_mul = max(0.76, min(1.42, 1.0 + wobble_amp * w_wave))
 
             r = ca[0] * (1.0 - mix_u) + cb[0] * mix_u
             g = ca[1] * (1.0 - mix_u) + cb[1] * mix_u
@@ -466,16 +521,16 @@ class AmbientGlowEngine:
             # Prevent complementary color stops from turning grey in the transition zone
             if gradient_mode != "1 Color":
                 h, s, v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
-                if 0.04 < s < 0.78:
-                    s = min(1.0, s + (0.78 - s) * 0.65)
+                if 0.04 < s < 0.80:
+                    s = min(1.0, s + (0.80 - s) * 0.68)
                 avg_sum = (ca[0] + cb[0] + ca[1] + cb[1] + ca[2] + cb[2]) / 1530.0
-                v = max(v, 0.45 * avg_sum)
+                v = max(v, 0.48 * avg_sum)
                 mr, mg, mb_v = colorsys.hsv_to_rgb(h, s, min(1.0, v))
                 r, g, b = mr * 255.0, mg * 255.0, mb_v * 255.0
 
-            if is_drop and drop_val > 0.72:
+            if use_spatial and drop_val > 0.72:
                 # Subtle glassy crest gleam at peak without losing album hue
-                crest_k = ((drop_val - 0.72) / 0.28) * (0.18 + bloom * 0.12)
+                crest_k = ((drop_val - 0.72) / 0.28) * (0.20 + bloom * 0.14)
                 r = r + (255.0 - r) * crest_k
                 g = g + (255.0 - g) * crest_k
                 b = b + (255.0 - b) * crest_k
@@ -497,7 +552,7 @@ class AmbientGlowEngine:
             lut_b[i] = max(0, min(255, int(b)))
 
         rgb_img = Image.merge("RGB", (theta_img.point(lut_r), theta_img.point(lut_g), theta_img.point(lut_b)))
-        drop_lo = theta_img.point(drop_lut).filter(ImageFilter.GaussianBlur(radius=1.5)) if is_drop else None
+        drop_lo = theta_img.point(drop_lut).filter(ImageFilter.GaussianBlur(radius=1.5)) if use_spatial else None
         return rgb_img, drop_lo
 
     def _slice_mask_strips(self, mask, s):
@@ -743,18 +798,24 @@ class AmbientGlowEngine:
             self.curr_c1 = new_pal[0]
             self.curr_c2 = new_pal[1] if len(new_pal) > 1 else new_pal[0]
 
-            animated = anim_mode in ("Liquid Flow", "Beat Pulse", "Water Drop")
+            animated = anim_mode in ("Liquid Flow", "Beat Pulse", "Water Drop", "Aurora Wave", "Neon Prism")
             if anim_mode == "Water Drop":
                 if audio_on:
-                    speed = 0.55 + peak * 0.40 + (bloom ** 0.85) * 3.45
+                    speed = 0.58 + peak * 0.42 + (bloom ** 0.85) * 3.55
                 else:
-                    speed = 0.85 + 0.22 * math.sin(anim_time * 1.4)
+                    speed = 0.88 + 0.24 * math.sin(anim_time * 1.4)
+                phase_rad = (phase_rad + dt * speed) % (2.0 * math.pi)
+            elif anim_mode == "Neon Prism":
+                speed = 1.45 + peak * 0.85 + (bloom ** 0.78) * 4.2
+                phase_rad = (phase_rad + dt * speed) % (2.0 * math.pi)
+            elif anim_mode == "Aurora Wave":
+                speed = 0.65 + bloom * 1.65 + peak * 0.45
                 phase_rad = (phase_rad + dt * speed) % (2.0 * math.pi)
             elif anim_mode == "Liquid Flow":
-                speed = 1.05 + bloom * 2.4 + peak * 0.65
+                speed = 1.15 + bloom * 2.5 + peak * 0.65
                 phase_rad = (phase_rad + dt * speed) % (2.0 * math.pi)
             elif anim_mode == "Beat Pulse" and audio_on:
-                phase_rad = (phase_rad + dt * (0.25 + bloom * 2.2)) % (2.0 * math.pi)
+                phase_rad = (phase_rad + dt * (0.30 + bloom * 2.4)) % (2.0 * math.pi)
 
             if rebuild_mask:
                 for ov in overlays:
@@ -769,13 +830,17 @@ class AmbientGlowEngine:
                 b_val = bloom if audio_on else 0.0
                 p_val = peak if audio_on else 0.0
                 if anim_mode == "Water Drop":
-                    surge_mix = min(1.0, 0.16 + p_val * 0.20 + (b_val ** 0.75) * 0.82) if audio_on else (0.22 + 0.14 * math.sin(anim_time * 2.0))
+                    surge_mix = min(1.0, 0.18 + p_val * 0.22 + (b_val ** 0.72) * 0.84) if audio_on else (0.24 + 0.14 * math.sin(anim_time * 2.0))
+                elif anim_mode == "Neon Prism":
+                    surge_mix = min(1.0, 0.30 + p_val * 0.28 + (b_val ** 0.68) * 0.82) if audio_on else (0.42 + 0.24 * math.sin(anim_time * 2.8))
+                elif anim_mode == "Aurora Wave":
+                    surge_mix = min(1.0, 0.26 + 0.22 * math.sin(anim_time * 1.35) + b_val * 0.78 + p_val * 0.25)
                 elif anim_mode == "Beat Pulse":
-                    surge_mix = min(1.0, b_val * 0.90 + p_val * 0.35) if audio_on else (0.5 + 0.5 * math.sin(anim_time * 3.0)) ** 4
+                    surge_mix = min(1.0, (b_val ** 0.65) * 0.94 + p_val * 0.35) if audio_on else (0.5 + 0.5 * math.sin(anim_time * 3.0)) ** 4
                 elif anim_mode == "Breathing":
-                    surge_mix = 0.45 + 0.45 * math.sin(anim_time * 1.8)
+                    surge_mix = 0.48 + 0.46 * math.sin(anim_time * 1.8)
                 elif anim_mode == "Liquid Flow":
-                    surge_mix = min(1.0, 0.12 + 0.12 * math.sin(anim_time * 1.9) + b_val * 0.85 + p_val * 0.25)
+                    surge_mix = min(1.0, 0.16 + 0.14 * math.sin(anim_time * 1.9) + b_val * 0.88 + p_val * 0.28)
                 else:
                     surge_mix = 0.0
 
@@ -800,20 +865,24 @@ class AmbientGlowEngine:
                         rgb_s = rgb_lo.crop(st["lbox"]).resize(st["dst_wh"], Image.Resampling.BILINEAR)
                         st["surf"].upload_rgb_alpha(rgb_s, mask_s)
 
-            base_alpha = min(255, int(218 + min(1.0, glow_val / 2.5) * 37))
+            base_alpha = min(255, int(222 + min(1.0, glow_val / 2.5) * 33))
             if anim_mode == "Static":
                 mod = 1.0
             elif anim_mode == "Water Drop":
-                mod = min(1.0, 0.48 + peak * 0.18 + (bloom ** 0.70) * 0.52) if audio_on else (0.76 + 0.24 * (0.5 + 0.5 * math.sin(anim_time * 2.2)))
+                mod = min(1.0, 0.50 + peak * 0.20 + (bloom ** 0.68) * 0.50) if audio_on else (0.76 + 0.24 * (0.5 + 0.5 * math.sin(anim_time * 2.2)))
+            elif anim_mode == "Neon Prism":
+                mod = min(1.0, 0.64 + peak * 0.22 + (bloom ** 0.64) * 0.48) if audio_on else (0.82 + 0.18 * (0.5 + 0.5 * math.sin(anim_time * 2.8)))
+            elif anim_mode == "Aurora Wave":
+                mod = min(1.0, 0.78 + 0.14 * math.sin(anim_time * 1.3) + (bloom * 0.34 + peak * 0.14 if audio_on else 0.0))
             elif anim_mode == "Breathing":
                 mod = 0.70 + 0.30 * (0.5 + 0.5 * math.sin(anim_time * 1.8))
             elif anim_mode == "Beat Pulse":
-                idle_pulse = 0.56 + 0.16 * math.sin(anim_time * 2.6)
-                spike = (bloom * 0.68 + peak * 0.32) if audio_on else 0.34 * (math.sin(anim_time * 3.0) ** 4)
+                idle_pulse = 0.58 + 0.16 * math.sin(anim_time * 2.6)
+                spike = ((bloom ** 0.68) * 0.72 + peak * 0.32) if audio_on else 0.34 * (math.sin(anim_time * 3.0) ** 4)
                 mod = min(1.0, idle_pulse + spike)
             else:  # Liquid Flow
-                breath = 0.84 + 0.10 * math.sin(anim_time * 1.6)
-                mod = min(1.0, breath + (bloom * 0.35 + peak * 0.15 if audio_on else 0.0))
+                breath = 0.85 + 0.10 * math.sin(anim_time * 1.6)
+                mod = min(1.0, breath + (bloom * 0.36 + peak * 0.16 if audio_on else 0.0))
 
             final_alpha = max(25, min(255, int(base_alpha * mod)))
             for ov in overlays:

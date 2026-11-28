@@ -46,9 +46,126 @@ class MobileCompanionServer:
         self.running = False
         self._art_cache = {"sig": None, "bytes": b""}
         self._art_lock = threading.Lock()
+        self._sp_verifier = ""
+        self._yt_cache = {}
 
     def get_url(self) -> str:
         return f"http://{get_lan_ip()}:{self.port}"
+
+    def get_spotify_redirect_uri(self) -> str:
+        return f"http://127.0.0.1:{self.port}/spotify_callback"
+
+    def build_spotify_auth_url(self) -> str:
+        import base64, hashlib, secrets
+        from urllib.parse import urlencode
+        sp = self.cfg_mgr.config.get("spotify", {}) if self.cfg_mgr else {}
+        cid = (sp.get("client_id") or "").strip()
+        if not cid:
+            return ""
+        verifier = secrets.token_hex(48)
+        self._sp_verifier = verifier
+        digest = hashlib.sha256(verifier.encode("ascii")).digest()
+        challenge = base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+        qs = urlencode({
+            "response_type": "code",
+            "client_id": cid,
+            "redirect_uri": self.get_spotify_redirect_uri(),
+            "code_challenge_method": "S256",
+            "code_challenge": challenge,
+            "scope": "user-read-playback-state user-modify-playback-state user-read-currently-playing",
+        })
+        return f"https://accounts.spotify.com/authorize?{qs}"
+
+    def complete_spotify_auth(self, code: str, err: str = "") -> tuple[bool, str]:
+        if err:
+            return False, f"Authorization error: {err}"
+        if not code:
+            return False, "Missing authorization code from Spotify."
+        sp = self.cfg_mgr.config.setdefault("spotify", {}) if self.cfg_mgr else {}
+        cid = (sp.get("client_id") or "").strip()
+        ver = self._sp_verifier
+        if not (cid and ver):
+            return False, "Spotify PKCE session expired. Start Connect Spotify again from SoulsLights."
+        try:
+            from urllib.parse import urlencode
+            import urllib.request
+            from core.media_monitor import _urlopen
+            body = urlencode({
+                "client_id": cid,
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": self.get_spotify_redirect_uri(),
+                "code_verifier": ver,
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                "https://accounts.spotify.com/api/token",
+                data=body,
+                headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "SoulsLights/2.3"},
+                method="POST",
+            )
+            with _urlopen(req, timeout=8.0) as resp:
+                tok = json.loads(resp.read().decode("utf-8"))
+            if not tok.get("access_token"):
+                return False, tok.get("error_description") or "Spotify did not return an access token."
+            sp["access_token"] = tok["access_token"]
+            if tok.get("refresh_token"):
+                sp["refresh_token"] = tok["refresh_token"]
+            sp["expires_at"] = int(time.time() * 1000 + float(tok.get("expires_in", 3600)) * 1000)
+            try:
+                me_req = urllib.request.Request(
+                    "https://api.spotify.com/v1/me",
+                    headers={"Authorization": f"Bearer {sp['access_token']}", "User-Agent": "SoulsLights/2.3"},
+                )
+                with _urlopen(me_req, timeout=5.0) as mr:
+                    me = json.loads(mr.read().decode("utf-8"))
+                    sp["user_name"] = me.get("display_name") or me.get("id") or "Spotify Connected"
+            except Exception:
+                sp["user_name"] = sp.get("user_name") or "Spotify Connected"
+            if self.cfg_mgr:
+                self.cfg_mgr.save_config()
+            if self.on_remote_change:
+                try:
+                    self.on_remote_change()
+                except Exception:
+                    pass
+            return True, f"Signed in as {sp['user_name']}. Music Video backdrop & Spotify sync are ready."
+        except Exception as e:
+            return False, str(e)
+
+    def _lookup_music_video(self, title: str, artist: str = "") -> dict:
+        import re
+        from urllib.parse import urlencode
+        import urllib.request
+        from core.media_monitor import _urlopen
+        clean_t = (title or "").strip()
+        clean_a = (artist or "").split(",")[0].strip()
+        if not clean_t:
+            return {"ok": False, "mp4_url": "", "youtube_id": ""}
+        mp4_url = self.media_mon.fetch_music_video_url(clean_t, clean_a) if self.media_mon else ""
+        ck = (clean_a.lower(), clean_t.lower())
+        yt_id = self._yt_cache.get(ck)
+        if yt_id is None:
+            yt_id = ""
+            try:
+                q = urlencode({"search_query": f"{clean_a} {clean_t} official music video".strip()})
+                req = urllib.request.Request(
+                    f"https://www.youtube.com/results?{q}",
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+                        "Accept-Language": "en-US,en;q=0.9",
+                    },
+                )
+                with _urlopen(req, timeout=5.0) as r:
+                    html = r.read().decode("utf-8", "ignore")
+                m = re.search(r'"videoId"\s*:\s*"([A-Za-z0-9_-]{11})"', html)
+                if m:
+                    yt_id = m.group(1)
+            except Exception:
+                yt_id = ""
+            if len(self._yt_cache) > 48:
+                self._yt_cache.clear()
+            self._yt_cache[ck] = yt_id
+        return {"ok": bool(mp4_url or yt_id), "mp4_url": mp4_url, "youtube_id": yt_id}
 
     def _get_art_jpeg(self) -> bytes:
         info = self.media_mon.current_info if self.media_mon else {}
@@ -84,6 +201,7 @@ class MobileCompanionServer:
                 accent_rgb = eng.accent_color
                 sec_rgb = eng.secondary_color
                 style = eng.style
+                fisheye_effect = getattr(eng, "fisheye_effect", "Auto Mix")
                 script_mode = eng.script_mode
                 font_scale = eng.font_scale
                 offset_sec = eng.offset_sec
@@ -93,6 +211,7 @@ class MobileCompanionServer:
             accent_rgb = (236, 72, 153)
             sec_rgb = (99, 102, 241)
             style = lyr.get("style", "Fisheye Visual")
+            fisheye_effect = lyr.get("fisheye_effect", "Auto Mix")
             script_mode = lyr.get("script_mode", "Auto")
             font_scale = float(lyr.get("font_scale", 1.0))
             offset_sec = float(lyr.get("sync_offset_ms", 0)) / 1000.0
@@ -113,10 +232,12 @@ class MobileCompanionServer:
             "position_sec": round(float(live_pos), 3),
             "duration_sec": round(float(info.get("duration_sec", 0.0)), 3),
             "has_art": info.get("thumbnail_img") is not None,
+            "music_video_url": info.get("music_video_url", ""),
             "colors": colors,
             "accent": f"#{accent_rgb[0]:02X}{accent_rgb[1]:02X}{accent_rgb[2]:02X}",
             "secondary": f"#{sec_rgb[0]:02X}{sec_rgb[1]:02X}{sec_rgb[2]:02X}",
             "lyrics_style": style,
+            "fisheye_effect": fisheye_effect,
             "script_mode": script_mode,
             "font_scale": font_scale,
             "offset_sec": offset_sec,
@@ -128,6 +249,7 @@ class MobileCompanionServer:
             "gradient_mode": amb.get("gradient_mode", "Multi Colors"),
             "backdrop_mode": amb.get("album_backdrop", "Desktop Layer"),
             "backdrop_style": amb.get("backdrop_style", "2-Blob Aura"),
+            "spotify_connected": bool((cfg.get("spotify") or {}).get("refresh_token") or (cfg.get("spotify") or {}).get("access_token")),
             "lyrics": lines,
             "styles": [
                 "Fisheye Visual", "Fisheye", "Visual", "Ship",
@@ -152,6 +274,11 @@ class MobileCompanionServer:
             self.cfg_mgr.save_config()
             if self.engine:
                 self.engine.lyrics_engine.set_style(val)
+        elif act == "set_fisheye_effect" and isinstance(val, str) and val:
+            self.cfg_mgr.config["lyrics"]["fisheye_effect"] = val
+            self.cfg_mgr.save_config()
+            if self.engine and hasattr(self.engine.lyrics_engine, "set_fisheye_effect"):
+                self.engine.lyrics_engine.set_fisheye_effect(val)
         elif act == "set_script_mode" and val in ("Auto", "Native", "Romanized"):
             self.cfg_mgr.config["lyrics"]["script_mode"] = val
             self.cfg_mgr.save_config()
@@ -197,7 +324,7 @@ class MobileCompanionServer:
             self.cfg_mgr.save_config()
             if self.engine:
                 self.engine.lyrics_engine.set_offset_ms(0)
-        elif act == "set_flow_mode" and val in ("Water Drop", "Liquid Flow", "Beat Pulse", "Breathing", "Static"):
+        elif act == "set_flow_mode" and val in ("Water Drop", "Liquid Flow", "Aurora Wave", "Neon Prism", "Beat Pulse", "Breathing", "Static"):
             self.cfg_mgr.config["ambient"]["animation_mode"] = val
             self.cfg_mgr.save_config()
             if self.engine:
@@ -213,6 +340,11 @@ class MobileCompanionServer:
             self.cfg_mgr.save_config()
             if self.engine:
                 self.engine.ambient_engine.set_gradient_mode(val)
+        elif act == "set_backdrop_style" and val in ("2-Blob Aura", "Video Reel", "Music Video"):
+            self.cfg_mgr.config["ambient"]["backdrop_style"] = val
+            self.cfg_mgr.save_config()
+            if self.engine:
+                self.engine.backdrop_engine.set_backdrop_style(val)
         elif act == "cycle_backdrop" and self.engine:
             self.engine.cycle_backdrop_mode()
         else:
@@ -287,6 +419,31 @@ class MobileCompanionServer:
                         self._send(200, "image/jpeg", raw)
                     else:
                         self._send(404, "text/plain", b"")
+                elif path == "/api/music_video":
+                    from urllib.parse import parse_qs
+                    qs = parse_qs(urlparse(self.path).query)
+                    title_q = (qs.get("title") or [""])[0]
+                    artist_q = (qs.get("artist") or [""])[0]
+                    res = srv._lookup_music_video(title_q, artist_q)
+                    self._send(200, "application/json; charset=utf-8", json.dumps(res).encode("utf-8"))
+                elif path == "/spotify_connect":
+                    auth_url = srv.build_spotify_auth_url()
+                    if not auth_url:
+                        html_err = b"<html><body style='background:#090812;color:#f8fafc;font-family:sans-serif;padding:40px'><h2>Spotify Client ID Missing</h2><p>Set your Spotify Developer Client ID in SoulsLights Screen settings first.</p></body></html>"
+                        self._send(400, "text/html; charset=utf-8", html_err)
+                    else:
+                        self.send_response(302)
+                        self.send_header("Location", auth_url)
+                        self.end_headers()
+                elif path == "/spotify_callback":
+                    from urllib.parse import parse_qs
+                    qs = parse_qs(urlparse(self.path).query)
+                    code = (qs.get("code") or [""])[0]
+                    err = (qs.get("error") or [""])[0]
+                    ok_sp, msg_sp = srv.complete_spotify_auth(code, err)
+                    col = "#22c55e" if ok_sp else "#f43f5e"
+                    body_html = f"""<!doctype html><html><body style="margin:0;background:#07060d;color:#f8fafc;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><div style="max-width:420px;text-align:center;padding:28px;border-radius:20px;background:#131122;border:1px solid {col}55"><h2 style="color:{col};margin-top:0">{'Spotify Connected!' if ok_sp else 'Spotify Auth Failed'}</h2><p style="color:#cbd5e1;line-height:1.5">{msg_sp}</p><p style="color:#94a3b8;font-size:13px">You can close this browser tab and return to SoulsLights.</p></div></body></html>""".encode("utf-8")
+                    self._send(200 if ok_sp else 400, "text/html; charset=utf-8", body_html)
                 else:
                     self._send(404, "text/plain", b"Not Found")
 

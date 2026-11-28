@@ -1400,7 +1400,7 @@ class UnifiedDashboard(ctk.CTk):
         colors_list = list(amb.get("custom_colors") or [amb.get("color_1", "#6366F1"), amb.get("color_2", "#EC4899")])
         pop_w = 604 if key == "Glow" else 584
         extra_col_rows = max(0, (len(colors_list) + 2) // 13) if key == "Glow" else 0
-        pop_h = {"Lyrics": 412, "Glow": 442 + extra_col_rows * 30, "Screen": 356, "Options": 424}.get(key, 340)
+        pop_h = {"Lyrics": 484, "Glow": 476 + extra_col_rows * 30, "Screen": 456, "Options": 424}.get(key, 340)
         px0 = max(18, (w - pop_w) // 2)
         py0 = 56
         self._popover_rect = (px0, py0, px0 + pop_w, py0 + pop_h)
@@ -1467,7 +1467,13 @@ class UnifiedDashboard(ctk.CTk):
             d.text((pad, y), "FONT FAMILY", font=f_sec, fill=(192, 132, 252, 220))
             y += 18
             fonts = ["Geometric", "Futura", "Didone", "Grotesque", "Rounded", "Serif"]
-            y = self._draw_pop_chips(panel, pad, y, inner_w, fonts, lyr.get("font", "Geometric"), "font", px0, py0, f_chip) + 12
+            y = self._draw_pop_chips(panel, pad, y, inner_w, fonts, lyr.get("font", "Geometric"), "font", px0, py0, f_chip) + 10
+
+            d = ImageDraw.Draw(panel)
+            d.text((pad, y), "FISHEYE EFFECT", font=f_sec, fill=(192, 132, 252, 220))
+            y += 18
+            fe_opts = ["Auto Mix", "Prism Split", "Vortex Spin", "Elastic Dome", "Hyperwave", "Shockwave", "3D Vault"]
+            y = self._draw_pop_chips(panel, pad, y, inner_w, fe_opts, lyr.get("fisheye_effect", "Auto Mix"), "fe_fx", px0, py0, f_chip) + 10
 
             d = ImageDraw.Draw(panel)
             d.text((pad, y), "LYRICS SCRIPT  (HINDI / MALAYALAM / TAMIL)", font=f_sec, fill=(192, 132, 252, 220))
@@ -1477,7 +1483,7 @@ class UnifiedDashboard(ctk.CTk):
                 "Native": "Native Script",
                 "Romanized": "Romanized (ABC)",
             }
-            y = self._draw_pop_chips(panel, pad, y, inner_w, ["Auto", "Native", "Romanized"], lyr.get("script_mode", "Auto"), "script", px0, py0, f_chip, labels_map=script_map) + 12
+            y = self._draw_pop_chips(panel, pad, y, inner_w, ["Auto", "Native", "Romanized"], lyr.get("script_mode", "Auto"), "script", px0, py0, f_chip, labels_map=script_map) + 10
 
             d = ImageDraw.Draw(panel)
             d.text((pad, y), "MEDIA SOURCE", font=f_sec, fill=(192, 132, 252, 220))
@@ -1550,7 +1556,7 @@ class UnifiedDashboard(ctk.CTk):
             d = ImageDraw.Draw(panel)
             d.text((pad, y), "ANIMATION MODE", font=f_sec, fill=(192, 132, 252, 220))
             y += 18
-            y = self._draw_pop_chips(panel, pad, y, inner_w, ["Water Drop", "Liquid Flow", "Beat Pulse", "Breathing", "Static"], amb.get("animation_mode", "Water Drop"), "anim", px0, py0, f_chip) + 12
+            y = self._draw_pop_chips(panel, pad, y, inner_w, ["Water Drop", "Liquid Flow", "Aurora Wave", "Neon Prism", "Beat Pulse", "Breathing", "Static"], amb.get("animation_mode", "Water Drop"), "anim", px0, py0, f_chip) + 12
 
             d = ImageDraw.Draw(panel)
             d.text((pad, y), "TARGET DISPLAY", font=f_sec, fill=(192, 132, 252, 220))
@@ -1563,30 +1569,39 @@ class UnifiedDashboard(ctk.CTk):
             d.text((pad, y), "ALBUM COVER BACKDROP MODE", font=f_sec, fill=(192, 132, 252, 220))
             y += 18
             nx_b = self._draw_pop_chips(panel, pad, y, inner_w, ["Desktop Layer", "Cinema Stage", "Off"], amb.get("album_backdrop", "Desktop Layer"), "bd_mode", px0, py0, f_chip)
-            y = nx_b + 12
+            y = nx_b + 10
 
             d = ImageDraw.Draw(panel)
             d.text((pad, y), "BACKDROP STYLE", font=f_sec, fill=(192, 132, 252, 220))
             y += 18
-            nx_bs = self._draw_pop_chips(panel, pad, y, inner_w, ["2-Blob Aura", "Video Reel"], amb.get("backdrop_style", "2-Blob Aura"), "bd_style", px0, py0, f_chip)
-            y = nx_bs + 12
+            nx_bs = self._draw_pop_chips(panel, pad, y, inner_w, ["2-Blob Aura", "Video Reel", "Music Video"], amb.get("backdrop_style", "2-Blob Aura"), "bd_style", px0, py0, f_chip)
+            y = nx_bs + 10
 
             bd_d = float(amb.get("backdrop_darkness", 0.34))
             self._draw_pop_slider(panel, pad, y, inner_w, "Background Depth", f"{int(round(bd_d * 100))}%", (max(0.15, min(1.0, bd_d)) - 0.15) / 0.85, "bg_depth", 0.15, 1.0, px0, py0, f_lbl, f_val)
-            y += 46
+            y += 44
 
             bd_bl = float(amb.get("backdrop_blur", 7.5))
             self._draw_pop_slider(panel, pad, y, inner_w, "Cover Blur", f"{int(round(max(0.0, min(12.0, bd_bl)) / 12.0 * 100))}%", max(0.0, min(12.0, bd_bl)) / 12.0, "bg_blur", 0.0, 12.0, px0, py0, f_lbl, f_val)
-            y += 46
+            y += 44
 
             self._draw_pop_toggle(panel, pad, y, "Show Over Fullscreen Windows", self.fs_var.get(), "toggle_fs", px0, py0, f_lbl)
-            y += 34
+            y += 32
 
             d = ImageDraw.Draw(panel)
             d.text((pad, y), "DISPLAY OUTPUT", font=f_sec, fill=(192, 132, 252, 220))
             y += 18
             mons = ["All Displays", "Primary Display"] + [m["device"] for m in get_monitors()]
-            self._draw_pop_chips(panel, pad, y, inner_w, mons, amb.get("target_displays", "All Displays"), "display", px0, py0, f_chip)
+            y = self._draw_pop_chips(panel, pad, y, inner_w, mons, amb.get("target_displays", "All Displays"), "display", px0, py0, f_chip) + 12
+
+            sp_cfg = cfg.get("spotify", {})
+            sp_on = bool(sp_cfg.get("refresh_token") or sp_cfg.get("access_token"))
+            sp_lbl = f"Connected: {sp_cfg.get('user_name') or 'Spotify'}" if sp_on else "Connect Spotify for Track Sync & Music Video BG"
+            d = ImageDraw.Draw(panel)
+            d.text((pad, y), f"SPOTIFY ACCOUNT  ({sp_lbl.upper()})", font=f_sec, fill=(34, 197, 94, 235) if sp_on else (192, 132, 252, 220))
+            y += 18
+            sp_opts = ["Connect Spotify", "Set Client ID", "Copy Redirect URI"] + (["Disconnect"] if sp_on else [])
+            self._draw_pop_chips(panel, pad, y, inner_w, sp_opts, "Connect Spotify" if sp_on else "", "spotify", px0, py0, f_chip)
 
         elif key == "Options":
             d = ImageDraw.Draw(panel)
@@ -1666,6 +1681,10 @@ class UnifiedDashboard(ctk.CTk):
             self._nudge_offset(0, reset=True)
         elif act.startswith("font:"):
             self._on_font_change(act[5:])
+        elif act.startswith("fe_fx:"):
+            self._on_fisheye_effect_change(act[6:])
+        elif act.startswith("spotify:"):
+            self._handle_spotify_action(act[8:])
         elif act.startswith("script:"):
             self._on_script_mode_change(act[7:])
         elif act.startswith("lyr_act:"):
@@ -1886,6 +1905,7 @@ class UnifiedDashboard(ctk.CTk):
         self.cfg_mgr.config["ambient"]["album_backdrop"] = val
         self.cfg_mgr.save_config()
         self.engine.backdrop_engine.set_mode(val)
+        self.engine.lyrics_engine._dirty_style = True
         if val == "Off":
             self.engine.stop_backdrop()
         elif self.master_switch_var.get():
@@ -1895,6 +1915,48 @@ class UnifiedDashboard(ctk.CTk):
         self.cfg_mgr.config["ambient"]["backdrop_style"] = val
         self.cfg_mgr.save_config()
         self.engine.backdrop_engine.set_backdrop_style(val)
+
+    def _handle_spotify_action(self, sub: str):
+        import webbrowser
+        from tkinter import simpledialog, messagebox
+        srv = getattr(self.engine, "mobile_server", None)
+        sp_cfg = self.cfg_mgr.config.setdefault("spotify", {})
+        redir_uri = srv.get_spotify_redirect_uri() if srv else "http://127.0.0.1:8765/spotify_callback"
+        if sub == "Copy Redirect URI":
+            try:
+                self.clipboard_clear()
+                self.clipboard_append(redir_uri)
+            except Exception:
+                pass
+            return
+        if sub == "Disconnect":
+            sp_cfg["access_token"] = ""
+            sp_cfg["refresh_token"] = ""
+            sp_cfg["expires_at"] = 0
+            sp_cfg["user_name"] = ""
+            self.cfg_mgr.save_config()
+            return
+        if sub == "Set Client ID" or not (sp_cfg.get("client_id") or "").strip():
+            cid = simpledialog.askstring(
+                "Spotify Developer Client ID",
+                f"Paste your Spotify App Client ID.\nSet its Redirect URI in Spotify Dashboard to:\n{redir_uri}",
+                initialvalue=sp_cfg.get("client_id", ""),
+                parent=self,
+            )
+            if cid is None:
+                return
+            cid = cid.strip()
+            if cid:
+                sp_cfg["client_id"] = cid
+                self.cfg_mgr.save_config()
+            if sub == "Set Client ID":
+                return
+        if sub == "Connect Spotify":
+            auth_url = srv.build_spotify_auth_url() if srv else ""
+            if auth_url:
+                webbrowser.open(auth_url)
+            else:
+                messagebox.showinfo("Spotify", "Please enter a valid Spotify Client ID first.", parent=self)
 
     def _on_backdrop_darkness_change(self, val):
         d = round(float(val), 2)
@@ -1988,6 +2050,11 @@ class UnifiedDashboard(ctk.CTk):
         self.cfg_mgr.config["lyrics"]["font"] = val
         self.cfg_mgr.save_config()
         self.engine.lyrics_engine.set_font(val)
+
+    def _on_fisheye_effect_change(self, val):
+        self.cfg_mgr.config["lyrics"]["fisheye_effect"] = val
+        self.cfg_mgr.save_config()
+        self.engine.lyrics_engine.set_fisheye_effect(val)
 
     def _on_script_mode_change(self, val):
         self.cfg_mgr.config["lyrics"]["script_mode"] = val

@@ -13,7 +13,7 @@ class EngineController:
         self.media_mon = media_monitor
         self.ambient_engine = AmbientGlowEngine(config_manager)
         self.backdrop_engine = AlbumBackdropEngine(config_manager)
-        self.lyrics_engine = SyncedLyricsOverlay(config_manager, media_monitor)
+        self.lyrics_engine = SyncedLyricsOverlay(config_manager, media_monitor, backdrop_engine=self.backdrop_engine)
         self.mobile_server = MobileCompanionServer(config_manager, self, media_monitor)
 
     def start_ambient(self):
@@ -105,6 +105,7 @@ class EngineController:
         self.cfg_mgr.config["ambient"]["album_backdrop"] = nxt
         self.cfg_mgr.save_config()
         self.backdrop_engine.set_mode(nxt)
+        self.lyrics_engine._dirty_style = True
         if nxt == "Off":
             self.stop_backdrop()
         elif self.cfg_mgr.config.get("master_enabled", True):
@@ -127,4 +128,5 @@ class EngineController:
         status = info.get("status", "Idle")
         is_playing = bool(info.get("is_playing", status == "Playing"))
         has_media = (status != "Idle") and (info.get("source", "Idle") != "Idle")
-        self.backdrop_engine.update_media_state(thumb, colors, is_playing, has_media)
+        mv_url = info.get("music_video_url", "")
+        self.backdrop_engine.update_media_state(thumb, colors, is_playing, has_media, music_video_url=mv_url)

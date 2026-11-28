@@ -47,7 +47,17 @@
       box-shadow:inset 0 0 var(--glow-blur, 28px) var(--glow-spread, 3px) var(--c1);
       transition:opacity .4s ease;
     }
-    .edge-glow i { position:absolute; display:block; pointer-events:none; transition:width .35s ease, height .35s ease; }
+    .edge-glow::before {
+      content:""; position:fixed; inset:0; pointer-events:none;
+      padding:calc(var(--glow-px, 28px) * 0.72);
+      background:conic-gradient(from var(--glow-ang, 0deg) at 50% 50%, var(--c1), var(--ec2, var(--c2)), var(--ec3, var(--c3)), var(--c1));
+      -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite:xor; mask-composite:exclude;
+      filter:blur(calc(var(--glow-px, 28px) * 0.42)) saturate(1.45);
+      opacity:.82;
+      transition:opacity .35s ease;
+    }
+    .edge-glow i { position:absolute; display:block; pointer-events:none; transition:width .35s ease, height .35s ease, opacity .35s ease; }
     .eg-t { top:0; left:0; right:0; height:var(--glow-px, 28px); background:linear-gradient(180deg, var(--c1), transparent); }
     .eg-b { bottom:0; left:0; right:0; height:var(--glow-px, 28px); background:linear-gradient(0deg, var(--ec2, var(--c2)), transparent); }
     .eg-l { top:0; bottom:0; left:0; width:var(--glow-px, 28px); background:linear-gradient(90deg, var(--ec3, var(--c3)), transparent); }
@@ -55,15 +65,19 @@
     .edge-glow.flow-water { animation:glowWater 2.8s ease-in-out infinite alternate; }
     .edge-glow.flow-water .eg-t, .edge-glow.flow-water .eg-b { animation:waterX 3.4s ease-in-out infinite alternate; }
     .edge-glow.flow-liquid { animation:glowLiquid 5s linear infinite; }
+    .edge-glow.flow-aurora { animation:glowAurora 6.5s ease-in-out infinite alternate; }
+    .edge-glow.flow-prism { animation:glowPrism 2.6s linear infinite; }
     .edge-glow.flow-beat { animation:glowBeat 0.72s cubic-bezier(.22,1,.36,1) infinite alternate; }
     .edge-glow.flow-breath { animation:glowBreath 4.8s ease-in-out infinite; }
     .edge-glow.flow-static { opacity:.92; }
-    @keyframes glowWater { 0%{opacity:.7} 100%{opacity:1} }
+    @keyframes glowWater { 0%{opacity:.74} 100%{opacity:1} }
     @keyframes waterX { 0%{opacity:.65} 50%{opacity:1} 100%{opacity:.72} }
-    @keyframes glowLiquid { 0%{filter:hue-rotate(0deg) saturate(1.25)} 50%{filter:hue-rotate(48deg) saturate(1.55)} 100%{filter:hue-rotate(0deg) saturate(1.25)} }
-    @keyframes glowBeat { 0%{opacity:.42;transform:scale(1)} 100%{opacity:1;transform:scale(0.996)} }
-    @keyframes glowBreath { 0%,100%{opacity:.36} 50%{opacity:1} }
-    .edge-glow.off { opacity:0 !important; animation:none !important; }
+    @keyframes glowLiquid { 0%{filter:hue-rotate(0deg) saturate(1.25)} 50%{filter:hue-rotate(52deg) saturate(1.6)} 100%{filter:hue-rotate(0deg) saturate(1.25)} }
+    @keyframes glowAurora { 0%{filter:hue-rotate(-14deg) saturate(1.3);opacity:.78} 50%{filter:hue-rotate(24deg) saturate(1.65);opacity:1} 100%{filter:hue-rotate(-14deg) saturate(1.3);opacity:.84} }
+    @keyframes glowPrism { 0%{filter:hue-rotate(0deg) saturate(1.6)} 100%{filter:hue-rotate(360deg) saturate(1.75)} }
+    @keyframes glowBeat { 0%{opacity:.46;transform:scale(1)} 100%{opacity:1;transform:scale(0.996)} }
+    @keyframes glowBreath { 0%,100%{opacity:.38} 50%{opacity:1} }
+    .edge-glow.off, .edge-glow.off::before { opacity:0 !important; animation:none !important; }
 
     #stage {
       position:fixed; inset:0; z-index:3;
@@ -77,10 +91,21 @@
     .fe-dome.tr-r { animation:feR .32s cubic-bezier(.22,1.35,.36,1) both; }
     .fe-dome.tr-u { animation:feU .30s cubic-bezier(.22,1.35,.36,1) both; }
     .fe-dome.tr-z { animation:feZ .32s cubic-bezier(.22,1.35,.36,1) both; }
+    .fe-dome.tr-vortex { animation:feVortex .42s cubic-bezier(.22,1.4,.36,1) both; }
+    .fe-dome.tr-vault { animation:feVault .38s cubic-bezier(.22,1.35,.36,1) both; }
+    .fe-dome.tr-elastic { animation:feElastic .44s cubic-bezier(.22,1.6,.36,1) both; }
+    .fe-dome.fx-hyper .fe-row { animation:feWave 2.4s ease-in-out infinite; }
+    .fe-dome.fx-shock .fe-w.act { animation:feShock .42s cubic-bezier(.16,1,.3,1) both; }
+    .fe-dome.fx-prism .fe-w.act { text-shadow:-6px 0 18px rgba(255,60,110,.92), 6px 0 18px rgba(60,180,255,.92), 0 0 36px var(--accent), 0 10px 28px rgba(0,0,0,.7); }
     @keyframes feL { from{opacity:.25;transform:translateX(75px) scale(.92)} to{opacity:1;transform:none} }
     @keyframes feR { from{opacity:.25;transform:translateX(-75px) scale(.92)} to{opacity:1;transform:none} }
     @keyframes feU { from{opacity:.25;transform:translateY(38px) scale(.92)} to{opacity:1;transform:none} }
     @keyframes feZ { from{opacity:.15;transform:scale(.68)} to{opacity:1;transform:none} }
+    @keyframes feVortex { from{opacity:.18;transform:scale(.55) rotate(-14deg) skewX(-8deg)} to{opacity:1;transform:none} }
+    @keyframes feVault { from{opacity:.2;transform:rotateX(58deg) scaleY(.58) translateY(24px)} to{opacity:1;transform:none} }
+    @keyframes feElastic { 0%{opacity:.2;transform:scaleX(1.38) scaleY(.74)} 60%{transform:scaleX(.94) scaleY(1.06)} 100%{opacity:1;transform:none} }
+    @keyframes feWave { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-4px) scale(1.02)} }
+    @keyframes feShock { 0%{transform:translateY(-4px) scale(1.42);filter:brightness(1.35)} 100%{transform:translateY(-9px) scale(1.26);filter:none} }
     .fe-row { display:flex; flex-wrap:wrap; justify-content:center; align-items:baseline; gap:.2em .34em; transform-style:preserve-3d; }
     .fe-w { display:inline-flex; align-items:center; gap:.16em; font-weight:800; line-height:1.18; letter-spacing:-.025em; transition:transform .24s cubic-bezier(.22,1.45,.36,1), color .18s ease, opacity .18s ease, filter .2s ease; }
     .fe-w.todo { color:rgba(205,215,235,.46); transform:scale(.86); text-shadow:0 4px 16px rgba(0,0,0,.5); }
@@ -221,6 +246,8 @@
 <body>
   <div class="backdrop" id="backdrop">
     <img id="bgArt" class="bg-art" alt="">
+    <video id="bgVid" class="bg-art" autoplay loop muted playsinline style="filter:brightness(0.45) saturate(1.22);animation:none"></video>
+    <div id="ytWrap" style="position:fixed;inset:-8%;z-index:0;opacity:0;pointer-events:none;transition:opacity .7s ease;filter:brightness(0.45) saturate(1.2)"><div id="ytPlayer" style="width:100%;height:100%"></div></div>
     <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
     <div class="bg-scrim"></div>
   </div>
@@ -277,6 +304,9 @@ const STYLES = [
   "Web", "Constellation", "Native Design",
   "Apple Design", "Minimal"
 ];
+const FISHEYE_EFFECTS = [
+  "Auto Mix", "Prism Split", "Vortex Spin", "Elastic Dome", "Hyperwave", "Shockwave", "3D Vault"
+];
 const ICON_MAP = {
   love:"❤️", loved:"❤️", heart:"💓", broken:"💔", fire:"🔥", burn:"🔥", burning:"🔥",
   star:"⭐", stars:"✨", shine:"✨", magic:"✨", moon:"🌙", night:"🌙", midnight:"🌙",
@@ -288,22 +318,93 @@ const ICON_MAP = {
   flower:"🌸", wood:"🌳", wind:"💨", snow:"❄️", ice:"🧊", time:"⏳", world:"🌍",
   city:"🏙️", road:"🛣️", car:"🚗", cars:"🚗", shoes:"👠", run:"🏃", home:"🏠",
   floors:"🪵", crown:"👑", diamond:"💎", diamonds:"💎", money:"💵", phone:"📱",
-  pyar:"❤️", mohabbat:"❤️", ishq:"❤️", dil:"💓", zindagi:"✨", chaand:"🌙", raat:"🌙",
-  barish:"🌧️", khwab:"💭", sneham:"❤️", mazha:"🌧️", nila:"🌙", kaalam:"⏳",
-  "സ്നേഹം":"❤️", "മഴ":"🌧️", "നിലാവ്":"🌙", "കാലം":"⏳",
-  "प्यार":"❤️", "मोहब्बत":"❤️", "दिल":"💓", "चाँद":"🌙", "बारिश":"🌧️"
+  // Hindi / Hinglish
+  pyar:"❤️", pyaar:"❤️", mohabbat:"❤️", ishq:"❤️", prem:"❤️", chahat:"💘", chaahat:"💘", aashiqui:"❤️",
+  dil:"💓", dhadkan:"💓", dhadkane:"💓", jaan:"💖", jaanu:"💖", sanam:"❤️", mehboob:"❤️", humsafar:"🫂",
+  yaar:"🫂", yaari:"🫂", dost:"🫂", dosti:"🫂", zindagi:"✨", jeevan:"✨", duniya:"🌍", jannat:"✨", rooh:"✨", saans:"🌬️", saanson:"🌬️",
+  chaand:"🌙", chand:"🌙", chandni:"🌙", raat:"🌙", raatein:"🌙", subah:"🌅", sawera:"🌅", shaam:"🌇", suraj:"☀️", dhoop:"☀️",
+  roshni:"💡", ujala:"💡", noor:"✨", andhera:"🌑", sitare:"✨", taare:"✨", jugnu:"✨", diya:"🪔", shama:"🕯️",
+  barish:"🌧️", baarish:"🌧️", baarishein:"🌧️", barsaat:"🌧️", sawan:"🌧️", rimjhim:"🌧️", boond:"💧", boondein:"💧",
+  badal:"☁️", baadal:"☁️", aasmaan:"☁️", falak:"🌌", paani:"💧", nadi:"🌊", samundar:"🌊", lehar:"🌊", kashti:"⛵",
+  aankhein:"👀", naina:"👀", naino:"👀", nazar:"👀", nazara:"🌅", kajal:"👁️", zulfein:"🌬️", khwab:"💭", khwaab:"💭", sapna:"💭", sapne:"💭",
+  yaad:"🎞️", yaadein:"🎞️", aansu:"💧", ashq:"💧", muskaan:"😊", hasi:"😄", khushi:"😊", jashn:"🎉", mehfil:"🪩",
+  gham:"😔", dard:"🩹", tanhai:"🥀", judai:"💔", bewafa:"💔", wafa:"🤞", khamosh:"🤫", khamoshi:"🤫",
+  aag:"🔥", hawa:"💨", toofan:"⛈️", bijli:"⚡", phool:"🌸", gulab:"🌹", khushboo:"🌸", titli:"🦋", parinda:"🕊️", pankh:"🪶",
+  waqt:"⏳", pal:"⏳", lamha:"⏳", intezar:"⏳", safar:"🛣️", musafir:"🧳", manzil:"🏔️",
+  geet:"🎵", sangeet:"🎶", sargam:"🎶", dhun:"🎶", naach:"💃", payal:"🔔", ghungroo:"🔔",
+  nasha:"🍾", jaam:"🥂", rang:"🎨", gulabi:"🩷", neela:"💙", mehendi:"🌿",
+  sona:"✨", heera:"💎", taaj:"👑", raja:"👑", rani:"👑", vaada:"🤞", dua:"🙏", ibadat:"🙏", sajda:"🙏",
+  alvida:"👋", deewana:"💘", deewani:"💘", fitoor:"🌀", junoon:"🔥", sukoon:"😌", suroor:"✨",
+  // Malayalam / Manglish
+  sneham:"❤️", pranayam:"❤️", pranayini:"❤️", ishtam:"❤️", premam:"❤️", anuraagam:"💖", moham:"💘",
+  hridayam:"💓", nenjile:"💓", nenjil:"💓", khalb:"💓", manam:"💓", manassu:"💓", ullam:"💓",
+  uyir:"✨", uyire:"✨", jeevitham:"✨", aathmaavu:"✨",
+  mazha:"🌧️", peyyum:"🌧️", mazhakkaalam:"🌧️", mazhanool:"🌧️", mazhaththulli:"💧", thulli:"💧", maari:"🌧️",
+  kaattu:"💨", kattu:"💨", poonkaattu:"🍃", thennal:"🍃", kulir:"❄️", thanuppu:"❄️", manju:"❄️",
+  kadal:"🌊", thira:"🌊", puzha:"🌊", theeram:"🏖️", thoni:"⛵", vallam:"⛵", kappal:"🚢",
+  nila:"🌙", nilaavu:"🌙", nilavu:"🌙", nilave:"🌙", vennila:"🌙", ambili:"🌙", chandran:"🌙", raathri:"🌙", rathri:"🌙", ravu:"🌙",
+  pakal:"☀️", suryan:"☀️", sooryan:"☀️", veyil:"☀️", pulari:"🌅", prabhatham:"🌅", sandhya:"🌇", udayam:"🌅",
+  velicham:"💡", vilakku:"🪔", irul:"🌑", niram:"🎨", varnam:"🎨",
+  nakshathram:"⭐", nakshathrangal:"✨", tharam:"⭐", tharakam:"✨", akasham:"☁️", megham:"☁️", kaarmukil:"⛈️",
+  minnal:"⚡", idi:"⛈️", minnaminni:"✨", minnaminungu:"✨", kanneer:"💧", kannuneer:"💧",
+  kannu:"👀", mizhi:"👀", mizhikal:"👀", chiri:"😊", punchiri:"😊", sundari:"💖", mukham:"✨",
+  swapnam:"💭", kinavu:"💭", kinaavu:"💭", orma:"🎞️", ormakal:"🎞️", viraham:"💔", nombaram:"🩹",
+  poovu:"🌸", pookkal:"🌸", malar:"🌺", malare:"🌺", poomaram:"🌳", poomala:"💐", mullappoo:"🌸", poomukham:"🏡",
+  thee:"🔥", agni:"🔥", kaalam:"⏳", samayam:"⏳", neram:"⏳", yathra:"🛣️", vazhi:"🛣️", kaathirippu:"⏳",
+  paattu:"🎵", pattu:"🎵", gaanam:"🎵", sangeetham:"🎶", ragam:"🎶", raagam:"🎶", thalam:"🥁", thaalam:"🥁", chenda:"🥁", veena:"🎻", tharattu:"🎶",
+  kuyil:"🐦", kuyile:"🐦", kili:"🐦", pakshi:"🕊️", thumbi:"🦋", mayil:"🦚", chiraku:"🪶",
+  thozha:"🫂", thozhan:"🫂", sakhi:"🫂", koottu:"🫂", kanmani:"💖", veedu:"🏠", vaathil:"🚪", kannadi:"🪞",
+  mutthu:"💎", muthu:"💎", swarnam:"✨", velli:"🪙", rajavu:"👑", aaghosham:"🎉", onam:"🌼", kalyanam:"💒", shanthi:"🕊️", prarthana:"🙏",
+  // Tamil / Tanglish
+  kaadhal:"❤️", kadhal:"❤️", kaathal:"❤️", kaadhalan:"💘", kaadhali:"💘", aasai:"💘", anbu:"💖", anbe:"💖", paasam:"🫂",
+  idhayam:"💓", nenjam:"💓", manasu:"💓", ennuyire:"✨", azhage:"✨", azhagu:"✨", azhagi:"💖",
+  penne:"👩", kanna:"💖", kannamma:"💖", chellam:"💖", ennavale:"💖", vaseegara:"✨",
+  mazhai:"🌧️", mazhaiyil:"🌧️", thoovanam:"🌧️", saaral:"🌦️", nilaa:"🌙", pagal:"☀️", kaalai:"🌅", maalai:"🌇", vidiyal:"🌅",
+  vaanam:"☁️", vaanavil:"🌈", megam:"☁️", puyal:"⛈️", kaatru:"💨", poongaatru:"🍃", thendral:"🍃",
+  alai:"🌊", nadhi:"🌊", aruvi:"🌊", poo:"🌸", roja:"🌹", mullai:"🌸", malligai:"🌸", thaamarai:"🪷",
+  neruppu:"🔥", kann:"👁️", kangal:"👀", vizhi:"👀", vizhigal:"👀", sirippu:"😊", punnagai:"😊", mutham:"💋", mounam:"🤫",
+  kanavu:"💭", kanaa:"💭", ninaivu:"🎞️", ninaivugal:"🎞️", ulagam:"🌍", payanam:"🛣️", thanimai:"🥀",
+  isai:"🎶", paadal:"🎵", thangam:"✨", vairam:"💎", natchathiram:"⭐", vinmeen:"🌟",
+  nanba:"🫂", nanban:"🫂", machan:"🫂", vaazhkai:"✨", santhosam:"😊", santhosham:"😊", magizhchi:"😊", sogam:"😔", vali:"🩹",
+  paravai:"🕊️", siragu:"🪶", vannam:"🎨", vanna:"🎨", thaali:"💍", kovil:"🛕", vetri:"🏆",
+  // Native Indic Unicode
+  "സ്നേഹം":"❤️", "പ്രണയം":"❤️", "ഇഷ്ടം":"❤️", "ഹൃദയം":"💓", "നെഞ്ച്":"💓", "മനസ്സ്":"💓", "കൽബ്":"💓", "ജീവൻ":"✨", "ജീവിതം":"✨", "ഉയിർ":"✨", "ഉയിരേ":"✨",
+  "മഴ":"🌧️", "മഴത്തുള്ളി":"💧", "തൂവാനം":"🌧️", "നിലാവ്":"🌙", "നിലാ":"🌙", "നിലാവേ":"🌙", "അമ്പിളി":"🌙", "രാത്രി":"🌙", "രാവ്":"🌙",
+  "സൂര്യൻ":"☀️", "വെയിൽ":"☀️", "പുലരി":"🌅", "സന്ധ്യ":"🌇", "വെളിച്ചം":"💡", "വിളക്ക്":"🪔", "ഇരുൾ":"🌑",
+  "നക്ഷത്രം":"⭐", "താരം":"⭐", "മിന്നാമിന്നി":"✨", "ആകാശം":"☁️", "മേഘം":"☁️", "മഞ്ഞ്":"❄️", "കാറ്റ്":"💨", "തെന്നൽ":"🍃", "മിന്നൽ":"⚡",
+  "കടൽ":"🌊", "തിര":"🌊", "പുഴ":"🌊", "തീരം":"🏖️", "തോണി":"⛵", "മിഴി":"👀", "മിഴികൾ":"👀", "കണ്ണ്":"👀", "കണ്ണീർ":"💧", "കണ്ണുനീർ":"💧",
+  "ചിരി":"😊", "പുഞ്ചിരി":"😊", "സ്വപ്നം":"💭", "കിനാവ്":"💭", "ഓർമ്മ":"🎞️", "ഓർമ്മകൾ":"🎞️", "വിരഹം":"💔", "സന്തോഷം":"😊",
+  "പൂവ്":"🌸", "പൂക്കൾ":"🌸", "പൂമാല":"💐", "മലർ":"🌺", "തീ":"🔥", "കാലം":"⏳", "സമയം":"⏳", "യാത്ര":"🛣️", "വഴി":"🛣️",
+  "പാട്ട്":"🎵", "സംഗീതം":"🎶", "രാഗം":"🎶", "തുമ്പി":"🦋", "മയിൽ":"🦚", "കുയിൽ":"🐦", "ചിറക്":"🪶", "വീട്":"🏠", "സ്വർണ്ണം":"✨", "മുത്ത്":"💎", "ആഘോഷം":"🎉",
+  "प्यार":"❤️", "मोहब्बत":"❤️", "इश्क":"❤️", "इश्क़":"❤️", "दिल":"💓", "धड़कन":"💓", "जान":"💖", "रूह":"✨", "सुकून":"😌", "जुनून":"🔥",
+  "चाँद":"🌙", "चांद":"🌙", "चांदनी":"🌙", "रात":"🌙", "सुबह":"🌅", "शाम":"🌇", "सूरज":"☀️", "धूप":"☀️", "रोशनी":"💡", "नूर":"✨",
+  "तारे":"✨", "सितारे":"✨", "जुगनू":"✨", "बारिश":"🌧️", "बरसात":"🌧️", "सावन":"🌧️", "बादल":"☁️", "आसमान":"☁️", "नदी":"🌊",
+  "आँखें":"👀", "आंखें":"👀", "नैन":"👀", "नयना":"👀", "नज़र":"👀", "ख्वाब":"💭", "सपना":"💭", "सपने":"💭", "याद":"🎞️", "यादें":"🎞️",
+  "आँसू":"💧", "आंसू":"💧", "मुस्कान":"😊", "हँसी":"😄", "खुशी":"😊", "जश्न":"🎉", "दर्द":"🩹", "तन्हाई":"🥀", "जुदाई":"💔",
+  "आग":"🔥", "हवा":"💨", "तूफ़ान":"⛈️", "बिजली":"⚡", "फूल":"🌸", "गुलाब":"🌹", "तितली":"🦋", "वक़्त":"⏳", "सफ़र":"🛣️", "मंज़िल":"🏔️",
+  "गीत":"🎵", "संगीत":"🎶", "धुन":"🎶", "रंग":"🎨", "दुआ":"🙏", "सजदा":"🙏", "दीया":"🪔", "जन्नत":"✨",
+  "காதல்":"❤️", "அன்பு":"💖", "அன்பே":"💖", "பாசம்":"🫂", "இதயம்":"💓", "நெஞ்சம்":"💓", "நெஞ்சில்":"💓", "உயிர்":"✨", "உயிரே":"✨",
+  "அழகு":"✨", "அழகே":"✨", "கண்மணி":"💖", "பெண்ணே":"👩", "மழை":"🌧️", "தூவானம்":"🌧️", "நிலா":"🌙", "நிலவு":"🌙", "இரவு":"🌙",
+  "சூரியன்":"☀️", "காலை":"🌅", "மாலை":"🌇", "வானம்":"☁️", "வானவில்":"🌈", "மேகம்":"☁️", "மின்னல்":"⚡", "காற்று":"💨", "தென்றல்":"🍃",
+  "கடல்":"🌊", "அலை":"🌊", "நதி":"🌊", "மலர்":"🌺", "பூ":"🌸", "பூக்கள்":"🌸", "ரோஜா":"🌹", "தீ":"🔥", "நெருப்பு":"🔥",
+  "கண்":"👁️", "கண்கள்":"👀", "விழி":"👀", "விழிகள்":"👀", "கண்ணீர்":"💧", "சிரிப்பு":"😊", "புன்னகை":"😊", "முத்தம்":"💋", "மௌனம்":"🤫",
+  "கனவு":"💭", "நினைவு":"🎞️", "நினைவுகள்":"🎞️", "உலகம்":"🌍", "பயணம்":"🛣️", "பாட்டு":"🎵", "இசை":"🎶", "தங்கம்":"✨", "வைரம்":"💎",
+  "நண்பா":"🫂", "வாழ்க்கை":"✨", "சந்தோஷம்":"😊", "மயில்":"🦚", "குயில்":"🐦", "பறவை":"🕊️", "நட்சத்திரம்":"⭐", "விண்மீன்":"🌟"
 };
 
 let state = {
   title:"SoulsLights", artist:"", source:"", status:"Idle", is_playing:false,
   position_sec:0, duration_sec:0, colors:["#6366F1","#EC4899","#8B5CF6"],
   accent:"#EC4899", lyrics_style: localStorage.getItem("sl_style") || "Fisheye Visual",
+  fisheye_effect: localStorage.getItem("sl_fe_fx") || "Auto Mix",
   script_mode: localStorage.getItem("sl_script") || "Auto",
   glow_enabled: localStorage.getItem("sl_glow") !== "0",
   flow_mode: localStorage.getItem("sl_flow") || "Water Drop",
   glow_intensity: Number(localStorage.getItem("sl_glow_int") || 1.35),
   gradient_mode: localStorage.getItem("sl_grad") || "Multi Colors",
-  backdrop_mode:"Desktop Layer", lyrics:[], styles:STYLES, lyrics_status:"Idle"
+  backdrop_mode:"Desktop Layer",
+  backdrop_style: localStorage.getItem("sl_bd_style") || "2-Blob Aura",
+  lyrics:[], styles:STYLES, lyrics_status:"Idle"
 };
 let lastPollAt = performance.now();
 let lastArtKey = "";
@@ -334,8 +435,30 @@ stage.addEventListener("click", () => hud.classList.toggle("hidden"));
 function fmtTime(s){ s=Math.max(0,Math.floor(s||0)); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
 function esc(s){ return String(s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function wordIcon(w){
-  const k = String(w||"").toLowerCase().replace(/[^a-z\u0900-\u0d7f]/g,"");
-  return ICON_MAP[k] || ICON_MAP[k.replace(/s$/,"")] || ICON_MAP[k.replace(/ing$/,"")] || "";
+  const raw = String(w||"").toLowerCase();
+  const k = raw.replace(/[^a-z\u0900-\u0d7f\u200c\u200d]/g,"");
+  if(!k) return "";
+  if(ICON_MAP[k]) return ICON_MAP[k];
+  const ascii = k.replace(/[^a-z]/g,"");
+  if(ascii){
+    const sufs = ["ies","es","s","ing","ed","ly","kalil","kalude","galil","galai","gal","kal","inte","inde","ude","ode","odu","yil","il","ein","on","aan","ai","ae"];
+    for(const suf of sufs){
+      if(ascii.endsWith(suf) && ascii.length > suf.length + 2){
+        const st = ascii.slice(0, -suf.length);
+        if(ICON_MAP[st]) return ICON_MAP[st];
+        if(ICON_MAP[st + "a"]) return ICON_MAP[st + "a"];
+        if(ICON_MAP[st + "u"]) return ICON_MAP[st + "u"];
+      }
+    }
+  }
+  const uSufs = ["കൾ","യിൽ","ിൽ","ന്റെ","യുടെ","ോടെ","ോട്","கள்","களை","ில்","இல்","ों","ओं","एं"];
+  for(const us of uSufs){
+    if(k.endsWith(us) && k.length > us.length + 1){
+      const hit = ICON_MAP[k.slice(0, -us.length)];
+      if(hit) return hit;
+    }
+  }
+  return "";
 }
 
 // ---- Lightweight Indic Script Detector & Romanizer for Standalone Mode ----
@@ -543,6 +666,94 @@ async function fetchLrclib(title, artist, album, dur){
   return [];
 }
 
+const WEB_API_BASE = "https://soulslights-api.ishaanroshanvt.workers.dev";
+let mvTrackKey = "";
+let ytPlayer = null;
+let ytReady = false;
+let activeYtId = "";
+let activeMp4 = "";
+
+window.onYouTubeIframeAPIReady = function(){ ytReady = true; if(activeYtId) mountYoutube(activeYtId); };
+function ensureYtApi(){
+  if(window.YT && window.YT.Player){ ytReady = true; return; }
+  if(document.getElementById("ytApiScript")) return;
+  const s = document.createElement("script");
+  s.id = "ytApiScript"; s.src = "https://www.youtube.com/iframe_api";
+  document.head.appendChild(s);
+}
+function mountYoutube(vid){
+  const wrap = document.getElementById("ytWrap");
+  if(!wrap) return;
+  if(!vid){
+    wrap.style.opacity = "0";
+    if(ytPlayer && typeof ytPlayer.stopVideo === "function"){ try{ ytPlayer.stopVideo(); }catch{} }
+    return;
+  }
+  ensureYtApi();
+  if(!ytReady || !window.YT || !window.YT.Player) return;
+  wrap.style.opacity = "1";
+  const seekAt = Math.max(0, Math.floor(getLivePos()));
+  if(ytPlayer && typeof ytPlayer.loadVideoById === "function"){
+    try{ ytPlayer.loadVideoById({videoId: vid, startSeconds: seekAt}); ytPlayer.mute(); if(state.is_playing) ytPlayer.playVideo(); else ytPlayer.pauseVideo(); }catch{}
+    return;
+  }
+  ytPlayer = new YT.Player("ytPlayer", {
+    videoId: vid,
+    playerVars: {autoplay:1, controls:0, mute:1, loop:1, playlist:vid, playsinline:1, modestbranding:1, rel:0, start:seekAt},
+    events: {
+      onReady: (ev)=>{ try{ ev.target.mute(); if(state.is_playing) ev.target.playVideo(); else ev.target.pauseVideo(); }catch{} },
+      onStateChange: (ev)=>{ if(ev.data === 0 && activeYtId){ try{ ev.target.seekTo(0); ev.target.playVideo(); }catch{} } }
+    }
+  });
+}
+
+async function resolveMusicVideo(title, artist){
+  const tk = `${artist}-${title}`;
+  if(tk === mvTrackKey) return;
+  mvTrackKey = tk;
+  activeMp4 = ""; activeYtId = "";
+  const vidEl = document.getElementById("bgVid");
+  if(vidEl){ vidEl.pause(); vidEl.removeAttribute("src"); vidEl.classList.remove("ready"); }
+  mountYoutube("");
+  if(state.backdrop_style !== "Music Video" || state.backdrop_mode === "Off" || !title || state.status === "Idle") return;
+  let mp4 = state.music_video_url || "";
+  let ytid = "";
+  try {
+    const q = new URLSearchParams({title, artist}).toString();
+    const base = (mode === "local") ? "" : WEB_API_BASE;
+    const r = await fetch(`${base}/api/music_video?${q}`);
+    if(r.ok){
+      const d = await r.json();
+      if(d.mp4_url) mp4 = mp4 || d.mp4_url;
+      if(d.youtube_id) ytid = d.youtube_id;
+    }
+  } catch{}
+  if(!mp4 && !ytid){
+    try {
+      const a0 = (artist||"").split(",")[0].trim();
+      const it = await fetch("https://itunes.apple.com/search?" + new URLSearchParams({term:`${a0} ${title}`.trim(), entity:"musicVideo", limit:"4"}).toString());
+      if(it.ok){
+        const idata = await it.json();
+        const aToks = a0.toLowerCase().split(/\s+/).filter(x=>x.length>=2);
+        for(const item of (idata.results||[])){
+          if(!item.previewUrl) continue;
+          const ia = String(item.artistName||"").toLowerCase();
+          if(!aToks.length || aToks.some(t=>ia.includes(t))){ mp4 = item.previewUrl; break; }
+        }
+      }
+    } catch{}
+  }
+  if(`${artist}-${title}` !== mvTrackKey) return;
+  activeMp4 = mp4; activeYtId = ytid;
+  if(ytid){
+    mountYoutube(ytid);
+  } else if(mp4 && vidEl){
+    vidEl.src = mp4;
+    vidEl.classList.add("ready");
+    vidEl.play().catch(()=>{});
+  }
+}
+
 function applyTheme(){
   const cols = state.colors || ["#6366F1","#EC4899","#8B5CF6"];
   const isOne = (state.gradient_mode === "1 Color");
@@ -560,31 +771,51 @@ function applyTheme(){
   document.documentElement.style.setProperty("--glow-px", Math.round(14 + gi * 18) + "px");
   document.documentElement.style.setProperty("--glow-blur", Math.round(14 + gi * 22) + "px");
   document.documentElement.style.setProperty("--glow-spread", Math.round(1 + gi * 4) + "px");
-  const flowCls = ({"Water Drop":"flow-water","Liquid Flow":"flow-liquid","Beat Pulse":"flow-beat","Breathing":"flow-breath","Static":"flow-static"})[state.flow_mode || "Water Drop"] || "flow-water";
+  const flowCls = ({
+    "Water Drop":"flow-water","Liquid Flow":"flow-liquid","Aurora Wave":"flow-aurora",
+    "Neon Prism":"flow-prism","Beat Pulse":"flow-beat","Breathing":"flow-breath","Static":"flow-static"
+  })[state.flow_mode || "Water Drop"] || "flow-water";
   document.getElementById("edgeGlow").className = "edge-glow " + flowCls + (state.glow_enabled ? "" : " off");
-  document.getElementById("backdrop").style.opacity = state.backdrop_mode === "Off" ? "0.18" : "0.85";
+  document.getElementById("backdrop").style.opacity = state.backdrop_mode === "Off" ? "0.18" : "0.88";
+  const wantMv = (state.backdrop_style === "Music Video" && state.backdrop_mode !== "Off");
+  const vidEl = document.getElementById("bgVid");
+  if(!wantMv){
+    if(vidEl){ vidEl.pause(); vidEl.classList.remove("ready"); }
+    mountYoutube("");
+  } else {
+    if(ytPlayer && typeof ytPlayer.getPlayerState === "function"){
+      try{ if(state.is_playing) ytPlayer.playVideo(); else ytPlayer.pauseVideo(); }catch{}
+    }
+    if(vidEl && activeMp4 && !activeYtId){ vidEl.classList.add("ready"); if(state.is_playing) vidEl.play().catch(()=>{}); else vidEl.pause(); }
+  }
   const gb = document.getElementById("glowBtn"); if(gb){ gb.textContent = state.glow_enabled ? "Glow: On" : "Glow: Off"; gb.style.opacity = state.glow_enabled ? "1" : "0.55"; }
   const lb = document.getElementById("lyrBtn"); if(lb) lb.style.opacity = (state.lyrics_enabled !== false) ? "1" : "0.5";
-  const bb = document.getElementById("bdBtn"); if(bb) bb.textContent = state.backdrop_mode === "Off" ? "BG: Off" : "BG: On";
+  const bb = document.getElementById("bdBtn"); if(bb) bb.textContent = state.backdrop_mode === "Off" ? "BG: Off" : (wantMv ? "BG: MV" : "BG: On");
   stage.style.opacity = (state.lyrics_enabled === false) ? "0" : "1";
 }
 
 function buildChips(){
   const list = (state.styles && state.styles.length) ? state.styles : STYLES;
+  const isFe = (state.lyrics_style || "").startsWith("Fisheye");
+  const curFe = state.fisheye_effect || localStorage.getItem("sl_fe_fx") || "Auto Mix";
   document.getElementById("styleChips").innerHTML = list.map(st =>
     `<button class="chip ${st===state.lyrics_style?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_style','${esc(st)}')">${esc(st)}</button>`
-  ).join("");
-  const flows = ["Water Drop", "Liquid Flow", "Beat Pulse", "Breathing", "Static"];
+  ).join("") + (isFe ? FISHEYE_EFFECTS.map(fx =>
+    `<button class="chip ${fx===curFe?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_fisheye_effect','${esc(fx)}')">FX: ${esc(fx)}</button>`
+  ).join("") : "");
+  const flows = ["Water Drop", "Liquid Flow", "Aurora Wave", "Neon Prism", "Beat Pulse", "Breathing", "Static"];
   const curF = state.flow_mode || "Water Drop";
   const curGi = Number(state.glow_intensity || 1.35);
   const ints = [[0.55,"Subtle"],[1.1,"Normal"],[1.7,"Bright"],[2.4,"Max"]];
   const nearGi = ints.reduce((a,b)=>Math.abs(b[0]-curGi)<Math.abs(a[0]-curGi)?b:a)[0];
   const isOne = (state.gradient_mode === "1 Color");
+  const curBds = state.backdrop_style || localStorage.getItem("sl_bd_style") || "2-Blob Aura";
   document.getElementById("glowChips").innerHTML =
     flows.map(fl => `<button class="chip ${fl===curF?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_flow_mode','${fl}')">Flow: ${fl}</button>`).join("") +
     ints.map(([v,lbl]) => `<button class="chip ${v===nearGi?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_glow_intensity',${v})">${lbl}</button>`).join("") +
     `<button class="chip ${!isOne?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_gradient_mode','Multi Colors')">Multi Color</button>` +
-    `<button class="chip ${isOne?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_gradient_mode','1 Color')">1 Color</button>`;
+    `<button class="chip ${isOne?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_gradient_mode','1 Color')">1 Color</button>` +
+    ["2-Blob Aura","Video Reel","Music Video"].map(bs => `<button class="chip ${bs===curBds?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_backdrop_style','${bs}')">BG: ${bs==='Music Video'?'Music Video':bs.split(' ')[0]}</button>`).join("");
   const fSc = (state.font_scale || 1.0).toFixed(1);
   document.getElementById("scriptChips").innerHTML = [
     ["Auto","Auto"],["Native","Native"],["Romanized","Roman"]
@@ -606,20 +837,30 @@ async function seekBar(evt){
   if(!tok) return;
   await fetch(`https://api.spotify.com/v1/me/player/seek?position_ms=${ms}`, {method:"PUT", headers:{Authorization:`Bearer ${tok}`}}).catch(()=>{});
   state.position_sec = ms / 1000.0; lastPollAt = performance.now(); lastRenderKey = "";
+  if(ytPlayer && typeof ytPlayer.seekTo === "function"){ try{ ytPlayer.seekTo(ms/1000.0, true); }catch{} }
 }
 
 async function sendCtrl(action, value){
   if(mode === "local"){
     await fetch("/api/control", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({action,value})}).catch(()=>{});
+    if(action === "set_backdrop_style" && value === "Music Video"){ mvTrackKey = ""; resolveMusicVideo(state.title, state.artist); }
     setTimeout(pollState, 120);
     return;
   }
   if(action === "set_style"){ state.lyrics_style = value; setStore("sl_style", value); lastRenderKey=""; buildChips(); return; }
+  if(action === "set_fisheye_effect"){ state.fisheye_effect = value; setStore("sl_fe_fx", value); lastRenderKey=""; buildChips(); return; }
   if(action === "set_script_mode"){ state.script_mode = value; setStore("sl_script", value); spLastTrackKey=""; lastRenderKey=""; buildChips(); pollState(); return; }
   if(action === "toggle_glow"){ state.glow_enabled = !state.glow_enabled; setStore("sl_glow", state.glow_enabled?"1":"0"); applyTheme(); return; }
   if(action === "set_flow_mode"){ state.flow_mode = value; setStore("sl_flow", value); applyTheme(); buildChips(); return; }
   if(action === "set_glow_intensity"){ state.glow_intensity = Number(value)||1.35; setStore("sl_glow_int", String(state.glow_intensity)); applyTheme(); buildChips(); return; }
   if(action === "set_gradient_mode"){ state.gradient_mode = value; setStore("sl_grad", value); applyTheme(); buildChips(); return; }
+  if(action === "set_backdrop_style"){
+    state.backdrop_style = value; setStore("sl_bd_style", value);
+    if(value === "Music Video" && state.backdrop_mode === "Off") state.backdrop_mode = "Desktop Layer";
+    mvTrackKey = ""; applyTheme(); buildChips();
+    if(value === "Music Video") resolveMusicVideo(state.title, state.artist);
+    return;
+  }
   if(action === "toggle_lyrics"){ state.lyrics_enabled = !(state.lyrics_enabled !== false); applyTheme(); return; }
   if(action === "cycle_backdrop"){ state.backdrop_mode = state.backdrop_mode === "Off" ? "Desktop Layer" : "Off"; applyTheme(); buildChips(); return; }
   if(action === "nudge_offset"){ state.offset_sec = Math.max(-5, Math.min(5, (state.offset_sec||0) + value/1000)); lastRenderKey=""; buildChips(); return; }
@@ -665,6 +906,7 @@ async function pollState(){
         document.getElementById("artImg").src = u;
         setArtBackdrop(u);
       }
+      if(state.backdrop_style === "Music Video") resolveMusicVideo(state.title, state.artist);
       buildChips();
     } catch(e){}
     return;
@@ -713,6 +955,7 @@ async function pollState(){
     state.position_sec = (p.progress_ms || 0) / 1000.0;
     state.duration_sec = (item.duration_ms || 0) / 1000.0;
     lastPollAt = (t0 + performance.now()) * 0.5;
+    if(!state.backdrop_style) state.backdrop_style = getStore("sl_bd_style") || "Video Reel";
 
     document.getElementById("mTitle").textContent = title;
     document.getElementById("mArtist").textContent = `${artist} • Spotify`;
@@ -730,6 +973,8 @@ async function pollState(){
       state.lyrics = await fetchLrclib(title, artist, album, state.duration_sec);
       state.lyrics_status = state.lyrics.length ? "Synced" : "No synced lyrics";
     }
+    if(state.backdrop_style === "Music Video") resolveMusicVideo(title, artist);
+    applyTheme();
     buildChips();
   } catch(e){}
 }
@@ -749,8 +994,13 @@ function lineTiltDeg(tk, idx){
 }
 
 let lastRenderKey = "";
-function renderFrame(){
+function renderFrame(nowTs){
   requestAnimationFrame(renderFrame);
+  if(state.glow_enabled){
+    const fm = state.flow_mode || "Water Drop";
+    const sp = fm==="Neon Prism" ? 135 : (fm==="Liquid Flow" ? 70 : (fm==="Water Drop" ? 85 : (fm==="Aurora Wave" ? 42 : 0)));
+    if(sp > 0) document.documentElement.style.setProperty("--glow-ang", (((nowTs||0)*0.001*sp)%360).toFixed(1) + "deg");
+  }
   const pos = getLivePos(), dur = state.duration_sec || 0;
   document.getElementById("tPos").textContent = fmtTime(pos);
   document.getElementById("tDur").textContent = fmtTime(dur);
@@ -770,7 +1020,8 @@ function renderFrame(){
   const cur = lyrics[idx], words = cur.words || [];
   let wIdx = 0; for(let wi=0;wi<words.length;wi++){ if(words[wi].start<=pos) wIdx=wi; else break; }
 
-  const rk = `${style}|${state.title}|${idx}|${wIdx}|${lyrics.length}`;
+  const feFx = state.fisheye_effect || getStore("sl_fe_fx") || "Auto Mix";
+  const rk = `${style}|${feFx}|${state.title}|${idx}|${wIdx}|${lyrics.length}`;
   if(rk === lastRenderKey) return;
   lastRenderKey = rk;
 
@@ -865,32 +1116,31 @@ function renderFrame(){
   if(style === "Constellation" && words.length){
     const W=800, H=440;
     let svg = `<defs>
-      <filter id="stGlow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <filter id="stGlow" color-interpolation-filters="sRGB" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
     </defs>`;
     for(let b=0;b<46;b++){
       const bx=((b*197+idx*53)%760)+20, by=((b*131+idx*29)%400)+20, br=(b%5===0)?2.1:(b%2===0?1.3:0.8);
       svg+=`<circle cx="${bx}" cy="${by}" r="${br}" fill="rgba(225,235,255,${b%4===0?.52:.2})"/>`;
     }
-    // Non-overlapping random placement + relaxation pass so Constellation words never overlap
     const placed = [];
     const nW = words.length;
     for(let wi=0; wi<nW; wi++){
       const wTxt = words[wi].word || "";
-      const hw = Math.max(54, wTxt.length * 9 + 24), hh = 34;
+      const hw = Math.max(58, wTxt.length * 9.5 + 26), hh = 38;
       const secW = (W - 180) / Math.max(1, nW);
-      const sxLo = Math.max(75 + hw*0.4, Math.round(90 + wi * secW * 0.88));
-      const sxHi = Math.min(W - 75 - hw*0.4, Math.max(sxLo + 24, Math.round(sxLo + secW * 1.25)));
+      const sxLo = Math.max(80 + hw*0.45, Math.round(90 + wi * secW * 0.88));
+      const sxHi = Math.min(W - 80 - hw*0.45, Math.max(sxLo + 24, Math.round(sxLo + secW * 1.25)));
       let seed = ((idx + 1) * 73856093) ^ ((wi + 1) * 19349663) ^ 0x5A17;
       const nxtR = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
       let bestX = (sxLo + sxHi) * 0.5, bestY = H * 0.5, bestScore = -1e9;
       for(let a=0; a<45; a++){
         const cx = (a < 25) ? (sxLo + nxtR() * (sxHi - sxLo)) : (90 + nxtR() * (W - 180));
-        const cy = 72 + nxtR() * (H - 135);
+        const cy = 76 + nxtR() * (H - 140);
         if(!placed.length){ bestX=cx; bestY=cy; break; }
         let ov = 0, minGap = 1e9;
         for(const q of placed){
-          const ox = (hw + q.hw + 14) - Math.abs(cx - q.x);
-          const oy = (hh + q.hh + 12) - Math.abs(cy - q.y);
+          const ox = (hw + q.hw + 16) - Math.abs(cx - q.x);
+          const oy = (hh + q.hh + 14) - Math.abs(cy - q.y);
           if(ox > 0 && oy > 0) ov += ox * oy;
           minGap = Math.min(minGap, Math.hypot(cx - q.x, cy - q.y));
         }
@@ -903,11 +1153,11 @@ function renderFrame(){
       for(let i=0; i<placed.length; i++){
         for(let j=i+1; j<placed.length; j++){
           const a = placed[i], b = placed[j];
-          const ox = (a.hw + b.hw + 14) - Math.abs(a.x - b.x);
-          const oy = (a.hh + b.hh + 12) - Math.abs(a.y - b.y);
+          const ox = (a.hw + b.hw + 16) - Math.abs(a.x - b.x);
+          const oy = (a.hh + b.hh + 14) - Math.abs(a.y - b.y);
           if(ox > 0 && oy > 0){
-            if(ox < oy){ const p = ox*0.52*(a.x<b.x?-1:1); a.x = Math.max(80,Math.min(W-80,a.x+p)); b.x = Math.max(80,Math.min(W-80,b.x-p)); }
-            else { const p = oy*0.52*(a.y<b.y?-1:1); a.y = Math.max(64,Math.min(H-50,a.y+p)); b.y = Math.max(64,Math.min(H-50,b.y-p)); }
+            if(ox < oy){ const p = ox*0.52*(a.x<b.x?-1:1); a.x = Math.max(85,Math.min(W-85,a.x+p)); b.x = Math.max(85,Math.min(W-85,b.x-p)); }
+            else { const p = oy*0.52*(a.y<b.y?-1:1); a.y = Math.max(68,Math.min(H-54,a.y+p)); b.y = Math.max(68,Math.min(H-54,b.y-p)); }
           }
         }
       }
@@ -916,19 +1166,19 @@ function renderFrame(){
     for(let i=0;i<pts.length-1;i++){
       if(i < wIdx){
         const isLast = (i === wIdx - 1);
-        svg+=`<line x1="${pts[i].x}" y1="${pts[i].y}" x2="${pts[i+1].x}" y2="${pts[i+1].y}" stroke="var(--accent)" stroke-width="${isLast?7:4}" stroke-opacity="${isLast?.7:.38}" filter="url(#stGlow)"/>`;
-        svg+=`<line x1="${pts[i].x}" y1="${pts[i].y}" x2="${pts[i+1].x}" y2="${pts[i+1].y}" stroke="#fff" stroke-width="${isLast?2.6:1.5}" stroke-opacity=".95"/>`;
+        svg+=`<line x1="${pts[i].x}" y1="${pts[i].y+12}" x2="${pts[i+1].x}" y2="${pts[i+1].y+12}" stroke="var(--accent)" stroke-width="${isLast?6:3.5}" stroke-opacity="${isLast?.72:.4}" filter="url(#stGlow)"/>`;
+        svg+=`<line x1="${pts[i].x}" y1="${pts[i].y+12}" x2="${pts[i+1].x}" y2="${pts[i+1].y+12}" stroke="#fff" stroke-width="${isLast?2.4:1.4}" stroke-opacity=".95"/>`;
       }
     }
     pts.forEach((p,wi)=>{
       const act=wi===wIdx, done=wi<wIdx;
       if(act){
-        svg+=`<circle cx="${p.x}" cy="${p.y}" r="18" fill="var(--accent)" fill-opacity=".35" filter="url(#stGlow)"/>`;
-        svg+=`<path d="M${p.x},${p.y-13} L${p.x+3},${p.y-3} L${p.x+13},${p.y} L${p.x+3},${p.y+3} L${p.x},${p.y+13} L${p.x-3},${p.y+3} L${p.x-13},${p.y} L${p.x-3},${p.y-3} Z" fill="#fff" filter="url(#stGlow)"/>`;
+        svg+=`<circle cx="${p.x}" cy="${p.y+12}" r="16" fill="var(--accent)" fill-opacity=".35" filter="url(#stGlow)"/>`;
+        svg+=`<path d="M${p.x},${p.y+1} L${p.x+2.6},${p.y+9.4} L${p.x+11},${p.y+12} L${p.x+2.6},${p.y+14.6} L${p.x},${p.y+23} L${p.x-2.6},${p.y+14.6} L${p.x-11},${p.y+12} L${p.x-2.6},${p.y+9.4} Z" fill="#fff" filter="url(#stGlow)"/>`;
       } else {
-        svg+=`<circle cx="${p.x}" cy="${p.y}" r="${done?4.5:2.5}" fill="${done?'var(--accent)':'rgba(215,228,255,.42)'}"/>`;
+        svg+=`<circle cx="${p.x}" cy="${p.y+12}" r="${done?4.2:2.4}" fill="${done?'var(--accent)':'rgba(215,228,255,.45)'}"/>`;
       }
-      svg+=`<text x="${p.x}" y="${p.y-20}" text-anchor="middle" fill="${act?'#fff':done?'rgba(235,244,255,.85)':'rgba(195,210,235,.4)'}" font-size="${act?26:16}" font-weight="${act?800:600}" ${act?'filter="url(#stGlow)"':''}>${esc(p.w)}</text>`;
+      svg+=`<text x="${p.x}" y="${p.y-12}" text-anchor="middle" fill="${act?'#fff':done?'rgba(235,244,255,.88)':'rgba(195,210,235,.44)'}" font-size="${act?26:16}" font-weight="${act?800:600}" ${act?'filter="url(#stGlow)"':''}>${esc(p.w)}</text>`;
     });
     stage.innerHTML = `<svg class="svg-stage" viewBox="0 0 ${W} ${H}">${svg}</svg>`;
     return;
@@ -961,7 +1211,9 @@ function renderFrame(){
     let chunks = [[0, nw]];
     if(nw >= 8){ const c1=Math.ceil(nw/3), c2=c1+Math.ceil((nw-c1)/2); chunks=[[0,c1],[c1,c2],[c2,nw]]; }
     else if(nw >= 4){ const s1=Math.ceil(nw/2); chunks=[[0,s1],[s1,nw]]; }
-    const trCls = ["tr-l","tr-r","tr-u","tr-z"][Math.abs((idx*7 + (state.title||"").length)) % 4];
+    const trPool = ["tr-l","tr-r","tr-u","tr-z","tr-vortex","tr-vault","tr-elastic"];
+    const fxMap = {"Vortex Spin":"tr-vortex","3D Vault":"tr-vault","Elastic Dome":"tr-elastic","Prism Split":"tr-z fx-prism","Hyperwave":"tr-u fx-hyper","Shockwave":"tr-z fx-shock"};
+    const trCls = fxMap[feFx] || (trPool[Math.abs((idx*7 + (state.title||"").length)) % trPool.length] + ((idx%3===0)?" fx-prism":(idx%3===1?" fx-hyper":" fx-shock")));
     const tilt = lineTiltDeg(`${state.artist}-${state.title}`, idx);
     const fBase = nw >= 8 ? "clamp(24px,4.4vw,42px)" : (nw >= 4 ? "clamp(28px,5.2vw,52px)" : "clamp(34px,6.2vw,62px)");
     const rowsHtml = chunks.map(([a,b], rIdx) => {
