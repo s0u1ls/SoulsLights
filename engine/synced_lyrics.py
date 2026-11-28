@@ -331,6 +331,31 @@ WORD_VISUALS = {
     "promise": "🤞", "forevermore": "♾️", "always": "♾️", "endless": "♾️", "infinite": "♾️",
     "money": "💵", "wealth": "💰", "million": "💰", "billion": "💰", "rich": "💎", "luxury": "💎",
     "celebration": "🎉", "champ": "🏆", "victory": "🏆", "golden": "✨", "shiny": "✨",
+
+    # Explicit / Profanity / Rap & Pop Slang (English + Hindi/Malayalam/Tamil)
+    "fuck": "🤬", "fucked": "💥", "fucker": "🤬", "fucking": "🤬", "motherfucker": "🤬", "mf": "🤬",
+    "shit": "💩", "shitty": "💩", "bullshit": "💩", "bs": "💩", "crap": "💩",
+    "bitch": "😈", "bitches": "😈", "bastard": "😡", "ass": "🍑", "asshole": "🤬", "arse": "🍑",
+    "damn": "💢", "dammit": "💢", "goddamn": "💢", "hell": "🔥", "wtf": "🤯", "stfu": "🤐",
+    "dick": "🍆", "cock": "🍆", "pussy": "🍒", "sex": "❤️‍🔥", "sexy": "🔥", "horny": "🥵",
+    "hoe": "💋", "hoes": "💋", "whore": "💄", "slut": "💋", "baddie": "💅", "freak": "😈",
+    "piss": "💢", "pissed": "😡", "suck": "👎", "sucks": "👎", "idiot": "🤡", "stupid": "🤡", "dumb": "🤡",
+    "psycho": "😵‍💫", "savage": "🐺", "badass": "🕶️", "kill": "🔪", "murder": "🩸", "dead": "💀",
+    "die": "💀", "death": "☠️", "grave": "🪦", "blood": "🩸", "gun": "🔫", "shoot": "🔫",
+    "weed": "🌿", "kush": "🌿", "smoke": "💨", "high": "😶‍🌫️", "drunk": "🍻", "wasted": "🥴",
+    "hangover": "🤕", "shots": "🥃", "vodka": "🍸", "tequila": "🍋", "henny": "🥃", "hennessy": "🥃",
+    "gin": "🍸", "beer": "🍺", "lean": "🟣", "perc": "💊", "pills": "💊", "drug": "💊", "drugs": "💊",
+    "flex": "💪", "drip": "💧", "racks": "💵", "bands": "💵", "cash": "💵", "bag": "💰",
+    "saala": "💢", "saale": "💢", "kamina": "😈", "kaminey": "😈", "harami": "😈", "pagal": "🤪",
+    "bewakoof": "🤡", "pataka": "🧨", "bawaal": "💥", "jhakaas": "🔥", "thug": "🕶️",
+    "machi": "🫂", "machan": "🫂", "thala": "👑", "mass": "🔥", "pwoli": "🔥", "polichu": "💥",
+    "kidu": "⚡", "aliyan": "🤜", "thendi": "💢", "poda": "👋", "podi": "👋", "myre": "🤬",
+}
+
+_CENSORED_BAD_WORDS = {
+    "fck": "🤬", "fuk": "🤬", "fuq": "🤬", "fking": "🤬", "fkin": "🤬", "fk": "🤬", "mf": "🤬",
+    "sht": "💩", "shyt": "💩", "btch": "😈", "bch": "😈", "dmn": "💢", "azz": "🍑",
+    "dck": "🍆", "cck": "🍆", "pssy": "🍒", "sx": "❤️‍🔥", "a$$": "🍑", "b!tch": "😈", "f**k": "🤬",
 }
 
 FONT_MAP = {
@@ -357,7 +382,24 @@ def _word_icon(word: str):
     if not word:
         return None
     low = word.lower().strip()
+    if any(ch in low for ch in "*$@#!") and low in _CENSORED_BAD_WORDS:
+        return _CENSORED_BAD_WORDS[low]
+    if any(ch in low for ch in "*$@#"):
+        de_cens = re.sub(r"[*$@#]+", "", low)
+        de_cens_a = re.sub(r"[^a-z]", "", de_cens)
+        if de_cens_a in _CENSORED_BAD_WORDS:
+            return _CENSORED_BAD_WORDS[de_cens_a]
+        if re.fullmatch(r"f[^a-z]*c?k\w*", low):
+            return "🤬"
+        if re.fullmatch(r"s[^a-z]*t\w*", low) and len(low) >= 4:
+            return "💩"
+        if re.fullmatch(r"b[^a-z]*t?ch\w*", low):
+            return "😈"
+        if re.fullmatch(r"a[^a-z]{2,}", low):
+            return "🍑"
     bare_ascii = re.sub(r"[^a-z]", "", low)
+    if bare_ascii in _CENSORED_BAD_WORDS:
+        return _CENSORED_BAD_WORDS[bare_ascii]
     if bare_ascii:
         hit = WORD_VISUALS.get(bare_ascii)
         if hit:
@@ -448,6 +490,74 @@ def _is_instrumental_marker(text: str) -> bool:
 def _sanitize_lyric_text(text: str) -> str:
     cleaned = _MUSIC_SYMBOL_STRIP_RE.sub("", text or "")
     return re.sub(r"\s+", " ", cleaned).strip()
+
+
+_DUET_ARTIST_RE = re.compile(r"\b(?:feat\.?|ft\.?|featuring|with)\b|[,&/×+]", re.IGNORECASE)
+_SECTION_TAG_RE = re.compile(
+    r"\[?\b(verse\s*\d*|chorus|pre-?chorus|post-?chorus|hook|drop|bridge|outro|intro|part\s*\d+|interlude)\b\]?",
+    re.IGNORECASE,
+)
+_SPEAKER_PREFIX_RE = re.compile(r"^(?:\[([A-Za-z0-9 ._-]{2,24})\]|([A-Za-z][A-Za-z0-9 ._-]{1,22}):)\s+")
+_CHORUS_TAG_RE = re.compile(r"\b(chorus|drop|hook|post-?chorus)\b", re.IGNORECASE)
+
+
+def _is_duet_artist(artist: str = "", title: str = "") -> bool:
+    comb = f"{artist or ''} {title or ''}"
+    return bool(_DUET_ARTIST_RE.search(comb))
+
+
+def _tag_duet_and_sections(lines: list, artist: str = "", title: str = ""):
+    """Annotates each lyric line with vocal_slot (0=accent1, 1=accent2) and is_chorus."""
+    if not lines:
+        return lines
+    duet_track = _is_duet_artist(artist, title)
+    text_counts = {}
+    for ln in lines:
+        norm = re.sub(r"[\(\)\[\],.!?]+", "", (ln.get("text") or "").lower()).strip()
+        if len(norm) >= 6:
+            text_counts[norm] = text_counts.get(norm, 0) + 1
+
+    cur_slot = 0
+    cur_speaker = ""
+    in_chorus = False
+    for i, ln in enumerate(lines):
+        txt = (ln.get("text") or "").strip()
+        t_start = float(ln.get("time", 0.0))
+        prev_end = float(lines[i - 1].get("end", t_start)) if i > 0 else t_start
+        gap = t_start - prev_end
+
+        sec_m = _SECTION_TAG_RE.search(txt)
+        spk_m = _SPEAKER_PREFIX_RE.match(txt)
+        has_feat_inline = bool(_DUET_ARTIST_RE.search(txt))
+        is_pure_paren = txt.startswith("(") and txt.endswith(")") and len(txt) > 2
+
+        if sec_m:
+            sec_word = sec_m.group(1).lower()
+            in_chorus = bool(_CHORUS_TAG_RE.search(sec_word))
+            cur_slot = 1 - cur_slot
+        elif spk_m:
+            spk = (spk_m.group(1) or spk_m.group(2) or "").strip().lower()
+            if spk and spk != cur_speaker:
+                cur_speaker = spk
+                cur_slot = 1 - cur_slot
+        elif has_feat_inline:
+            cur_slot = 1
+        elif is_pure_paren:
+            # Call-and-response parenthesized line switches accent immediately for that line
+            pass
+        elif duet_track and i > 0:
+            # Alternate between artists across stanza gaps (>1.6s) or verse/bridge transitions
+            if gap > 1.65:
+                cur_slot = 1 - cur_slot
+
+        norm = re.sub(r"[\(\)\[\],.!?]+", "", txt.lower()).strip()
+        words = ln.get("words") or []
+        dur_l = max(0.35, float(ln.get("end", t_start + 1.0)) - t_start)
+        wps = len(words) / dur_l
+        rep_chorus = (text_counts.get(norm, 0) >= 2 and wps >= 1.6)
+        ln["vocal_slot"] = (1 - cur_slot) if is_pure_paren else cur_slot
+        ln["is_chorus"] = bool(in_chorus or rep_chorus)
+    return lines
 
 
 def _slow_cue_weight(word: str, is_final: bool, gap: float, n_words: int) -> float:
@@ -919,11 +1029,11 @@ class LyricsFetcher:
         with self._cache_lock:
             cached = None if force_refresh else self.cache.get(key)
         if isinstance(cached, dict) and cached.get("lines"):
-            return cached["lines"], cached.get("source", "Cache")
+            return _tag_duet_and_sections(cached["lines"], artist, title), cached.get("source", "Cache")
         if isinstance(cached, list) and cached:
             entries = [(float(x["time"]), str(x["text"])) for x in cached if isinstance(x, dict) and "time" in x and "text" in x]
             if entries:
-                lines = self._build_word_timings(sorted(entries, key=lambda x: x[0]))
+                lines = _tag_duet_and_sections(self._build_word_timings(sorted(entries, key=lambda x: x[0])), artist, title)
                 with self._cache_lock:
                     self.cache[key] = {"cache_v": 6, "source": "Cache (Synced)", "lines": lines}
                 self._save_cache()
@@ -971,6 +1081,7 @@ class LyricsFetcher:
                 source = f"{source} [Romanized]"
 
         if lines:
+            lines = _tag_duet_and_sections(lines, artist, title)
             with self._cache_lock:
                 self.cache[key] = {"cache_v": 6, "source": source, "lines": lines}
             self._save_cache()
@@ -1499,8 +1610,12 @@ class SyncedLyricsOverlay:
         self.style = "Fisheye Visual"
         self.fisheye_effect = "Auto Mix"
         self.auto_sync_colors = True
+        self.duet_split = True
+        self.chorus_boost = True
         self.accent_color = (236, 72, 153)
         self.secondary_color = (99, 102, 241)
+        self._target_accent = (236, 72, 153)
+        self._target_sec = (99, 102, 241)
         self.custom_accent = (236, 72, 153)
         self.text_color = (255, 255, 255)
         self.font_name = "Geometric"
@@ -1521,6 +1636,9 @@ class SyncedLyricsOverlay:
         self._shaped_patch_cache = {}
         self._audio_peak = 0.0
         self._audio_bloom = 0.0
+        self._audio_bloom_ema = 0.0
+        self.energy_boost = 0.0
+        self.on_energy_update = None
 
         # Reused full-screen canvases for fast Constellation dirty-rect rendering
         self._full_canvas = None
@@ -1538,11 +1656,14 @@ class SyncedLyricsOverlay:
         if not self.cfg_mgr:
             return
         v = self.cfg_mgr.config.get("lyrics", {})
+        a = self.cfg_mgr.config.get("ambient", {})
         with self._lock:
             st = v.get("style", "Fisheye Visual")
             self.style = "Fisheye Visual" if st == "Neon Noir" else st
             self.fisheye_effect = str(v.get("fisheye_effect", "Auto Mix"))
             self.auto_sync_colors = bool(v.get("auto_sync_colors", True))
+            self.duet_split = bool(v.get("duet_split", True))
+            self.chorus_boost = bool(a.get("chorus_boost", True))
             self.custom_accent = _hex_to_rgb(v.get("custom_accent_color", "#EC4899"))
             self.text_color = _hex_to_rgb(v.get("custom_text_color", "#FFFFFF"), (255, 255, 255))
             self.font_name = v.get("font", "Geometric")
@@ -1638,10 +1759,21 @@ class SyncedLyricsOverlay:
         with self._lock:
             self.auto_sync_colors = bool(enable)
 
+    def set_duet_split(self, enable: bool):
+        with self._lock:
+            self.duet_split = bool(enable)
+            self._dirty_style = True
+
+    def set_chorus_boost(self, enable: bool):
+        with self._lock:
+            self.chorus_boost = bool(enable)
+            if not self.chorus_boost:
+                self.energy_boost = 0.0
+
     def set_album_palette(self, hex1: str, hex2: str = None):
         with self._lock:
-            self.accent_color = _hex_to_rgb(hex1)
-            self.secondary_color = _hex_to_rgb(hex2) if hex2 else self.accent_color
+            self._target_accent = _hex_to_rgb(hex1)
+            self._target_sec = _hex_to_rgb(hex2) if hex2 else self._target_accent
 
     def set_custom_accent(self, hex_color: str):
         with self._lock:
@@ -1929,6 +2061,8 @@ class SyncedLyricsOverlay:
         for li, line in enumerate(lyrics):
             paren_d = 0
             sq_d = 0
+            line_slot = int(line.get("vocal_slot", 0))
+            is_ch = bool(line.get("is_chorus", False))
             for wi, w in enumerate(line.get("words", [])):
                 w_txt = w["word"]
                 in_br = (paren_d > 0 or sq_d > 0
@@ -1945,6 +2079,8 @@ class SyncedLyricsOverlay:
                     "word_idx": wi,
                     "g_idx": len(flat),
                     "in_brackets": in_br,
+                    "vocal_slot": (1 - line_slot) if in_br else line_slot,
+                    "is_chorus": is_ch,
                 })
         return flat
 
@@ -2197,11 +2333,18 @@ class SyncedLyricsOverlay:
                         self._ensure_fonts()
                     style = self.style
                     fe_eff = self.fisheye_effect
-                    accent = self.accent_color if self.auto_sync_colors else self.custom_accent
-                    sec = self.secondary_color if self.auto_sync_colors else self.custom_accent
+                    auto_sync = self.auto_sync_colors
+                    tgt_acc = self._target_accent if auto_sync else self.custom_accent
+                    tgt_sec = self._target_sec if auto_sync else self.custom_accent
+                    lerp_c = min(1.0, target_dt * 4.2)
+                    self.accent_color = _lerp_color(self.accent_color, tgt_acc, lerp_c)
+                    self.secondary_color = _lerp_color(self.secondary_color, tgt_sec, lerp_c)
+                    accent = self.accent_color
+                    sec = self.secondary_color
                     text_col = self.text_color
                     off_sec = self.offset_sec
                     ct = self.click_through
+                    chorus_on = self.chorus_boost
                     dirty_style = self._dirty_style
                     self._dirty_style = False
 
@@ -2286,19 +2429,40 @@ class SyncedLyricsOverlay:
 
                 anim_t = time.perf_counter()
                 is_playing = (status == "Playing" and bool(title) and title not in _NO_MEDIA_TITLES)
+
+                # Auto Chorus Energy Boost: combine lyric word density, chorus/drop section tag, and sustained audio bloom
+                self._audio_bloom_ema += (self._audio_bloom - self._audio_bloom_ema) * min(1.0, target_dt * 1.8)
+                if is_playing and chorus_on:
+                    win_cnt = sum(1 for fw in flat_snap if (eff_pos - 2.2) <= fw["start"] <= (eff_pos + 2.2))
+                    wps = win_cnt / 4.4
+                    density_e = max(0.0, min(1.0, (wps - 1.9) / 2.2))
+                    chorus_tag_e = 0.35 if (0 <= idx < len(lyrics_snap) and lyrics_snap[idx].get("is_chorus")) else 0.0
+                    bloom_e = min(1.0, self._audio_bloom_ema * 1.75) * 0.45
+                    target_e = min(1.0, density_e * 0.52 + chorus_tag_e + bloom_e)
+                else:
+                    target_e = 0.0
+                e_rate = 2.4 if target_e > self.energy_boost else 0.95
+                self.energy_boost += (target_e - self.energy_boost) * min(1.0, target_dt * e_rate)
+                if self.on_energy_update:
+                    self.on_energy_update(self.energy_boost)
+
                 anim_tick = int(round(anim_t * 60.0)) if is_playing else (int(anim_t * 4) if not ct else 0)
                 sig = (
                     style, fe_eff, idx, w_idx, g_idx, anim_tick, status, title,
-                    accent, text_col, ct, dirty_style, len(lyrics_snap), l_status_snap
+                    accent, sec, text_col, ct, dirty_style, len(lyrics_snap), l_status_snap,
+                    round(self.energy_boost, 2), self.duet_split
                 )
 
                 if sig != last_render_sig:
                     last_render_sig = sig
                     pres_target = self.hwnd if IS_WIN else self.mac_win
                     in_interlude = self._in_instrumental_gap(lyrics_snap, idx, eff_pos)
+                    slot_line = int(lyrics_snap[idx].get("vocal_slot", 0)) if (0 <= idx < len(lyrics_snap)) else 0
+                    eff_acc = sec if (self.duet_split and slot_line == 1) else accent
+                    eff_sec = accent if (self.duet_split and slot_line == 1) else sec
                     if curr_is_fs and lyrics_snap and idx >= 0 and flat_snap and not in_interlude:
                         sub_img, drect = self._render_constellation_dirty(
-                            flat_snap, g_idx, eff_pos, anim_t, accent, sec, text_col
+                            flat_snap, g_idx, eff_pos, anim_t, eff_acc, eff_sec, text_col
                         )
                         surf.upload_rect_rgba(sub_img, drect, prev_rect=self._prev_dirty_rect)
                         self._prev_dirty_rect = drect
@@ -2311,7 +2475,7 @@ class SyncedLyricsOverlay:
                             w_u_f = max(0.0, min(1.0, (eff_pos - cw["start"]) / max(0.12, cw["end"] - cw["start"])))
                         warped, ox, oy = self._render_fisheye(
                             lyrics_snap, idx, w_idx, w_u_f, eff_pos, anim_t,
-                            accent, sec, text_col, show_icons=(style == "Fisheye Visual")
+                            eff_acc, eff_sec, text_col, show_icons=(style == "Fisheye Visual")
                         )
                         drect = (ox, oy, ox + warped.width, oy + warped.height)
                         surf.upload_rect_rgba(warped, drect, prev_rect=self._prev_dirty_rect)
@@ -2321,7 +2485,7 @@ class SyncedLyricsOverlay:
                         frame = self._render_frame(
                             lyrics_snap, flat_snap, l_status_snap,
                             style, idx, w_idx, g_idx, eff_pos, anim_t,
-                            status, title, artist, accent, sec, text_col, ct
+                            status, title, artist, eff_acc, eff_sec, text_col, ct
                         )
                         surf.upload_pil_rgba(frame)
                         self._prev_dirty_rect = (0, 0, self.OVERLAY_W, self.OVERLAY_H)
@@ -2724,10 +2888,14 @@ class SyncedLyricsOverlay:
     def _draw_word_line_kinetic(
         self, canvas_img, draw, y_center, words, w_idx, w_u, eff_pos, font, emoji_font,
         active_col, done_col, todo_col, accent_rgb=(236, 72, 153), show_icons=True, glow_layer=None,
-        wave_amp=0.0, active_lift=0.0, active_pop=False, max_w=None, anim_t=0.0
+        wave_amp=0.0, active_lift=0.0, active_pop=False, max_w=None, anim_t=0.0, sec_rgb=None
     ):
         """Draws a line with smooth per-word wave motion, spring pop, lift, and monochrome/duotone icons."""
         max_line_w = (max_w or (self.OVERLAY_W - 80))
+        e_boost = self.energy_boost if self.chorus_boost else 0.0
+        duet_on = bool(self.duet_split and sec_rgb is not None and sec_rgb != accent_rgb)
+        wave_eff = wave_amp * (1.0 + 0.55 * e_boost) if wave_amp > 0.0 else 0.0
+        lift_eff = active_lift * (1.0 + 0.35 * e_boost) if active_lift > 0.0 else 0.0
 
         def _layout(f_txt, f_emo):
             sp = self._measure_text(draw, " ", f_txt)[0]
@@ -2738,8 +2906,9 @@ class SyncedLyricsOverlay:
                 fe_use = f_emo
                 if active_pop and i == w_idx and w_idx >= 0:
                     pop_u = _ease_out_back(min(1.0, w_u * 2.4))
-                    f_use = self._get_font("bold", int(f_txt.size * (1.0 + 0.16 * pop_u))) or f_txt
-                    fe_use = self._get_font("emoji", int(f_emo.size * (1.0 + 0.16 * pop_u))) if f_emo else None
+                    pop_k = (0.16 + 0.09 * e_boost) * pop_u
+                    f_use = self._get_font("bold", int(f_txt.size * (1.0 + pop_k))) or f_txt
+                    fe_use = self._get_font("emoji", int(f_emo.size * (1.0 + pop_k))) if f_emo else None
                 w = wobj["word"]
                 ox, oy, ww, wh, is_sh, f_real = self._text_box(draw, w, f_use)
                 ico = (_word_icon(wobj["word"]) or wobj.get("icon")) if show_icons else None
@@ -2764,39 +2933,41 @@ class SyncedLyricsOverlay:
         gd = ImageDraw.Draw(glow_layer) if glow_layer is not None else None
         for i, w, ox, oy, ww, wh, is_sh, f_orig, f_real, fe_use, ico, iw in tokens:
             is_act = (i == w_idx and w_idx >= 0)
+            is_resp = duet_on and (w.startswith("(") or w.endswith(")") or w.startswith("[") or w.endswith("]"))
+            w_acc = sec_rgb if is_resp else accent_rgb
             if w_idx < 0:
                 col = todo_col
             elif i < w_idx:
-                col = done_col
+                col = (*_lerp_color((255, 255, 255), sec_rgb, 0.52), done_col[3]) if is_resp else done_col
             elif is_act:
-                col = active_col
+                col = (*_lerp_color(active_col[:3], sec_rgb, 0.35), active_col[3]) if is_resp else active_col
             else:
                 col = todo_col
 
             wy = y_center
-            if wave_amp > 0.0:
-                wy += math.sin(eff_pos * 4.5 + i * 0.85) * wave_amp
-            if active_lift and is_act:
+            if wave_eff > 0.0:
+                wy += math.sin(eff_pos * (4.5 + 1.2 * e_boost) + i * 0.85) * wave_eff
+            if lift_eff and is_act:
                 lift_u = math.sin(max(0.0, min(1.0, w_u)) * math.pi)
-                wy -= active_lift * (0.45 + 0.55 * lift_u)
+                wy -= lift_eff * (0.45 + 0.55 * lift_u)
 
             tx = cx - ox
             ty = int(wy - (oy + wh * 0.5))
             f_draw = f_orig if is_sh else f_real
 
             if is_act and gd is not None:
-                self._stamp_text(glow_layer, gd, tx, ty, w, f_draw, (*active_col[:3], 235))
+                self._stamp_text(glow_layer, gd, tx, ty, w, f_draw, (*w_acc[:3], 235))
 
             self._stamp_text(canvas_img, draw, tx, ty, w, f_draw, col, shadow_alpha=215)
             cx += ww
             if iw and fe_use and canvas_img is not None:
                 ico_dy = int(-6 * math.sin(anim_t * 8.0)) if is_act else 0
-                patch = self._get_tinted_icon(ico, fe_use, accent_rgb, is_active=(w_idx >= 0 and i <= w_idx))
+                patch = self._get_tinted_icon(ico, fe_use, w_acc, is_active=(w_idx >= 0 and i <= w_idx))
                 if patch is not None:
                     ey = int(wy - patch.height * 0.5) + ico_dy
-                    self._stamp_icon(canvas_img, cx + 6, ey, ico, fe_use, accent_rgb, is_active=(w_idx >= 0 and i <= w_idx), alpha_mul=col[3] / 255.0)
+                    self._stamp_icon(canvas_img, cx + 6, ey, ico, fe_use, w_acc, is_active=(w_idx >= 0 and i <= w_idx), alpha_mul=col[3] / 255.0)
                     if is_act and gd is not None:
-                        gd.ellipse([cx + 4, ey, cx + 6 + patch.width, ey + patch.height], fill=(*accent_rgb, 110))
+                        gd.ellipse([cx + 4, ey, cx + 6 + patch.width, ey + patch.height], fill=(*w_acc, 110))
                 cx += iw
             cx += space_w
 
@@ -3382,6 +3553,7 @@ class SyncedLyricsOverlay:
                 active_pop=True,
                 max_w=LW - 80,
                 anim_t=anim_t,
+                sec_rgb=sec,
             )
             if r_dx != 0 and -LW < r_dx < LW:
                 line_canvas.alpha_composite(row_img, (r_dx, 0))
@@ -3454,7 +3626,8 @@ class SyncedLyricsOverlay:
         if abs(tilt_deg) > 0.2:
             lens_combined = lens_combined.rotate(tilt_deg, resample=Image.Resampling.BILINEAR)
 
-        warp_k = warp_base_k + 0.09 * atk_pulse + 0.09 * self._audio_bloom + 0.028 * math.sin(anim_t * 2.6)
+        e_boost = self.energy_boost if self.chorus_boost else 0.0
+        warp_k = warp_base_k + 0.09 * atk_pulse + (0.09 + 0.06 * e_boost) * self._audio_bloom + 0.04 * e_boost + 0.028 * math.sin(anim_t * 2.6)
         mesh = self._get_warp_mesh(
             LW, LH, warp_k, zoom_base=0.78, twist_rad=twist_rad, wave_amp=wave_amp, wave_phase=wave_phase
         )
@@ -3609,13 +3782,14 @@ class SyncedLyricsOverlay:
                     warm_a = int(185 * ((word_prog - 0.55) / 0.45))
                     self._stamp_text(gl, gd, qx, qy, display_word, f_gq_u, (255, 250, 225, warm_a))
                 if spark_fire:
+                    e_sp = self.energy_boost if self.chorus_boost else 0.0
                     rng_sp = random.Random(int(anim_t * 24) ^ wobj["g_idx"])
-                    for _ in range(7):
+                    for _ in range(7 + int(9 * e_sp)):
                         ang = rng_sp.uniform(0, 2 * math.pi)
-                        dist = rng_sp.uniform(18, 52)
+                        dist = rng_sp.uniform(18, 52 + 24 * e_sp)
                         spx = int(px + math.cos(ang) * dist)
                         spy = int(sy_star + math.sin(ang) * dist)
-                        d.ellipse([spx - 2, spy - 2, spx + 2, spy + 2], fill=(*accent, rng_sp.randint(140, 230)))
+                        d.ellipse([spx - 2, spy - 2, spx + 2, spy + 2], fill=(*accent, rng_sp.randint(140, 235)))
             elif is_done:
                 is_prev = (i == rel_active - 1)
                 alpha_s = int(235 - 40 * trans_u) if is_prev else 190

@@ -11,7 +11,11 @@
   <link rel="apple-touch-icon" href="../logo.png">
   <title>SoulsLights — iPad & Mobile</title>
   <style>
-    :root { --c1:#6366F1; --c2:#EC4899; --c3:#8B5CF6; --accent:#EC4899; }
+    @property --c1 { syntax:"<color>"; inherits:true; initial-value:#6366F1; }
+    @property --c2 { syntax:"<color>"; inherits:true; initial-value:#EC4899; }
+    @property --c3 { syntax:"<color>"; inherits:true; initial-value:#8B5CF6; }
+    @property --accent { syntax:"<color>"; inherits:true; initial-value:#EC4899; }
+    :root { --c1:#6366F1; --c2:#EC4899; --c3:#8B5CF6; --accent:#EC4899; transition:--c1 .9s ease, --c2 .9s ease, --c3 .9s ease, --accent .9s ease; }
     * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
     html, body {
       margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#000000; color:#f8fafc;
@@ -24,13 +28,61 @@
     .bg-art {
       position:absolute; inset:-12%; width:124%; height:124%; object-fit:cover;
       filter:blur(26px) brightness(0.46) saturate(1.25); opacity:0;
-      transition:opacity .8s ease; animation:reelKen 18s ease-in-out infinite alternate;
+      transition:opacity .9s ease, filter .9s ease; animation:reelKen 18s ease-in-out infinite alternate;
     }
     .bg-art.ready { opacity:1; }
+    .bg-art.blur-out { opacity:0 !important; filter:blur(42px) brightness(0.28) saturate(1.4) !important; }
     @keyframes reelKen { 0%{transform:scale(1.04) translate(-1.5%,-1%)} 100%{transform:scale(1.16) translate(1.5%,1.2%)} }
     .bg-scrim {
       position:absolute; inset:0;
       background:radial-gradient(circle at 50% 45%, rgba(6,6,12,.18) 0%, rgba(0,0,0,.78) 85%);
+    }
+    #vinylStage {
+      position:fixed; inset:0; z-index:1; pointer-events:none;
+      display:none; align-items:center; justify-content:center;
+    }
+    #vinylStage.on { display:flex; }
+    .vinyl-rig {
+      position:relative; width:min(72vw, 390px); height:min(72vw, 390px);
+      display:flex; align-items:center; justify-content:center;
+    }
+    .vinyl-disc {
+      position:relative; width:100%; height:100%; border-radius:50%;
+      background:
+        repeating-radial-gradient(circle, rgba(255,255,255,.045) 0 1px, transparent 1px 4px),
+        radial-gradient(circle, #171923 28%, #0a0b10 68%, #1d202d 99%);
+      box-shadow:0 28px 80px rgba(0,0,0,.78), inset 0 0 0 2px rgba(255,255,255,.14), 0 0 60px color-mix(in srgb, var(--c1) 35%, transparent);
+      display:flex; align-items:center; justify-content:center;
+      will-change:transform;
+    }
+    .vinyl-label {
+      width:38%; height:38%; border-radius:50%; object-fit:cover;
+      border:3px solid color-mix(in srgb, var(--accent) 65%, rgba(255,255,255,.45));
+      box-shadow:0 0 24px rgba(0,0,0,.6);
+    }
+    .vinyl-hole {
+      position:absolute; width:18px; height:18px; border-radius:50%;
+      background:#08090d; border:3px solid rgba(226,232,240,.85);
+    }
+    .vinyl-sheen {
+      position:absolute; inset:0; border-radius:50%; pointer-events:none;
+      background:conic-gradient(from 32deg at 50% 50%, transparent 0deg, rgba(255,255,255,.09) 24deg, transparent 54deg, transparent 180deg, rgba(255,255,255,.08) 206deg, transparent 236deg);
+    }
+    .vinyl-arm {
+      position:absolute; top:2%; right:4%; width:12px; height:48%;
+      transform-origin:50% 10px;
+      transform:rotate(-8deg);
+      transition:transform .55s cubic-bezier(.22,1.2,.36,1);
+    }
+    .vinyl-arm.playing { transform:rotate(18deg); }
+    .vinyl-arm::before {
+      content:""; position:absolute; top:0; left:-7px; width:26px; height:26px; border-radius:50%;
+      background:#262938; border:2px solid rgba(255,255,255,.35);
+    }
+    .vinyl-arm::after {
+      content:""; position:absolute; top:14px; left:3px; width:5px; height:100%; border-radius:4px;
+      background:linear-gradient(180deg, #e2e8f0, #64748b);
+      box-shadow:0 6px 16px rgba(0,0,0,.65);
     }
     .blob {
       position:absolute; border-radius:50%; width:54vw; height:54vw; max-width:620px; max-height:620px;
@@ -41,6 +93,29 @@
     .blob.b2 { right:-6%; bottom:-4%; background:radial-gradient(circle, var(--c2), transparent 70%); animation-delay:-6s; }
     .blob.b3 { left:28%; top:34%; background:radial-gradient(circle, var(--c3), transparent 72%); animation-delay:-11s; opacity:.28; }
     @keyframes drift { 0%{transform:translate(0,0) scale(1)} 100%{transform:translate(5vw,-4vh) scale(1.14)} }
+
+    /* Chromeless OBS Streamer Mode */
+    body.obs-mode, html.obs-mode { background:transparent !important; }
+    body.obs-mode #hud, body.obs-mode #spModal, body.obs-mode #toast { display:none !important; }
+    body.obs-mode .backdrop { display:none !important; }
+    body.obs-mode.obs-bg .backdrop { display:block !important; }
+    body.obs-mode #edgeGlow { display:none !important; }
+    body.obs-mode.obs-glow #edgeGlow { display:block !important; }
+    body.obs-mode #stage { padding:24px !important; }
+
+    /* Synchronized Room Glow Wall Roles */
+    .edge-glow.room-left .eg-r { opacity:.18 !important; }
+    .edge-glow.room-center .eg-l, .edge-glow.room-center .eg-r { opacity:.12 !important; }
+    .edge-glow.room-right .eg-l { opacity:.18 !important; }
+
+    #toast {
+      position:fixed; top:max(18px, env(safe-area-inset-top)); left:50%; transform:translate(-50%,-16px);
+      z-index:40; background:rgba(20,16,36,.92); border:1px solid rgba(216,180,254,.4); color:#fff;
+      padding:8px 16px; border-radius:999px; font-size:12.5px; font-weight:600;
+      opacity:0; pointer-events:none; transition:opacity .25s ease, transform .25s ease;
+      backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+    }
+    #toast.show { opacity:1; transform:translate(-50%,0); }
 
     .edge-glow {
       position:fixed; inset:0; z-index:5; pointer-events:none;
@@ -245,18 +320,30 @@
 </head>
 <body>
   <div class="backdrop" id="backdrop">
-    <img id="bgArt" class="bg-art" alt="">
+    <img id="bgArtA" class="bg-art" alt="" crossorigin="anonymous">
+    <img id="bgArtB" class="bg-art" alt="" crossorigin="anonymous">
     <video id="bgVid" class="bg-art" autoplay loop muted playsinline style="filter:brightness(0.45) saturate(1.22);animation:none"></video>
     <div id="ytWrap" style="position:fixed;inset:-8%;z-index:0;opacity:0;pointer-events:none;transition:opacity .7s ease;filter:brightness(0.45) saturate(1.2)"><div id="ytPlayer" style="width:100%;height:100%"></div></div>
     <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+    <div id="vinylStage">
+      <div class="vinyl-rig">
+        <div class="vinyl-disc" id="vinylDisc">
+          <img class="vinyl-label" id="vinylArt" alt="" crossorigin="anonymous">
+          <div class="vinyl-hole"></div>
+          <div class="vinyl-sheen"></div>
+        </div>
+        <div class="vinyl-arm" id="vinylArm"></div>
+      </div>
+    </div>
     <div class="bg-scrim"></div>
   </div>
   <div class="edge-glow" id="edgeGlow"><i class="eg-t"></i><i class="eg-b"></i><i class="eg-l"></i><i class="eg-r"></i></div>
   <div id="stage"></div>
+  <div id="toast"></div>
 
   <div id="hud">
     <div class="hud-top">
-      <img id="artImg" class="art" alt="">
+      <img id="artImg" class="art" alt="" crossorigin="anonymous">
       <div class="meta">
         <div class="m-title" id="mTitle">SoulsLights</div>
         <div class="m-artist" id="mArtist">Connecting...</div>
@@ -268,6 +355,7 @@
         <button class="btn" onclick="sendCtrl('toggle_lyrics')" id="lyrBtn">Lyrics</button>
         <button class="btn" onclick="toggleGlow()" id="glowBtn">Glow</button>
         <button class="btn" onclick="sendCtrl('cycle_backdrop')" id="bdBtn">BG</button>
+        <button class="btn" onclick="event.stopPropagation(); exportStoryCard()" id="cardBtn" title="Save 9:16 Lyric Story Card">📷 Card</button>
         <button class="btn spotify" id="spBtn" onclick="openSpotifyModal()">Spotify</button>
       </div>
     </div>
@@ -389,14 +477,44 @@ const ICON_MAP = {
   "கடல்":"🌊", "அலை":"🌊", "நதி":"🌊", "மலர்":"🌺", "பூ":"🌸", "பூக்கள்":"🌸", "ரோஜா":"🌹", "தீ":"🔥", "நெருப்பு":"🔥",
   "கண்":"👁️", "கண்கள்":"👀", "விழி":"👀", "விழிகள்":"👀", "கண்ணீர்":"💧", "சிரிப்பு":"😊", "புன்னகை":"😊", "முத்தம்":"💋", "மௌனம்":"🤫",
   "கனவு":"💭", "நினைவு":"🎞️", "நினைவுகள்":"🎞️", "உலகம்":"🌍", "பயணம்":"🛣️", "பாட்டு":"🎵", "இசை":"🎶", "தங்கம்":"✨", "வைரம்":"💎",
-  "நண்பா":"🫂", "வாழ்க்கை":"✨", "சந்தோஷம்":"😊", "மயில்":"🦚", "குயில்":"🐦", "பறவை":"🕊️", "நட்சத்திரம்":"⭐", "விண்மீன்":"🌟"
+  "நண்பா":"🫂", "வாழ்க்கை":"✨", "சந்தோஷம்":"😊", "மயில்":"🦚", "குயில்":"🐦", "பறவை":"🕊️", "நட்சத்திரம்":"⭐", "விண்மீன்":"🌟",
+  // Explicit / Profanity / Rap & Pop Slang
+  fuck:"🤬", fucked:"💥", fucker:"🤬", fucking:"🤬", motherfucker:"🤬", mf:"🤬",
+  shit:"💩", shitty:"💩", bullshit:"💩", bs:"💩", crap:"💩", bitch:"😈", bitches:"😈", bastard:"😡",
+  ass:"🍑", asshole:"🤬", arse:"🍑", damn:"💢", dammit:"💢", goddamn:"💢", hell:"🔥", wtf:"🤯", stfu:"🤐",
+  dick:"🍆", cock:"🍆", pussy:"🍒", sex:"❤️‍🔥", sexy:"🔥", horny:"🥵", hoe:"💋", hoes:"💋", whore:"💄", slut:"💋",
+  baddie:"💅", freak:"😈", piss:"💢", pissed:"😡", suck:"👎", sucks:"👎", idiot:"🤡", stupid:"🤡", dumb:"🤡",
+  psycho:"😵‍💫", savage:"🐺", badass:"🕶️", kill:"🔪", murder:"🩸", dead:"💀", die:"💀", death:"☠️", grave:"🪦", blood:"🩸", gun:"🔫", shoot:"🔫",
+  weed:"🌿", kush:"🌿", high:"😶‍🌫️", drunk:"🍻", wasted:"🥴", hangover:"🤕", shots:"🥃", vodka:"🍸", tequila:"🍋", henny:"🥃", gin:"🍸", beer:"🍺",
+  lean:"🟣", perc:"💊", pills:"💊", drug:"💊", drugs:"💊", flex:"💪", drip:"💧", racks:"💵", bands:"💵", cash:"💵", bag:"💰",
+  saala:"💢", saale:"💢", kamina:"😈", kaminey:"😈", harami:"😈", pagal:"🤪", bewakoof:"🤡", pataka:"🧨", bawaal:"💥", jhakaas:"🔥",
+  machi:"🫂", machan:"🫂", thala:"👑", mass:"🔥", pwoli:"🔥", polichu:"💥", kidu:"⚡", aliyan:"🤜", thendi:"💢", poda:"👋", podi:"👋", myre:"🤬"
 };
+
+const CENSORED_BAD = {
+  fck:"🤬", fuk:"🤬", fuq:"🤬", fking:"🤬", fkin:"🤬", fk:"🤬", mf:"🤬",
+  sht:"💩", shyt:"💩", btch:"😈", bch:"😈", dmn:"💢", azz:"🍑", dck:"🍆", cck:"🍆", pssy:"🍒", sx:"❤️‍🔥"
+};
+
+const QP = new URLSearchParams(location.search);
+const isObsMode = location.pathname.endsWith("/obs") || QP.get("obs") === "1";
+if(isObsMode){
+  document.documentElement.classList.add("obs-mode");
+  document.body.classList.add("obs-mode");
+  if(QP.get("glow")==="1") document.body.classList.add("obs-glow");
+  if(QP.get("bg")==="1") document.body.classList.add("obs-bg");
+}
 
 let state = {
   title:"SoulsLights", artist:"", source:"", status:"Idle", is_playing:false,
   position_sec:0, duration_sec:0, colors:["#6366F1","#EC4899","#8B5CF6"],
-  accent:"#EC4899", lyrics_style: localStorage.getItem("sl_style") || "Fisheye Visual",
-  fisheye_effect: localStorage.getItem("sl_fe_fx") || "Auto Mix",
+  accent:"#EC4899", secondary:"#6366F1",
+  lyrics_style: QP.get("style") || localStorage.getItem("sl_style") || "Fisheye Visual",
+  fisheye_effect: QP.get("fx") || localStorage.getItem("sl_fe_fx") || "Auto Mix",
+  duet_split: localStorage.getItem("sl_duet") !== "0",
+  chorus_boost: localStorage.getItem("sl_cboost") !== "0",
+  chorus_energy: 0,
+  room_role: QP.get("room") || localStorage.getItem("sl_room") || "Solo",
   script_mode: localStorage.getItem("sl_script") || "Auto",
   glow_enabled: localStorage.getItem("sl_glow") !== "0",
   flow_mode: localStorage.getItem("sl_flow") || "Water Drop",
@@ -407,9 +525,12 @@ let state = {
   lyrics:[], styles:STYLES, lyrics_status:"Idle"
 };
 let lastPollAt = performance.now();
+let clockOffsetMs = 0;
 let lastArtKey = "";
+let bgActiveLayer = "A";
 let spLastTrackKey = "";
 let spLyricsCache = {};
+let vinylAngle = 0, vinylVel = 0, lastFrameTs = 0, webEnergy = 0;
 
 // ---- Persistent Storage (localStorage + 1-year cookie backup for iPad Safari/PWA) ----
 function getStore(k){
@@ -431,13 +552,27 @@ function delStore(k){
 const isLocalHost = ["192.168.", "10.", "172.", "127.0.0.1", "localhost"].some(p => location.hostname.startsWith(p));
 let mode = isLocalHost ? "local" : "spotify";
 
-stage.addEventListener("click", () => hud.classList.toggle("hidden"));
+if(!isObsMode) stage.addEventListener("click", () => hud.classList.toggle("hidden"));
+function showToast(msg){
+  const el = document.getElementById("toast"); if(!el) return;
+  el.textContent = msg; el.classList.add("show");
+  clearTimeout(el._t); el._t = setTimeout(()=>el.classList.remove("show"), 2300);
+}
 function fmtTime(s){ s=Math.max(0,Math.floor(s||0)); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
 function esc(s){ return String(s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function wordIcon(w){
-  const raw = String(w||"").toLowerCase();
+  const raw = String(w||"").toLowerCase().trim();
+  if(/[*\u0024@#!]/.test(raw)){
+    const stripped = raw.replace(/[^a-z]/g,"");
+    if(CENSORED_BAD[stripped]) return CENSORED_BAD[stripped];
+    if(/^f[^a-z]*c?k\w*$/.test(raw)) return "🤬";
+    if(/^s[^a-z]*t\w*$/.test(raw) && raw.length>=4) return "💩";
+    if(/^b[^a-z]*t?ch\w*$/.test(raw)) return "😈";
+    if(/^a[^a-z]{2,}$/.test(raw)) return "🍑";
+  }
   const k = raw.replace(/[^a-z\u0900-\u0d7f\u200c\u200d]/g,"");
   if(!k) return "";
+  if(CENSORED_BAD[k]) return CENSORED_BAD[k];
   if(ICON_MAP[k]) return ICON_MAP[k];
   const ascii = k.replace(/[^a-z]/g,"");
   if(ascii){
@@ -595,17 +730,54 @@ function extractImageColors(url){
   img.src = url;
 }
 
-function parseLrc(lrc){
+function tagDuetAndSections(lines, artist="", title=""){
+  if(!Array.isArray(lines) || !lines.length) return lines;
+  const duetTrack = /\b(?:feat\.?|ft\.?|featuring|with)\b|[,&/×+]/i.test(`${artist} ${title}`);
+  const counts = {};
+  for(const ln of lines){
+    const k = String(ln.text||"").toLowerCase().replace(/[\(\)\[\],.!?]+/g,"").trim();
+    if(k.length>=6) counts[k] = (counts[k]||0) + 1;
+  }
+  let curSlot = 0, curSpk = "", inChorus = false;
+  return lines.map((ln, i) => {
+    if(ln.vocal_slot !== undefined && ln.is_chorus !== undefined) return ln;
+    const txt = String(ln.text||"").trim();
+    const prevEnd = i>0 ? (lines[i-1].end ?? lines[i-1].time) : ln.time;
+    const gap = ln.time - prevEnd;
+    const secM = txt.match(/\[?\b(verse\s*\d*|chorus|pre-?chorus|post-?chorus|hook|drop|bridge|outro|intro|part\s*\d+)\b\]?/i);
+    const spkM = txt.match(/^(?:\[([A-Za-z0-9 ._-]{2,24})\]|([A-Za-z][A-Za-z0-9 ._-]{1,22}):)\s+/);
+    const hasFeat = /\b(?:feat\.?|ft\.?|featuring|with)\b|[,&/×+]/i.test(txt);
+    const isParen = txt.startsWith("(") && txt.endsWith(")") && txt.length > 2;
+    if(secM){
+      inChorus = /\b(chorus|drop|hook|post-?chorus)\b/i.test(secM[1]);
+      curSlot = 1 - curSlot;
+    } else if(spkM){
+      const spk = (spkM[1]||spkM[2]||"").trim().toLowerCase();
+      if(spk && spk !== curSpk){ curSpk = spk; curSlot = 1 - curSlot; }
+    } else if(hasFeat){
+      curSlot = 1;
+    } else if(!isParen && duetTrack && i>0 && gap > 1.65){
+      curSlot = 1 - curSlot;
+    }
+    const norm = txt.toLowerCase().replace(/[\(\)\[\],.!?]+/g,"").trim();
+    const nW = (ln.words||[]).length;
+    const dur = Math.max(0.35, (ln.end||ln.time+1) - ln.time);
+    const repChorus = (counts[norm]>=2 && (nW/dur)>=1.6);
+    return {...ln, vocal_slot: isParen ? (1 - curSlot) : curSlot, is_chorus: !!(inChorus || repChorus)};
+  });
+}
+
+function parseLrc(lrc, artist="", title=""){
   const raw = [];
   for(const line of String(lrc||"").split(/\r?\n/)){
-    const matches = [...line.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)];
+    const matches = [...line.matchAll(/\[(\d+):(\d+(?:[.:]\d+)?)\]/g)];
     if(!matches.length) continue;
-    const txt = line.replace(/\[[^\]]+\]/g,"").trim();
+    const txt = line.replace(/\[\d+:\d+(?:[.:]\d+)?\]/g,"").replace(/\[(ti|ar|al|au|by|offset|re|ve):[^\]]*\]/ig,"").trim();
     if(!txt) continue;
-    for(const m of matches) raw.push({time: Number(m[1])*60 + Number(m[2]), text: txt});
+    for(const m of matches) raw.push({time: Number(m[1])*60 + Number(m[2].replace(":",".")), text: txt});
   }
   raw.sort((a,b)=>a.time-b.time);
-  return raw.map((ln, idx)=>{
+  const parsed = raw.map((ln, idx)=>{
     const nextT = idx+1 < raw.length ? raw[idx+1].time : ln.time + 4.0;
     const end = Math.max(ln.time + 0.5, Math.min(ln.time + 7.5, nextT - 0.1));
     const ws = ln.text.split(/\s+/).filter(Boolean);
@@ -620,6 +792,7 @@ function parseLrc(lrc){
     });
     return {time: ln.time, end, text: ln.text, words};
   });
+  return tagDuetAndSections(parsed, artist, title);
 }
 
 async function fetchLrclib(title, artist, album, dur){
@@ -654,7 +827,7 @@ async function fetchLrclib(title, artist, album, dur){
           return Math.abs((x.duration||dur)-dur) + sp + ap;
         };
         synced.sort((a,b)=>scoreItem(a)-scoreItem(b));
-        let lines = parseLrc(synced[0].syncedLyrics);
+        let lines = parseLrc(synced[0].syncedLyrics, artist, title);
         if(sm==="Romanized" && detectScript(lines.slice(0,6).map(x=>x.text).join(" ")) !== "roman"){
           lines = lines.map(ln=>({...ln, text:romanizeText(ln.text), words:ln.words.map(w=>({...w, word:romanizeWord(w.word)}))}));
         }
@@ -715,7 +888,7 @@ async function resolveMusicVideo(title, artist){
   const vidEl = document.getElementById("bgVid");
   if(vidEl){ vidEl.pause(); vidEl.removeAttribute("src"); vidEl.classList.remove("ready"); }
   mountYoutube("");
-  if(state.backdrop_style !== "Music Video" || state.backdrop_mode === "Off" || !title || state.status === "Idle") return;
+  if(state.backdrop_style !== "Music Video" || state.backdrop_mode === "Off" || !title || state.status === "Idle" || isObsMode) return;
   let mp4 = state.music_video_url || "";
   let ytid = "";
   try {
@@ -754,6 +927,14 @@ async function resolveMusicVideo(title, artist){
   }
 }
 
+function setRoomRole(role){
+  state.room_role = role || "Solo";
+  setStore("sl_room", state.room_role);
+  applyTheme();
+  buildChips();
+  showToast(state.room_role==="Solo" ? "Room Glow: Solo Device" : `Room Glow Wall: ${state.room_role} Zone`);
+}
+
 function applyTheme(){
   const cols = state.colors || ["#6366F1","#EC4899","#8B5CF6"];
   const isOne = (state.gradient_mode === "1 Color");
@@ -767,16 +948,25 @@ function applyTheme(){
   document.documentElement.style.setProperty("--ec2", c2);
   document.documentElement.style.setProperty("--ec3", c3);
   document.documentElement.style.setProperty("--accent", acc);
-  const gi = Math.max(0.4, Math.min(2.6, Number(state.glow_intensity || 1.35)));
+  const eMul = (state.chorus_boost !== false ? webEnergy : 0);
+  const gi = Math.max(0.4, Math.min(3.0, Number(state.glow_intensity || 1.35) + eMul * 0.65));
   document.documentElement.style.setProperty("--glow-px", Math.round(14 + gi * 18) + "px");
   document.documentElement.style.setProperty("--glow-blur", Math.round(14 + gi * 22) + "px");
-  document.documentElement.style.setProperty("--glow-spread", Math.round(1 + gi * 4) + "px");
+  document.documentElement.style.setProperty("--glow-spread", Math.round(1 + gi * 4.5) + "px");
   const flowCls = ({
     "Water Drop":"flow-water","Liquid Flow":"flow-liquid","Aurora Wave":"flow-aurora",
     "Neon Prism":"flow-prism","Beat Pulse":"flow-beat","Breathing":"flow-breath","Static":"flow-static"
   })[state.flow_mode || "Water Drop"] || "flow-water";
-  document.getElementById("edgeGlow").className = "edge-glow " + flowCls + (state.glow_enabled ? "" : " off");
+  const roomCls = ({Left:"room-left", Center:"room-center", Right:"room-right"})[state.room_role] || "";
+  document.getElementById("edgeGlow").className = `edge-glow ${flowCls} ${roomCls} ${state.glow_enabled ? "" : "off"}`.trim();
   document.getElementById("backdrop").style.opacity = state.backdrop_mode === "Off" ? "0.18" : "0.88";
+
+  const isVinyl = (state.backdrop_style === "Spinning Vinyl" && state.backdrop_mode !== "Off" && !isObsMode);
+  const vStage = document.getElementById("vinylStage");
+  if(vStage) vStage.classList.toggle("on", isVinyl);
+  const vArm = document.getElementById("vinylArm");
+  if(vArm) vArm.classList.toggle("playing", isVinyl && !!state.is_playing);
+
   const wantMv = (state.backdrop_style === "Music Video" && state.backdrop_mode !== "Off");
   const vidEl = document.getElementById("bgVid");
   if(!wantMv){
@@ -790,14 +980,14 @@ function applyTheme(){
   }
   const gb = document.getElementById("glowBtn"); if(gb){ gb.textContent = state.glow_enabled ? "Glow: On" : "Glow: Off"; gb.style.opacity = state.glow_enabled ? "1" : "0.55"; }
   const lb = document.getElementById("lyrBtn"); if(lb) lb.style.opacity = (state.lyrics_enabled !== false) ? "1" : "0.5";
-  const bb = document.getElementById("bdBtn"); if(bb) bb.textContent = state.backdrop_mode === "Off" ? "BG: Off" : (wantMv ? "BG: MV" : "BG: On");
+  const bb = document.getElementById("bdBtn"); if(bb) bb.textContent = state.backdrop_mode === "Off" ? "BG: Off" : (wantMv ? "BG: MV" : (isVinyl ? "BG: Vinyl" : "BG: On"));
   stage.style.opacity = (state.lyrics_enabled === false) ? "0" : "1";
 }
 
 function buildChips(){
   const list = (state.styles && state.styles.length) ? state.styles : STYLES;
   const isFe = (state.lyrics_style || "").startsWith("Fisheye");
-  const curFe = state.fisheye_effect || localStorage.getItem("sl_fe_fx") || "Auto Mix";
+  const curFe = state.fisheye_effect || getStore("sl_fe_fx") || "Auto Mix";
   document.getElementById("styleChips").innerHTML = list.map(st =>
     `<button class="chip ${st===state.lyrics_style?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_style','${esc(st)}')">${esc(st)}</button>`
   ).join("") + (isFe ? FISHEYE_EFFECTS.map(fx =>
@@ -809,19 +999,25 @@ function buildChips(){
   const ints = [[0.55,"Subtle"],[1.1,"Normal"],[1.7,"Bright"],[2.4,"Max"]];
   const nearGi = ints.reduce((a,b)=>Math.abs(b[0]-curGi)<Math.abs(a[0]-curGi)?b:a)[0];
   const isOne = (state.gradient_mode === "1 Color");
-  const curBds = state.backdrop_style || localStorage.getItem("sl_bd_style") || "2-Blob Aura";
+  const curBds = state.backdrop_style || getStore("sl_bd_style") || "2-Blob Aura";
+  const curRoom = state.room_role || "Solo";
   document.getElementById("glowChips").innerHTML =
     flows.map(fl => `<button class="chip ${fl===curF?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_flow_mode','${fl}')">Flow: ${fl}</button>`).join("") +
     ints.map(([v,lbl]) => `<button class="chip ${v===nearGi?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_glow_intensity',${v})">${lbl}</button>`).join("") +
     `<button class="chip ${!isOne?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_gradient_mode','Multi Colors')">Multi Color</button>` +
     `<button class="chip ${isOne?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_gradient_mode','1 Color')">1 Color</button>` +
-    ["2-Blob Aura","Video Reel","Music Video"].map(bs => `<button class="chip ${bs===curBds?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_backdrop_style','${bs}')">BG: ${bs==='Music Video'?'Music Video':bs.split(' ')[0]}</button>`).join("");
+    ["2-Blob Aura","Video Reel","Spinning Vinyl","Music Video"].map(bs => `<button class="chip ${bs===curBds?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_backdrop_style','${bs}')">BG: ${bs==='Music Video'?'Music Video':(bs==='Spinning Vinyl'?'Vinyl':bs.split(' ')[0])}</button>`).join("") +
+    ["Solo","Left","Center","Right"].map(rm => `<button class="chip ${rm===curRoom?'active':''}" onclick="event.stopPropagation(); setRoomRole('${rm}')">Room: ${rm}</button>`).join("");
   const fSc = (state.font_scale || 1.0).toFixed(1);
+  const duetOn = state.duet_split !== false;
+  const cboostOn = state.chorus_boost !== false;
   document.getElementById("scriptChips").innerHTML = [
     ["Auto","Auto"],["Native","Native"],["Romanized","Roman"]
   ].map(([k,lbl]) =>
     `<button class="chip ${k===state.script_mode?'active':''}" onclick="event.stopPropagation(); sendCtrl('set_script_mode','${k}')">${lbl}</button>`
   ).join("") +
+    `<button class="chip ${duetOn?'active':''}" onclick="event.stopPropagation(); sendCtrl('toggle_duet_split')">Duet Split</button>` +
+    `<button class="chip ${cboostOn?'active':''}" onclick="event.stopPropagation(); sendCtrl('toggle_chorus_boost')">Chorus Boost</button>` +
     `<button class="chip" onclick="event.stopPropagation(); sendCtrl('set_font_scale', Math.max(0.7, (state.font_scale||1)-0.15))">A-</button>` +
     `<button class="chip" onclick="event.stopPropagation(); sendCtrl('set_font_scale', Math.min(2.2, (state.font_scale||1)+0.15))">A+ (${fSc}x)</button>` +
     `<button class="chip" onclick="event.stopPropagation(); sendCtrl('refresh_lyrics')">↻ Refresh</button>`;
@@ -849,6 +1045,8 @@ async function sendCtrl(action, value){
   }
   if(action === "set_style"){ state.lyrics_style = value; setStore("sl_style", value); lastRenderKey=""; buildChips(); return; }
   if(action === "set_fisheye_effect"){ state.fisheye_effect = value; setStore("sl_fe_fx", value); lastRenderKey=""; buildChips(); return; }
+  if(action === "toggle_duet_split"){ state.duet_split = !(state.duet_split !== false); setStore("sl_duet", state.duet_split?"1":"0"); lastRenderKey=""; buildChips(); return; }
+  if(action === "toggle_chorus_boost"){ state.chorus_boost = !(state.chorus_boost !== false); setStore("sl_cboost", state.chorus_boost?"1":"0"); applyTheme(); buildChips(); return; }
   if(action === "set_script_mode"){ state.script_mode = value; setStore("sl_script", value); spLastTrackKey=""; lastRenderKey=""; buildChips(); pollState(); return; }
   if(action === "toggle_glow"){ state.glow_enabled = !state.glow_enabled; setStore("sl_glow", state.glow_enabled?"1":"0"); applyTheme(); return; }
   if(action === "set_flow_mode"){ state.flow_mode = value; setStore("sl_flow", value); applyTheme(); buildChips(); return; }
@@ -856,7 +1054,7 @@ async function sendCtrl(action, value){
   if(action === "set_gradient_mode"){ state.gradient_mode = value; setStore("sl_grad", value); applyTheme(); buildChips(); return; }
   if(action === "set_backdrop_style"){
     state.backdrop_style = value; setStore("sl_bd_style", value);
-    if(value === "Music Video" && state.backdrop_mode === "Off") state.backdrop_mode = "Desktop Layer";
+    if(["Music Video","Spinning Vinyl"].includes(value) && state.backdrop_mode === "Off") state.backdrop_mode = "Desktop Layer";
     mvTrackKey = ""; applyTheme(); buildChips();
     if(value === "Music Video") resolveMusicVideo(state.title, state.artist);
     return;
@@ -881,10 +1079,141 @@ async function sendCtrl(action, value){
 function toggleGlow(){ sendCtrl("toggle_glow"); }
 
 function setArtBackdrop(src){
-  const bg = document.getElementById("bgArt");
-  if(!bg) return;
-  if(src){ bg.src = src; bg.classList.add("ready"); }
-  else { bg.removeAttribute("src"); bg.classList.remove("ready"); }
+  const elA = document.getElementById("bgArtA");
+  const elB = document.getElementById("bgArtB");
+  const vArt = document.getElementById("vinylArt");
+  if(vArt){ if(src) vArt.src = src; else vArt.removeAttribute("src"); }
+  if(!elA || !elB) return;
+  if(!src){
+    elA.classList.remove("ready","blur-out"); elB.classList.remove("ready","blur-out");
+    elA.removeAttribute("src"); elB.removeAttribute("src");
+    return;
+  }
+  const inc = bgActiveLayer === "A" ? elB : elA;
+  const out = bgActiveLayer === "A" ? elA : elB;
+  bgActiveLayer = (bgActiveLayer === "A") ? "B" : "A";
+  inc.classList.remove("blur-out");
+  inc.onload = () => {
+    inc.classList.add("ready");
+    out.classList.remove("ready");
+    out.classList.add("blur-out");
+  };
+  inc.src = src;
+  if(inc.complete) inc.onload();
+}
+
+async function exportStoryCard(){
+  try {
+    showToast("Creating 9:16 Lyric Story Card...");
+    const CW = 1080, CH = 1920;
+    const cv = document.createElement("canvas");
+    cv.width = CW; cv.height = CH;
+    const ctx = cv.getContext("2d");
+
+    const cols = state.colors || ["#6366F1","#EC4899","#8B5CF6"];
+    const c1 = cols[0] || "#6366F1", c2 = cols[1] || cols[0] || "#EC4899", c3 = cols[2] || c1;
+    const g = ctx.createLinearGradient(0, 0, CW, CH);
+    g.addColorStop(0, c1); g.addColorStop(0.5, "#110d1e"); g.addColorStop(1, c2);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, CW, CH);
+
+    const artEl = document.getElementById("artImg");
+    let loadedArt = null;
+    if(artEl && artEl.src){
+      loadedArt = await new Promise(res => {
+        const im = new Image(); im.crossOrigin = "anonymous";
+        im.onload = () => res(im); im.onerror = () => res(artEl.complete && artEl.naturalWidth ? artEl : null);
+        im.src = artEl.src;
+      });
+    }
+    if(loadedArt){
+      ctx.save();
+      ctx.globalAlpha = 0.42;
+      ctx.filter = "blur(56px) saturate(1.35) brightness(0.62)";
+      const scaleBg = Math.max(CW / loadedArt.width, CH / loadedArt.height) * 1.12;
+      const bw = loadedArt.width * scaleBg, bh = loadedArt.height * scaleBg;
+      ctx.drawImage(loadedArt, (CW - bw)/2, (CH - bh)/2, bw, bh);
+      ctx.restore();
+    }
+    const rad = ctx.createRadialGradient(CW*0.5, CH*0.44, 120, CW*0.5, CH*0.44, CH*0.65);
+    rad.addColorStop(0, "rgba(0,0,0,0.12)");
+    rad.addColorStop(1, "rgba(4,4,10,0.82)");
+    ctx.fillStyle = rad; ctx.fillRect(0, 0, CW, CH);
+
+    // Album Cover Card (500x500)
+    const artSz = 500, ax = (CW - artSz)/2, ay = 260, radC = 44;
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.65)"; ctx.shadowBlur = 64; ctx.shadowOffsetY = 26;
+    ctx.beginPath(); ctx.roundRect(ax, ay, artSz, artSz, radC); ctx.fillStyle = "#161326"; ctx.fill();
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; ctx.clip();
+    if(loadedArt){ ctx.drawImage(loadedArt, ax, ay, artSz, artSz); }
+    ctx.restore();
+    ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.roundRect(ax, ay, artSz, artSz, radC); ctx.stroke();
+
+    // Active Lyric Phrase + Next Line Whisper
+    const pos = getLivePos(), lyrics = state.lyrics || [];
+    let idx = 0; for(let i=0;i<lyrics.length;i++){ if(lyrics[i].time<=pos) idx=i; else break; }
+    const curLine = lyrics[idx];
+    const lyricTxt = curLine ? curLine.text : (state.title || "SoulsLights");
+    const nextTxt = (lyrics[idx+1]?.text || "");
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = '800 62px -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif';
+    const words = lyricTxt.split(/\s+/);
+    const wrapped = []; let curW = "";
+    for(const w of words){
+      const test = curW ? `${curW} ${w}` : w;
+      if(ctx.measureText(test).width > CW - 160 && curW){ wrapped.push(curW); curW = w; }
+      else curW = test;
+    }
+    if(curW) wrapped.push(curW);
+    const showLines = wrapped.slice(0, 4);
+    let lyY = 980 - (showLines.length - 1) * 42;
+    for(const lnStr of showLines){
+      ctx.save();
+      ctx.shadowColor = state.accent || c2; ctx.shadowBlur = 28;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(lnStr, CW/2, lyY);
+      ctx.restore();
+      lyY += 86;
+    }
+    if(nextTxt){
+      ctx.font = '600 32px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      ctx.fillStyle = "rgba(226,232,244,0.62)";
+      ctx.fillText(nextTxt.slice(0, 48), CW/2, lyY + 46);
+    }
+
+    // Track Metadata & SoulsLights Glass Footer Pill
+    ctx.font = '700 40px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillText((state.title || "SoulsLights").slice(0, 36), CW/2, 1545);
+    ctx.font = '500 30px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.fillStyle = "rgba(216,180,254,0.86)";
+    ctx.fillText((state.artist || c3).slice(0, 42), CW/2, 1605);
+
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.strokeStyle = "rgba(216,180,254,0.38)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(CW/2 - 190, 1720, 380, 68, 34); ctx.fill(); ctx.stroke();
+    ctx.font = '700 26px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.fillStyle = "#f3e8ff";
+    ctx.fillText("✦ SoulsLights Studio", CW/2, 1755);
+
+    const blob = await new Promise(res => cv.toBlob(res, "image/png"));
+    if(!blob) return showToast("Export failed");
+    const file = new File([blob], "soulslights-story.png", {type:"image/png"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title: `${state.title} — SoulsLights`}).catch(()=>{});
+      showToast("Story Card shared!");
+    } else {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `soulslights-${(state.title||"story").toLowerCase().replace(/[^a-z0-9]+/g,"-")}.png`;
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+      showToast("Saved 9:16 Lyric Story Card PNG!");
+    }
+  } catch(e){
+    showToast("Could not create Story Card");
+  }
 }
 
 async function pollState(){
@@ -893,8 +1222,16 @@ async function pollState(){
       const t0 = performance.now();
       const r = await fetch("/api/state", {cache:"no-store"});
       if(!r.ok) return;
-      state = await r.json();
-      lastPollAt = (t0 + performance.now()) * 0.5;
+      const d = await r.json();
+      const t1 = performance.now();
+      const keepStyle = isObsMode && QP.get("style");
+      const keepFx = isObsMode && QP.get("fx");
+      const savedRoom = state.room_role;
+      state = {...d, room_role: savedRoom};
+      if(keepStyle) state.lyrics_style = keepStyle;
+      if(keepFx) state.fisheye_effect = keepFx;
+      lastPollAt = (t0 + t1) * 0.5;
+      if(d.server_ts) clockOffsetMs = (d.server_ts * 1000) - Date.now();
       applyTheme();
       document.getElementById("mTitle").textContent = state.title || "No Active Music";
       document.getElementById("mArtist").textContent = (state.artist||"") + (state.source?` • ${state.source}`:"");
@@ -996,32 +1333,88 @@ function lineTiltDeg(tk, idx){
 let lastRenderKey = "";
 function renderFrame(nowTs){
   requestAnimationFrame(renderFrame);
-  if(state.glow_enabled){
-    const fm = state.flow_mode || "Water Drop";
-    const sp = fm==="Neon Prism" ? 135 : (fm==="Liquid Flow" ? 70 : (fm==="Water Drop" ? 85 : (fm==="Aurora Wave" ? 42 : 0)));
-    if(sp > 0) document.documentElement.style.setProperty("--glow-ang", (((nowTs||0)*0.001*sp)%360).toFixed(1) + "deg");
-  }
+  const dt = lastFrameTs ? Math.min(0.08, Math.max(0.004, (nowTs - lastFrameTs) * 0.001)) : 0.016;
+  lastFrameTs = nowTs || performance.now();
+
+  // Spinning Vinyl smooth inertial spin-up & coast-to-stop physics
+  const vDisc = document.getElementById("vinylDisc");
+  const isVinylActive = (state.backdrop_style === "Spinning Vinyl" && state.backdrop_mode !== "Off" && !isObsMode);
+  const tgtVel = (isVinylActive && state.is_playing) ? 44.0 : 0.0;
+  if(tgtVel > vinylVel) vinylVel = Math.min(tgtVel, vinylVel + dt * 52.0);
+  else vinylVel = Math.max(0.0, vinylVel * Math.exp(-dt * 2.1));
+  vinylAngle = (vinylAngle + dt * vinylVel) % 360.0;
+  if(vDisc && isVinylActive) vDisc.style.transform = `rotate(${vinylAngle.toFixed(2)}deg)`;
+
   const pos = getLivePos(), dur = state.duration_sec || 0;
+  const lyrics = state.lyrics || [];
+  let idx = 0; for(let i=0;i<lyrics.length;i++){ if(lyrics[i].time<=pos) idx=i; else break; }
+
+  // Auto Chorus Energy Boost (desktop feed OR live lyric density estimation)
+  let tgtE = 0;
+  if(state.is_playing && state.chorus_boost !== false){
+    if(mode === "local" && state.chorus_energy !== undefined){
+      tgtE = Number(state.chorus_energy || 0);
+    } else if(lyrics.length){
+      let wCnt = 0;
+      for(const ln of lyrics){
+        if(ln.time > pos + 2.2) break;
+        for(const w of (ln.words||[])){ if(w.start >= pos - 2.2 && w.start <= pos + 2.2) wCnt++; }
+      }
+      const wps = wCnt / 4.4;
+      const dE = Math.max(0, Math.min(1, (wps - 1.9) / 2.1));
+      const chE = lyrics[idx]?.is_chorus ? 0.38 : 0;
+      tgtE = Math.min(1, dE * 0.62 + chE);
+    }
+  }
+  webEnergy += (tgtE - webEnergy) * Math.min(1, dt * (tgtE > webEnergy ? 2.6 : 1.0));
+
+  // Synchronized Room Glow Wall phase-locked clock (Left -> Center -> Right)
+  if(state.glow_enabled && !(isObsMode && !document.body.classList.contains("obs-glow"))){
+    const fm = state.flow_mode || "Water Drop";
+    const syncSec = (Date.now() + clockOffsetMs) * 0.001;
+    const rOff = ({Solo:0, Left:0, Center:0.55, Right:1.10})[state.room_role || "Solo"] || 0;
+    const sp = (fm==="Neon Prism" ? 135 : (fm==="Liquid Flow" ? 70 : (fm==="Water Drop" ? 85 : (fm==="Aurora Wave" ? 42 : 0)))) * (1 + 0.35 * webEnergy);
+    if(sp > 0){
+      const angDeg = ((syncSec * sp - rOff * 58) % 360 + 360) % 360;
+      document.documentElement.style.setProperty("--glow-ang", angDeg.toFixed(1) + "deg");
+    }
+    const eg = document.getElementById("edgeGlow");
+    if(eg && (state.room_role && state.room_role !== "Solo")){
+      const crest = 0.68 + 0.32 * Math.sin(syncSec * (2.2 + webEnergy) - rOff * 2.1);
+      eg.style.opacity = Math.min(1, crest).toFixed(2);
+    } else if(eg){
+      eg.style.opacity = "";
+    }
+    const gi = Math.max(0.4, Math.min(3.0, Number(state.glow_intensity || 1.35) + (state.chorus_boost!==false ? webEnergy*0.65 : 0)));
+    document.documentElement.style.setProperty("--glow-px", Math.round(14 + gi * 18) + "px");
+    document.documentElement.style.setProperty("--glow-blur", Math.round(14 + gi * 22) + "px");
+  }
+
   document.getElementById("tPos").textContent = fmtTime(pos);
   document.getElementById("tDur").textContent = fmtTime(dur);
   document.getElementById("progFill").style.width = dur>0 ? Math.min(100,(pos/dur)*100)+"%" : "0%";
 
-  const lyrics = state.lyrics || [];
   const style = state.lyrics_style || "Fisheye Visual";
   if(!lyrics.length || pos < lyrics[0].time - 1.8){
     const rk = `idle|${style}|${state.status}|${state.lyrics_status}|${state.title}`;
     if(rk === lastRenderKey) return;
     lastRenderKey = rk;
+    if(isObsMode){ stage.innerHTML = ""; return; }
     stage.innerHTML = `<div class="idle-dots"><span></span><span></span><span></span></div>
       <div class="sub-whisper">${esc(state.status==="Idle" ? "Play music in Spotify or Apple Music" : (state.lyrics_status||state.title))}</div>`;
     return;
   }
-  let idx = 0; for(let i=0;i<lyrics.length;i++){ if(lyrics[i].time<=pos) idx=i; else break; }
   const cur = lyrics[idx], words = cur.words || [];
   let wIdx = 0; for(let wi=0;wi<words.length;wi++){ if(words[wi].start<=pos) wIdx=wi; else break; }
 
   const feFx = state.fisheye_effect || getStore("sl_fe_fx") || "Auto Mix";
-  const rk = `${style}|${feFx}|${state.title}|${idx}|${wIdx}|${lyrics.length}`;
+  const duetOn = (state.duet_split !== false);
+  const cols = state.colors || ["#6366F1","#EC4899","#8B5CF6"];
+  const lineAcc = (duetOn && Number(cur.vocal_slot) === 1) ? (state.secondary || cols[0] || "#6366F1") : (state.accent || cols[1] || "#EC4899");
+  const altAcc = (duetOn && Number(cur.vocal_slot) === 1) ? (state.accent || cols[1] || "#EC4899") : (state.secondary || cols[0] || "#6366F1");
+  stage.style.setProperty("--accent", lineAcc);
+
+  const rk = `${style}|${feFx}|${duetOn}|${cur.vocal_slot||0}|${state.title}|${idx}|${wIdx}|${lyrics.length}`;
   if(rk === lastRenderKey) return;
   lastRenderKey = rk;
 
@@ -1101,13 +1494,13 @@ function renderFrame(nowTs){
       return {x:cx+rr*Math.cos(a), y:cy+rr*Math.sin(a), w:w.word};
     });
     for(let i=0;i<wIdx;i++){
-      svg+=`<line x1="${nodes[i].x}" y1="${nodes[i].y}" x2="${nodes[i+1].x}" y2="${nodes[i+1].y}" stroke="var(--accent)" stroke-width="5" stroke-opacity=".45"/>`;
+      svg+=`<line x1="${nodes[i].x}" y1="${nodes[i].y}" x2="${nodes[i+1].x}" y2="${nodes[i+1].y}" stroke="${lineAcc}" stroke-width="5" stroke-opacity=".45"/>`;
       svg+=`<line x1="${nodes[i].x}" y1="${nodes[i].y}" x2="${nodes[i+1].x}" y2="${nodes[i+1].y}" stroke="#fff" stroke-width="2" stroke-opacity=".9"/>`;
     }
     svg+=`<circle cx="${cx}" cy="${cy}" r="11" fill="#e2e8f0" stroke="#000" stroke-width="2.5"/>`;
     nodes.forEach((n,wi)=>{
       const act=wi===wIdx, done=wi<wIdx;
-      svg+=`<circle cx="${n.x}" cy="${n.y}" r="${act?7:4}" fill="${act?'#fff':done?'var(--accent)':'rgba(255,255,255,.35)'}"/>`;
+      svg+=`<circle cx="${n.x}" cy="${n.y}" r="${act?7:4}" fill="${act?'#fff':done?lineAcc:'rgba(255,255,255,.35)'}"/>`;
       svg+=`<text x="${n.x}" y="${n.y-14}" text-anchor="middle" fill="${act?'#fff':done?'rgba(255,255,255,.88)':'rgba(255,255,255,.4)'}" font-size="${act?23:16}" font-weight="${act?800:600}">${esc(n.w)}</text>`;
     });
     stage.innerHTML = `<svg class="svg-stage" viewBox="0 0 ${W} ${H}">${svg}</svg>`;
@@ -1166,17 +1559,17 @@ function renderFrame(nowTs){
     for(let i=0;i<pts.length-1;i++){
       if(i < wIdx){
         const isLast = (i === wIdx - 1);
-        svg+=`<line x1="${pts[i].x}" y1="${pts[i].y+12}" x2="${pts[i+1].x}" y2="${pts[i+1].y+12}" stroke="var(--accent)" stroke-width="${isLast?6:3.5}" stroke-opacity="${isLast?.72:.4}" filter="url(#stGlow)"/>`;
+        svg+=`<line x1="${pts[i].x}" y1="${pts[i].y+12}" x2="${pts[i+1].x}" y2="${pts[i+1].y+12}" stroke="${lineAcc}" stroke-width="${isLast?6:3.5}" stroke-opacity="${isLast?.72:.4}" filter="url(#stGlow)"/>`;
         svg+=`<line x1="${pts[i].x}" y1="${pts[i].y+12}" x2="${pts[i+1].x}" y2="${pts[i+1].y+12}" stroke="#fff" stroke-width="${isLast?2.4:1.4}" stroke-opacity=".95"/>`;
       }
     }
     pts.forEach((p,wi)=>{
       const act=wi===wIdx, done=wi<wIdx;
       if(act){
-        svg+=`<circle cx="${p.x}" cy="${p.y+12}" r="16" fill="var(--accent)" fill-opacity=".35" filter="url(#stGlow)"/>`;
+        svg+=`<circle cx="${p.x}" cy="${p.y+12}" r="16" fill="${lineAcc}" fill-opacity=".35" filter="url(#stGlow)"/>`;
         svg+=`<path d="M${p.x},${p.y+1} L${p.x+2.6},${p.y+9.4} L${p.x+11},${p.y+12} L${p.x+2.6},${p.y+14.6} L${p.x},${p.y+23} L${p.x-2.6},${p.y+14.6} L${p.x-11},${p.y+12} L${p.x-2.6},${p.y+9.4} Z" fill="#fff" filter="url(#stGlow)"/>`;
       } else {
-        svg+=`<circle cx="${p.x}" cy="${p.y+12}" r="${done?4.2:2.4}" fill="${done?'var(--accent)':'rgba(215,228,255,.45)'}"/>`;
+        svg+=`<circle cx="${p.x}" cy="${p.y+12}" r="${done?4.2:2.4}" fill="${done?lineAcc:'rgba(215,228,255,.45)'}"/>`;
       }
       svg+=`<text x="${p.x}" y="${p.y-12}" text-anchor="middle" fill="${act?'#fff':done?'rgba(235,244,255,.88)':'rgba(195,210,235,.44)'}" font-size="${act?26:16}" font-weight="${act?800:600}" ${act?'filter="url(#stGlow)"':''}>${esc(p.w)}</text>`;
     });
@@ -1193,13 +1586,13 @@ function renderFrame(nowTs){
       if(u <= wIdx/Math.max(1,n-1)+0.001) litD += (s===0?`M${x.toFixed(1)},${y.toFixed(1)}`:` L${x.toFixed(1)},${y.toFixed(1)}`);
     }
     let svg = `<path d="${fullD}" fill="none" stroke="rgba(195,210,225,.35)" stroke-width="2"/>`;
-    if(litD) svg += `<path d="${litD}" fill="none" stroke="var(--accent)" stroke-width="5" stroke-opacity=".55"/><path d="${litD}" fill="none" stroke="#f5faff" stroke-width="2"/>`;
+    if(litD) svg += `<path d="${litD}" fill="none" stroke="${lineAcc}" stroke-width="5" stroke-opacity=".55"/><path d="${litD}" fill="none" stroke="#f5faff" stroke-width="2"/>`;
     words.forEach((w,wi)=>{
       const u = n>1 ? wi/(n-1) : 0.5, nx=m+span*u, ny=waveY(u);
       const dir = (wi%2===0) ? -1 : 1, stem = 58 + 20*((wi*3)%2), wy = ny + dir*stem;
       const lit = wi<=wIdx, act = wi===wIdx;
       svg+=`<line x1="${nx}" y1="${ny}" x2="${nx}" y2="${wy}" stroke="${lit?'rgba(240,248,255,.85)':'rgba(195,210,225,.3)'}" stroke-width="1.4"/>`;
-      svg+=`<circle cx="${nx}" cy="${wy}" r="${act?6:(lit?4.5:3)}" fill="${act?'#fff':(lit?'var(--accent)':'rgba(180,195,215,.45)')}"/>`;
+      svg+=`<circle cx="${nx}" cy="${wy}" r="${act?6:(lit?4.5:3)}" fill="${act?'#fff':(lit?lineAcc:'rgba(180,195,215,.45)')}"/>`;
       svg+=`<text x="${nx}" y="${wy + dir*22}" text-anchor="middle" dominant-baseline="central" fill="${act?'#fff':(lit?'rgba(230,240,250,.88)':'rgba(190,205,220,.48)')}" font-size="${act?24:17}" font-weight="${act?800:500}">${esc(w.word)}</text>`;
     });
     stage.innerHTML = `<svg class="svg-stage" viewBox="0 0 ${W} ${H}">${svg}</svg>`;
@@ -1221,8 +1614,10 @@ function renderFrame(nowTs){
       const rowW = words.slice(a,b).map((w, j) => {
         const wi = a + j;
         const cls = wi < wIdx ? "done" : (wi === wIdx ? "act" : "todo");
+        const isResp = duetOn && /^[\(\[]|[\)\]]$/.test(w.word||"");
+        const wStyle = isResp ? `style="--accent:${altAcc}"` : "";
         const ico = (showIcons && w.icon && wi <= wIdx) ? `<span class="fe-ico">${w.icon}</span>` : "";
-        return `<span class="fe-w ${cls}">${esc(w.word)}${ico}</span>`;
+        return `<span class="fe-w ${cls}" ${wStyle}>${esc(w.word)}${ico}</span>`;
       }).join("");
       return `<div class="fe-row" style="font-size:${fBase};transform:rotateX(${rx}deg)">${rowW}</div>`;
     }).join("");
@@ -1235,8 +1630,10 @@ function renderFrame(nowTs){
 
   const wordHtml = words.map((w,wi)=>{
     const cls = wi<wIdx ? "done" : (wi===wIdx ? "act" : "todo");
+    const isResp = duetOn && /^[\(\[]|[\)\]]$/.test(w.word||"");
+    const wStyle = isResp ? `style="--accent:${altAcc}"` : "";
     const ico = (showIcons && w.icon) ? `<span>${w.icon}</span>` : "";
-    return `<span class="word ${cls}">${esc(w.word)}${ico}</span>`;
+    return `<span class="word ${cls}" ${wStyle}>${esc(w.word)}${ico}</span>`;
   }).join("");
 
   if(style === "Apple Design"){

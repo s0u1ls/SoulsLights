@@ -205,6 +205,9 @@ class MobileCompanionServer:
                 script_mode = eng.script_mode
                 font_scale = eng.font_scale
                 offset_sec = eng.offset_sec
+                duet_split = getattr(eng, "duet_split", True)
+                chorus_boost = getattr(eng, "chorus_boost", True)
+                chorus_energy = round(float(getattr(eng, "energy_boost", 0.0)), 3)
         else:
             lines = []
             l_status = "Idle"
@@ -215,6 +218,9 @@ class MobileCompanionServer:
             script_mode = lyr.get("script_mode", "Auto")
             font_scale = float(lyr.get("font_scale", 1.0))
             offset_sec = float(lyr.get("sync_offset_ms", 0)) / 1000.0
+            duet_split = bool(lyr.get("duet_split", True))
+            chorus_boost = bool(amb.get("chorus_boost", True))
+            chorus_energy = 0.0
 
         colors = list(info.get("colors") or ["#6366F1", "#EC4899", "#8B5CF6"])
         if amb.get("override_album_color", False):
@@ -238,6 +244,9 @@ class MobileCompanionServer:
             "secondary": f"#{sec_rgb[0]:02X}{sec_rgb[1]:02X}{sec_rgb[2]:02X}",
             "lyrics_style": style,
             "fisheye_effect": fisheye_effect,
+            "duet_split": bool(duet_split),
+            "chorus_boost": bool(chorus_boost),
+            "chorus_energy": chorus_energy,
             "script_mode": script_mode,
             "font_scale": font_scale,
             "offset_sec": offset_sec,
@@ -249,6 +258,7 @@ class MobileCompanionServer:
             "gradient_mode": amb.get("gradient_mode", "Multi Colors"),
             "backdrop_mode": amb.get("album_backdrop", "Desktop Layer"),
             "backdrop_style": amb.get("backdrop_style", "2-Blob Aura"),
+            "mini_player": bool(cfg.get("system", {}).get("mini_player", False)),
             "spotify_connected": bool((cfg.get("spotify") or {}).get("refresh_token") or (cfg.get("spotify") or {}).get("access_token")),
             "lyrics": lines,
             "styles": [
@@ -340,11 +350,29 @@ class MobileCompanionServer:
             self.cfg_mgr.save_config()
             if self.engine:
                 self.engine.ambient_engine.set_gradient_mode(val)
-        elif act == "set_backdrop_style" and val in ("2-Blob Aura", "Video Reel", "Music Video"):
+        elif act == "set_backdrop_style" and val in ("2-Blob Aura", "Video Reel", "Spinning Vinyl", "Music Video"):
             self.cfg_mgr.config["ambient"]["backdrop_style"] = val
             self.cfg_mgr.save_config()
             if self.engine:
                 self.engine.backdrop_engine.set_backdrop_style(val)
+        elif act == "toggle_duet_split":
+            cur = bool(self.cfg_mgr.config["lyrics"].get("duet_split", True))
+            self.cfg_mgr.config["lyrics"]["duet_split"] = not cur
+            self.cfg_mgr.save_config()
+            if self.engine and hasattr(self.engine.lyrics_engine, "set_duet_split"):
+                self.engine.lyrics_engine.set_duet_split(not cur)
+        elif act == "toggle_chorus_boost":
+            cur = bool(self.cfg_mgr.config["ambient"].get("chorus_boost", True))
+            self.cfg_mgr.config["ambient"]["chorus_boost"] = not cur
+            self.cfg_mgr.save_config()
+            if self.engine:
+                self.engine.ambient_engine.set_chorus_boost(not cur)
+                self.engine.backdrop_engine.set_chorus_boost(not cur)
+                self.engine.lyrics_engine.set_chorus_boost(not cur)
+        elif act == "toggle_mini_player":
+            cur = bool(self.cfg_mgr.config.setdefault("system", {}).get("mini_player", False))
+            self.cfg_mgr.config["system"]["mini_player"] = not cur
+            self.cfg_mgr.save_config()
         elif act == "cycle_backdrop" and self.engine:
             self.engine.cycle_backdrop_mode()
         else:
@@ -382,7 +410,7 @@ class MobileCompanionServer:
 
             def do_GET(self):
                 path = urlparse(self.path).path
-                if path in ("/", "/index.html"):
+                if path in ("/", "/index.html", "/obs"):
                     html_p = get_resource_path(os.path.join("mobile", "index.html"))
                     if os.path.exists(html_p):
                         with open(html_p, "rb") as f:

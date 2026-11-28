@@ -12,6 +12,7 @@ from core.platform_utils import (
     IS_MAC, IS_WIN, get_monitors, get_cursor_pos,
     load_pil_font, get_resource_path, UI_FONT_FAMILY
 )
+from core.qr_gen import render_qr_rgba
 
 if IS_WIN:
     import ctypes
@@ -542,6 +543,280 @@ def _render_style_preview(style_name: str, w: int, h: int, c_left: tuple, c_righ
     return img
 
 
+class MiniPlayerPill(tk.Toplevel):
+    """Compact floating frosted glass pill on desktop (album art + live waveform + inline controls)."""
+
+    PILL_W = 368
+    PILL_H = 66
+
+    def __init__(self, dashboard):
+        super().__init__(dashboard)
+        self.dash = dashboard
+        self.withdraw()
+        self.overrideredirect(True)
+        self.configure(bg="#0E1019")
+        try:
+            self.attributes("-topmost", True)
+        except Exception:
+            pass
+
+        mons = get_monitors()
+        prim = [m for m in mons if m["primary"]] or mons[:1]
+        m = prim[0]
+        x0 = m["x"] + max(16, m["w"] - self.PILL_W - 28)
+        y0 = m["y"] + max(16, m["h"] - self.PILL_H - 96)
+        self.geometry(f"{self.PILL_W}x{self.PILL_H}+{x0}+{y0}")
+
+        self.canvas = tk.Canvas(self, width=self.PILL_W, height=self.PILL_H, bg="#0E1019", highlightthickness=0, bd=0)
+        self.canvas.pack(fill="both", expand=True)
+        self.img_item = self.canvas.create_image(0, 0, anchor="nw")
+        self._photo = None
+        self._art_sig = None
+        self._art_patch = None
+        self._hits = []
+        self._drag_off = None
+        self._phase = 0.0
+        self._bars = [0.22] * 12
+        self._visible = False
+        self._tick_job = None
+
+        self.canvas.bind("<Button-1>", self._on_click)
+        self.canvas.bind("<B1-Motion>", self._on_drag)
+        self.canvas.bind("<ButtonRelease-1>", self._on_release)
+        self.canvas.bind("<Motion>", self._on_move)
+        self.after(40, self._apply_native_polish)
+
+    def _apply_native_polish(self):
+        if IS_WIN:
+            try:
+                self.update_idletasks()
+                hwnd = int(user32.GetParent(self.winfo_id()) or self.winfo_id())
+                dwm = ctypes.windll.dwmapi
+                dwm.DwmSetWindowAttribute.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_void_p, ctypes.c_ulong]
+                dwm.DwmSetWindowAttribute.restype = ctypes.c_long
+                for attr, val in ((20, 1), (33, 2)):
+                    cv = ctypes.c_int(val)
+                    dwm.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(cv), ctypes.sizeof(cv))
+            except Exception:
+                pass
+        elif IS_MAC:
+            try:
+                import Foundation, AppKit
+                def _mac_round():
+                    for win in AppKit.NSApp.windows():
+                        try:
+                            if abs(win.frame().size.width - self.PILL_W) < 4 and abs(win.frame().size.height - self.PILL_H) < 4:
+                                win.setLevel_(AppKit.NSFloatingWindowLevel)
+                                cv = win.contentView()
+                                if cv:
+                                    cv.setWantsLayer_(True)
+                                    cv.layer().setCornerRadius_(18.0)
+                                    cv.layer().setMasksToBounds_(True)
+                                break
+                        except Exception:
+                            pass
+                Foundation.NSOperationQueue.mainQueue().addOperationWithBlock_(_mac_round)
+            except Exception:
+                pass
+
+    def show_pill(self):
+        if not self._visible:
+            self._visible = True
+            self.deiconify()
+            self.lift()
+            self._schedule_tick()
+
+    def hide_pill(self):
+        self._visible = False
+        if self._tick_job:
+            try:
+                self.after_cancel(self._tick_job)
+            except Exception:
+                pass
+            self._tick_job = None
+        self.withdraw()
+
+    def _schedule_tick(self):
+        if not self._visible:
+            return
+        self._render()
+        self._tick_job = self.after(55, self._schedule_tick)
+
+    def _on_move(self, evt):
+        hit = self._hit(evt.x, evt.y)
+        self.canvas.configure(cursor="hand2" if hit else "fleur")
+
+    def _hit(self, x: int, y: int):
+        for act, (x0, y0, x1, y1) in self._hits:
+            if x0 <= x <= x1 and y0 <= y <= y1:
+                return act
+        return None
+
+    def _on_click(self, evt):
+        act = self._hit(evt.x, evt.y)
+        if not act:
+            cx, cy = get_cursor_pos(evt)
+            self._drag_off = (cx - self.winfo_rootx(), cy - self.winfo_rooty())
+            return
+        self._drag_off = None
+        if act == "prev":
+            self.dash.media_mon.send_previous()
+        elif act == "play":
+            self.dash.media_mon.send_play_pause()
+        elif act == "next":
+            self.dash.media_mon.send_next()
+        elif act == "open_hub":
+            self.dash.show_window()
+        elif act == "close":
+            self.dash.mini_player_var.set(False)
+            self.dash.cfg_mgr.config.setdefault("system", {})["mini_player"] = False
+            self.dash.cfg_mgr.save_config()
+            self.hide_pill()
+            if self.dash._active_popover == "Options":
+                self.dash._render_popover()
+
+    def _on_drag(self, evt):
+        if not self._drag_off:
+            return
+        cx, cy = get_cursor_pos(evt)
+        self.geometry(f"+{cx - self._drag_off[0]}+{cy - self._drag_off[1]}")
+
+    def _on_release(self, _evt):
+        self._drag_off = None
+
+    def _render(self):
+        W, H = self.PILL_W, self.PILL_H
+        info = self.dash.current_media or {}
+        title = (info.get("title") or "SoulsLights Ready").strip()
+        artist = (info.get("artist") or info.get("source") or "Idle").strip()
+        is_play = (info.get("status") == "Playing")
+        cols = info.get("colors") or ["#6366F1", "#EC4899"]
+
+        def _hx(s, fb):
+            st = (s or "").lstrip("#")
+            if len(st) == 6:
+                try:
+                    return tuple(int(st[i:i + 2], 16) for i in (0, 2, 4))
+                except ValueError:
+                    pass
+            return fb
+
+        c1 = _hx(cols[0], (168, 85, 247))
+        c2 = _hx(cols[1] if len(cols) > 1 else cols[0], (236, 72, 153))
+        e_lvl = float(getattr(self.dash.engine.lyrics_engine, "energy_boost", 0.0))
+
+        self._phase += 0.24 if is_play else 0.04
+        img = Image.new("RGBA", (W, H), (14, 16, 25, 255))
+        d = ImageDraw.Draw(img)
+        # Subtle dual-color glass wash along top/left
+        wash = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ImageDraw.Draw(wash).ellipse([-40, -30, 170, 90], fill=(*c1, 44))
+        ImageDraw.Draw(wash).ellipse([W - 140, -25, W + 30, 88], fill=(*c2, 34))
+        wash = wash.filter(ImageFilter.GaussianBlur(radius=16))
+        img = Image.alpha_composite(img, wash)
+        img.alpha_composite(_rounded_outline_overlay(W, H, 18, (216, 180, 254, 110), width=1), (0, 0))
+
+        # Mini Album Art (44x44)
+        thumb = info.get("thumbnail_img")
+        sig = (title, artist, id(thumb) if thumb is not None else 0)
+        if sig != self._art_sig:
+            self._art_sig = sig
+            art_sz = 44
+            if thumb is not None:
+                try:
+                    ar = thumb.convert("RGB").resize((art_sz, art_sz), Image.Resampling.LANCZOS).convert("RGBA")
+                except Exception:
+                    ar = Image.new("RGBA", (art_sz, art_sz), (*c1, 255))
+            else:
+                ar = Image.new("RGBA", (art_sz, art_sz), (*c1, 255))
+                ar.alpha_composite(_get_hi_icon("music_note", 24, True), (10, 10))
+            patch = Image.new("RGBA", (art_sz, art_sz), (0, 0, 0, 0))
+            patch.paste(ar, (0, 0), _rounded_mask(art_sz, art_sz, 10))
+            patch.alpha_composite(_rounded_outline_overlay(art_sz, art_sz, 10, (255, 255, 255, 70), width=1), (0, 0))
+            self._art_patch = patch
+
+        if self._art_patch is not None:
+            img.alpha_composite(self._art_patch, (11, 11))
+
+        d = ImageDraw.Draw(img)
+        f_t = _load_font("segoeuib.ttf", 12)
+        f_a = _load_font("segoeui.ttf", 10)
+        tx = 64
+        max_tw = 152
+        t_disp = title
+        while len(t_disp) > 4 and d.textlength(t_disp, font=f_t) > max_tw:
+            t_disp = t_disp[:-2] + "…"
+        a_disp = artist
+        while len(a_disp) > 4 and d.textlength(a_disp, font=f_a) > max_tw:
+            a_disp = a_disp[:-2] + "…"
+        d.text((tx, 10), t_disp, font=f_t, fill=(246, 248, 255, 250))
+        d.text((tx, 25), a_disp, font=f_a, fill=(176, 184, 204, 210))
+
+        # 12-bar reactive waveform strip
+        bx0 = tx
+        by_base = 55
+        for bi in range(12):
+            if is_play:
+                tgt = 0.25 + 0.55 * abs(math.sin(self._phase * 1.15 + bi * 0.65)) * (0.75 + 0.55 * e_lvl)
+                tgt = min(1.0, tgt + 0.20 * abs(math.cos(self._phase * 0.7 - bi * 0.9)))
+            else:
+                tgt = 0.14
+            self._bars[bi] += (tgt - self._bars[bi]) * 0.35
+            bh = max(3, int(14 * self._bars[bi]))
+            u_b = bi / 11.0
+            b_col = (
+                int(c1[0] + (c2[0] - c1[0]) * u_b),
+                int(c1[1] + (c2[1] - c1[1]) * u_b),
+                int(c1[2] + (c2[2] - c1[2]) * u_b),
+                235 if is_play else 115,
+            )
+            bx = bx0 + bi * 7
+            d.rounded_rectangle([bx, by_base - bh, bx + 4, by_base], radius=2, fill=b_col)
+
+        # Inline playback + Hub + Close buttons
+        hits = []
+        ctrl_x = 224
+        btn_specs = [
+            ("prev", ctrl_x, 19, 28, False),
+            ("play", ctrl_x + 32, 16, 34, True),
+            ("next", ctrl_x + 70, 19, 28, False),
+        ]
+        for bid, bx, by, bsz, is_pri in btn_specs:
+            bm = _rounded_mask(bsz, bsz, bsz // 2)
+            fill_b = (*c2, 235) if is_pri else (255, 255, 255, 24)
+            img.paste(Image.new("RGBA", (bsz, bsz), fill_b), (bx, by), bm)
+            img.alpha_composite(_rounded_outline_overlay(bsz, bsz, bsz // 2, (255, 255, 255, 110 if is_pri else 48)), (bx, by))
+            bd = ImageDraw.Draw(img)
+            mcx, mcy = bx + bsz // 2, by + bsz // 2
+            fg = (255, 255, 255, 248)
+            if bid == "prev":
+                bd.polygon([(mcx + 3, mcy - 4), (mcx - 3, mcy), (mcx + 3, mcy + 4)], fill=fg)
+                bd.rectangle([mcx - 5, mcy - 4, mcx - 3, mcy + 4], fill=fg)
+            elif bid == "next":
+                bd.polygon([(mcx - 3, mcy - 4), (mcx + 3, mcy), (mcx - 3, mcy + 4)], fill=fg)
+                bd.rectangle([mcx + 3, mcy - 4, mcx + 5, mcy + 4], fill=fg)
+            elif bid == "play":
+                if is_play:
+                    bd.rectangle([mcx - 4, mcy - 5, mcx - 1, mcy + 5], fill=fg)
+                    bd.rectangle([mcx + 1, mcy - 5, mcx + 4, mcy + 5], fill=fg)
+                else:
+                    bd.polygon([(mcx - 3, mcy - 5), (mcx + 5, mcy), (mcx - 3, mcy + 5)], fill=fg)
+            hits.append((bid, (bx, by, bx + bsz, by + bsz)))
+
+        # Hub expand pill & mini close pill at far right
+        bd = ImageDraw.Draw(img)
+        hx0, hy0 = W - 36, 9
+        img.alpha_composite(_get_hi_icon("win_max", 13), (hx0, hy0))
+        hits.append(("open_hub", (hx0 - 3, hy0 - 3, hx0 + 16, hy0 + 16)))
+        cx0, cy0 = W - 20, 9
+        img.alpha_composite(_get_hi_icon("win_close", 13), (cx0, cy0))
+        hits.append(("close", (cx0 - 3, cy0 - 3, cx0 + 16, cy0 + 16)))
+
+        self._hits = hits
+        self._photo = ImageTk.PhotoImage(img)
+        self.canvas.itemconfig(self.img_item, image=self._photo)
+
+
 class UnifiedDashboard(ctk.CTk):
     """SoulsLights Studio — 1:1 Verci Picture 1 & Picture 2 interface rendered via true PIL RGBA Liquid Glass."""
 
@@ -622,11 +897,16 @@ class UnifiedDashboard(ctk.CTk):
         self.verci_switch_var = ctk.BooleanVar(value=cfg.get("lyrics_enabled", True))
         self.click_through_var = ctk.BooleanVar(value=lyr.get("click_through", True))
         self.auto_sync_var = ctk.BooleanVar(value=lyr.get("auto_sync_colors", True))
+        self.duet_split_var = ctk.BooleanVar(value=lyr.get("duet_split", True))
         self.override_var = ctk.BooleanVar(value=amb.get("override_album_color", False))
         self.audio_react_var = ctk.BooleanVar(value=amb.get("audio_reactive", True))
+        self.chorus_boost_var = ctk.BooleanVar(value=amb.get("chorus_boost", True))
         self.fs_var = ctk.BooleanVar(value=amb.get("show_over_fullscreen", True))
         self.tray_var = ctk.BooleanVar(value=sys_cfg.get("minimize_to_tray", True))
         self.startup_var = ctk.BooleanVar(value=sys_cfg.get("start_with_windows", False))
+        self.mini_player_var = ctk.BooleanVar(value=sys_cfg.get("mini_player", False))
+        self._qr_cache = {}
+        self._mini_pill = MiniPlayerPill(self)
 
         if lyr.get("style") not in STYLE_META:
             lyr["style"] = "Ship"
@@ -637,6 +917,8 @@ class UnifiedDashboard(ctk.CTk):
         self.after(80, self._tick_previews)
         self.after(60, self._poll_ui_queue)
         self.after(1000, self._periodic_status_check)
+        if self.mini_player_var.get():
+            self.after(220, self._mini_pill.show_pill)
         self.protocol("WM_DELETE_WINDOW", self._on_close_window)
 
     def enqueue_ui(self, fn, *args, **kwargs):
@@ -1400,7 +1682,7 @@ class UnifiedDashboard(ctk.CTk):
         colors_list = list(amb.get("custom_colors") or [amb.get("color_1", "#6366F1"), amb.get("color_2", "#EC4899")])
         pop_w = 604 if key == "Glow" else 584
         extra_col_rows = max(0, (len(colors_list) + 2) // 13) if key == "Glow" else 0
-        pop_h = {"Lyrics": 484, "Glow": 476 + extra_col_rows * 30, "Screen": 456, "Options": 424}.get(key, 340)
+        pop_h = {"Lyrics": 516, "Glow": 506 + extra_col_rows * 30, "Screen": 468, "Options": 532}.get(key, 340)
         px0 = max(18, (w - pop_w) // 2)
         py0 = 56
         self._popover_rect = (px0, py0, px0 + pop_w, py0 + pop_h)
@@ -1448,9 +1730,11 @@ class UnifiedDashboard(ctk.CTk):
         y = 60
 
         if key == "Lyrics":
-            nx = self._draw_pop_toggle(panel, pad, y, "Enable Lyrics", self.verci_switch_var.get(), "toggle_lyrics", px0, py0, f_lbl)
-            nx = self._draw_pop_toggle(panel, nx + 24, y, "Lock Click-Through", self.click_through_var.get(), "toggle_lock", px0, py0, f_lbl)
-            self._draw_pop_toggle(panel, nx + 24, y, "Album Colors", self.auto_sync_var.get(), "toggle_lyr_sync", px0, py0, f_lbl)
+            self._draw_pop_toggle(panel, pad, y, "Enable Lyrics", self.verci_switch_var.get(), "toggle_lyrics", px0, py0, f_lbl)
+            self._draw_pop_toggle(panel, pad + 260, y, "Lock Click-Through", self.click_through_var.get(), "toggle_lock", px0, py0, f_lbl)
+            y += 32
+            self._draw_pop_toggle(panel, pad, y, "Album Colors", self.auto_sync_var.get(), "toggle_lyr_sync", px0, py0, f_lbl)
+            self._draw_pop_toggle(panel, pad + 260, y, "Duet Vocal Split", self.duet_split_var.get(), "toggle_duet_split", px0, py0, f_lbl)
             y += 38
 
             sc = float(lyr.get("font_scale", 1.0))
@@ -1493,9 +1777,11 @@ class UnifiedDashboard(ctk.CTk):
             self._draw_pop_chips(panel, pad + 340, y, inner_w - 340, ["Reset Stage Pos", "Refresh Lyrics"], "", "lyr_act", px0, py0, f_chip)
 
         elif key == "Glow":
-            nx = self._draw_pop_toggle(panel, pad, y, "Enable Glow", self.lumn_switch_var.get(), "toggle_glow", px0, py0, f_lbl)
-            nx = self._draw_pop_toggle(panel, nx + 24, y, "Beat Sync", self.audio_react_var.get(), "toggle_beat", px0, py0, f_lbl)
-            self._draw_pop_toggle(panel, nx + 24, y, "Custom Colors", self.override_var.get(), "toggle_override", px0, py0, f_lbl)
+            self._draw_pop_toggle(panel, pad, y, "Enable Glow", self.lumn_switch_var.get(), "toggle_glow", px0, py0, f_lbl)
+            self._draw_pop_toggle(panel, pad + 260, y, "Beat Sync", self.audio_react_var.get(), "toggle_beat", px0, py0, f_lbl)
+            y += 30
+            self._draw_pop_toggle(panel, pad, y, "Chorus Energy Boost", self.chorus_boost_var.get(), "toggle_chorus_boost", px0, py0, f_lbl)
+            self._draw_pop_toggle(panel, pad + 260, y, "Custom Colors", self.override_var.get(), "toggle_override", px0, py0, f_lbl)
             y += 36
 
             gi = float(amb.get("glow_intensity", 1.35))
@@ -1574,7 +1860,7 @@ class UnifiedDashboard(ctk.CTk):
             d = ImageDraw.Draw(panel)
             d.text((pad, y), "BACKDROP STYLE", font=f_sec, fill=(192, 132, 252, 220))
             y += 18
-            nx_bs = self._draw_pop_chips(panel, pad, y, inner_w, ["2-Blob Aura", "Video Reel", "Music Video"], amb.get("backdrop_style", "2-Blob Aura"), "bd_style", px0, py0, f_chip)
+            nx_bs = self._draw_pop_chips(panel, pad, y, inner_w, ["2-Blob Aura", "Video Reel", "Spinning Vinyl", "Music Video"], amb.get("backdrop_style", "2-Blob Aura"), "bd_style", px0, py0, f_chip)
             y = nx_bs + 10
 
             bd_d = float(amb.get("backdrop_darkness", 0.34))
@@ -1625,37 +1911,54 @@ class UnifiedDashboard(ctk.CTk):
                 d = ImageDraw.Draw(panel)
                 d.text((rx + 12, ry + 7), hk, font=f_val, fill=(243, 232, 255, 250))
                 d.text((rx + 122, ry + 7), desc_hk, font=f_chip, fill=(220, 222, 236, 220))
-            y += 78
+            y += 74
 
             d = ImageDraw.Draw(panel)
             d.text((pad, y), "GENERAL SETTINGS", font=f_sec, fill=(192, 132, 252, 220))
-            y += 20
-            nx = self._draw_pop_toggle(panel, pad, y, "Master Power", self.master_switch_var.get(), "toggle_master", px0, py0, f_lbl)
-            nx = self._draw_pop_toggle(panel, nx + 20, y, "Minimize to Tray", self.tray_var.get(), "toggle_tray", px0, py0, f_lbl)
+            y += 18
+            self._draw_pop_toggle(panel, pad, y, "Master Power", self.master_switch_var.get(), "toggle_master", px0, py0, f_lbl)
+            self._draw_pop_toggle(panel, pad + 260, y, "Minimize to Tray", self.tray_var.get(), "toggle_tray", px0, py0, f_lbl)
+            y += 28
+            self._draw_pop_toggle(panel, pad, y, "Floating Mini Player", self.mini_player_var.get(), "toggle_mini_player", px0, py0, f_lbl)
             startup_lbl = "Launch at Login" if IS_MAC else "Start with Windows"
-            self._draw_pop_toggle(panel, nx + 20, y, startup_lbl, self.startup_var.get(), "toggle_startup", px0, py0, f_lbl)
-            y += 38
+            self._draw_pop_toggle(panel, pad + 260, y, startup_lbl, self.startup_var.get(), "toggle_startup", px0, py0, f_lbl)
+            y += 34
 
             d = ImageDraw.Draw(panel)
             d.text((pad, y), "STUDIO PRESETS  &  UTILITIES", font=f_sec, fill=(192, 132, 252, 220))
             y += 18
             cur_pr = cfg.get("active_preset", "studio")
             pr_map = {"studio": "Studio", "ambient_only": "Glow Only", "karaoke": "Karaoke", "night_mode": "Night Dim"}
-            y = self._draw_pop_chips(panel, pad, y, inner_w, ["studio", "ambient_only", "karaoke", "night_mode"], cur_pr, "preset", px0, py0, f_chip, labels_map=pr_map) + 10
-            y = self._draw_pop_chips(panel, pad, y, inner_w, ["Restart Engines", "Refresh Lyrics", "Reset Lyrics Pos"], "", "util", px0, py0, f_chip) + 14
+            y = self._draw_pop_chips(panel, pad, y, inner_w, ["studio", "ambient_only", "karaoke", "night_mode"], cur_pr, "preset", px0, py0, f_chip, labels_map=pr_map) + 8
+            y = self._draw_pop_chips(panel, pad, y, inner_w, ["Restart Engines", "Refresh Lyrics", "Reset Lyrics Pos"], "", "util", px0, py0, f_chip) + 12
 
             d = ImageDraw.Draw(panel)
-            d.text((pad, y), "IPAD & MOBILE COMPANION  (OPEN IN SAFARI / CHROME ON SAME WI-FI)", font=f_sec, fill=(192, 132, 252, 220))
+            d.text((pad, y), "INSTANT QR CODE  •  IPAD / PHONE / OBS COMPANION", font=f_sec, fill=(192, 132, 252, 220))
             y += 18
             srv = getattr(self.engine, "mobile_server", None)
             mob_url = srv.get_url() if srv else "http://localhost:8765"
-            url_w = inner_w - 150
-            um = _rounded_mask(url_w, 28, 10)
-            panel.paste(Image.new("RGBA", (url_w, 28), (255, 255, 255, 16)), (pad, y), um)
-            panel.alpha_composite(_rounded_outline_overlay(url_w, 28, 10, (192, 132, 252, 85)), (pad, y))
+            qr_img = self._qr_cache.get(mob_url)
+            if qr_img is None:
+                try:
+                    qr_raw = render_qr_rgba(mob_url, target_size=90)
+                    qr_img = Image.new("RGBA", (90, 90), (0, 0, 0, 0))
+                    qr_img.paste(qr_raw, (0, 0), _rounded_mask(90, 90, 12))
+                    self._qr_cache[mob_url] = qr_img
+                except Exception:
+                    qr_img = None
+            if qr_img is not None:
+                panel.alpha_composite(qr_img, (pad, y))
+
+            rx_mob = pad + 104
+            rw_mob = inner_w - 104
+            um = _rounded_mask(rw_mob, 28, 10)
+            panel.paste(Image.new("RGBA", (rw_mob, 28), (255, 255, 255, 16)), (rx_mob, y), um)
+            panel.alpha_composite(_rounded_outline_overlay(rw_mob, 28, 10, (192, 132, 252, 85)), (rx_mob, y))
             d = ImageDraw.Draw(panel)
-            d.text((pad + 12, y + 7), mob_url, font=f_val, fill=(243, 232, 255, 250))
-            self._draw_pop_chips(panel, pad + url_w + 10, y + 1, 140, ["Copy URL", "Open"], "", "mob", px0, py0, f_chip)
+            d.text((rx_mob + 12, y + 7), mob_url, font=f_val, fill=(243, 232, 255, 250))
+            self._draw_pop_chips(panel, rx_mob, y + 36, rw_mob, ["Copy URL", "Open", "Copy OBS"], "", "mob", px0, py0, f_chip)
+            d = ImageDraw.Draw(panel)
+            d.text((rx_mob, y + 70), "Scan QR on Wi-Fi  •  Add /obs as transparent OBS Browser Source", font=f_chip, fill=(178, 184, 206, 200))
 
         tk_pop = ImageTk.PhotoImage(panel)
         self._tk_photos["popover"] = tk_pop
@@ -1675,6 +1978,8 @@ class UnifiedDashboard(ctk.CTk):
         elif act == "toggle_lyr_sync":
             self.auto_sync_var.set(not self.auto_sync_var.get())
             self._on_auto_sync_toggle()
+        elif act == "toggle_duet_split":
+            self._on_duet_split_toggle()
         elif act == "reset_scale":
             self._on_font_scale_change(1.0)
         elif act == "reset_offset":
@@ -1701,6 +2006,8 @@ class UnifiedDashboard(ctk.CTk):
         elif act == "toggle_beat":
             self.audio_react_var.set(not self.audio_react_var.get())
             self._on_audio_react_toggle()
+        elif act == "toggle_chorus_boost":
+            self._on_chorus_boost_toggle()
         elif act == "toggle_override":
             self.override_var.set(not self.override_var.get())
             self._on_override_toggle()
@@ -1736,6 +2043,8 @@ class UnifiedDashboard(ctk.CTk):
             self.tray_var.set(val)
             self.cfg_mgr.config["system"]["minimize_to_tray"] = val
             self.cfg_mgr.save_config()
+        elif act == "toggle_mini_player":
+            self._on_mini_player_toggle()
         elif act == "toggle_startup":
             self._on_startup_toggle()
         elif act.startswith("preset:"):
@@ -1758,6 +2067,12 @@ class UnifiedDashboard(ctk.CTk):
                     self.clipboard_append(mob_url)
                 except Exception:
                     pass
+            elif m_act == "Copy OBS":
+                try:
+                    self.clipboard_clear()
+                    self.clipboard_append(f"{mob_url}/obs")
+                except Exception:
+                    pass
             elif m_act == "Open":
                 try:
                     import webbrowser
@@ -1776,12 +2091,21 @@ class UnifiedDashboard(ctk.CTk):
         self.master_switch_var.set(cfg.get("master_enabled", True))
         self.lumn_switch_var.set(cfg.get("ambient_enabled", True))
         self.verci_switch_var.set(cfg.get("lyrics_enabled", True))
-        self.style_var.set(cfg["lyrics"].get("style", "Fisheye Visual"))
         self.auto_sync_var.set(cfg["lyrics"].get("auto_sync_colors", True))
+        self.duet_split_var.set(cfg["lyrics"].get("duet_split", True))
+        self.chorus_boost_var.set(cfg["ambient"].get("chorus_boost", True))
+        mp = bool(cfg.get("system", {}).get("mini_player", False))
+        self.mini_player_var.set(mp)
+        if getattr(self, "_mini_pill", None):
+            if mp:
+                self._mini_pill.show_pill()
+            else:
+                self._mini_pill.hide_pill()
         if self._active_popover:
             self._render_popover()
         self._render_sticky_header()
         self._render_hero_stage()
+        self._render_all_cards()
 
     def _on_media_update(self, info):
         colors = tuple(info.get("colors", ["#D4E2EE", "#6B7280"]))
@@ -2027,6 +2351,33 @@ class UnifiedDashboard(ctk.CTk):
         self.engine.ambient_engine.set_audio_reactive(val)
         self.engine.backdrop_engine.set_audio_reactive(val)
 
+    def _on_chorus_boost_toggle(self):
+        val = not self.chorus_boost_var.get()
+        self.chorus_boost_var.set(val)
+        self.cfg_mgr.config["ambient"]["chorus_boost"] = val
+        self.cfg_mgr.save_config()
+        self.engine.ambient_engine.set_chorus_boost(val)
+        self.engine.backdrop_engine.set_chorus_boost(val)
+        self.engine.lyrics_engine.set_chorus_boost(val)
+
+    def _on_duet_split_toggle(self):
+        val = not self.duet_split_var.get()
+        self.duet_split_var.set(val)
+        self.cfg_mgr.config["lyrics"]["duet_split"] = val
+        self.cfg_mgr.save_config()
+        self.engine.lyrics_engine.set_duet_split(val)
+
+    def _on_mini_player_toggle(self):
+        val = not self.mini_player_var.get()
+        self.mini_player_var.set(val)
+        self.cfg_mgr.config.setdefault("system", {})["mini_player"] = val
+        self.cfg_mgr.save_config()
+        if getattr(self, "_mini_pill", None):
+            if val:
+                self._mini_pill.show_pill()
+            else:
+                self._mini_pill.hide_pill()
+
     def _on_fs_toggle(self):
         val = self.fs_var.get()
         self.cfg_mgr.config["ambient"]["show_over_fullscreen"] = val
@@ -2086,6 +2437,12 @@ class UnifiedDashboard(ctk.CTk):
             self.quit_app()
 
     def quit_app(self):
+        try:
+            if getattr(self, "_mini_pill", None):
+                self._mini_pill.hide_pill()
+                self._mini_pill.destroy()
+        except Exception:
+            pass
         if self.on_quit_callback:
             self.on_quit_callback()
         else:

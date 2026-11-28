@@ -142,6 +142,8 @@ class AmbientGlowEngine:
         self.target_displays = "All Displays"
         self.show_over_fullscreen = True
         self.audio_reactive = True
+        self.chorus_boost = True
+        self.energy_boost = 0.0
 
         self._dirty_mask = True
         self._dirty_monitors = False
@@ -170,6 +172,7 @@ class AmbientGlowEngine:
             self.target_displays = str(a.get("target_displays", "All Displays"))
             self.show_over_fullscreen = bool(a.get("show_over_fullscreen", True))
             self.audio_reactive = bool(a.get("audio_reactive", True))
+            self.chorus_boost = bool(a.get("chorus_boost", True))
             self._dirty_mask = True
             self._dirty_pixels = True
 
@@ -265,6 +268,14 @@ class AmbientGlowEngine:
     def set_audio_reactive(self, enable: bool):
         with self._lock:
             self.audio_reactive = bool(enable)
+
+    def set_chorus_boost(self, enable: bool):
+        with self._lock:
+            self.chorus_boost = bool(enable)
+
+    def set_energy_boost(self, val: float):
+        with self._lock:
+            self.energy_boost = max(0.0, min(1.0, float(val)))
 
     def _select_monitors(self):
         all_mons = get_monitors()
@@ -745,6 +756,7 @@ class AmbientGlowEngine:
                 balance = self.color_balance
                 show_fs = self.show_over_fullscreen
                 audio_on = self.audio_reactive
+                e_boost = self.energy_boost if self.chorus_boost else 0.0
 
                 if rebuild_mons:
                     new_mons = self._select_monitors()
@@ -781,8 +793,11 @@ class AmbientGlowEngine:
                 continue
 
             peak, bloom = audio.sample() if audio_on else (0.0, 0.0)
+            if e_boost > 0.02:
+                bloom = min(1.0, bloom + e_boost * 0.42)
+                peak = min(1.0, peak + e_boost * 0.25)
 
-            lerp_k = min(1.0, dt * 5.0)
+            lerp_k = min(1.0, dt * 3.6)
             if len(self.curr_palette) != len(target_pal):
                 old = self.curr_palette or target_pal
                 self.curr_palette = [old[min(idx_p, len(old) - 1)] for idx_p in range(len(target_pal))]
@@ -800,21 +815,21 @@ class AmbientGlowEngine:
 
             animated = anim_mode in ("Liquid Flow", "Beat Pulse", "Water Drop", "Aurora Wave", "Neon Prism")
             if anim_mode == "Water Drop":
-                if audio_on:
-                    speed = 0.58 + peak * 0.42 + (bloom ** 0.85) * 3.55
+                if audio_on or e_boost > 0.05:
+                    speed = 0.58 + peak * 0.42 + (bloom ** 0.85) * 3.55 + e_boost * 0.85
                 else:
                     speed = 0.88 + 0.24 * math.sin(anim_time * 1.4)
                 phase_rad = (phase_rad + dt * speed) % (2.0 * math.pi)
             elif anim_mode == "Neon Prism":
-                speed = 1.45 + peak * 0.85 + (bloom ** 0.78) * 4.2
+                speed = 1.45 + peak * 0.85 + (bloom ** 0.78) * 4.2 + e_boost * 1.1
                 phase_rad = (phase_rad + dt * speed) % (2.0 * math.pi)
             elif anim_mode == "Aurora Wave":
-                speed = 0.65 + bloom * 1.65 + peak * 0.45
+                speed = 0.65 + bloom * 1.65 + peak * 0.45 + e_boost * 0.75
                 phase_rad = (phase_rad + dt * speed) % (2.0 * math.pi)
             elif anim_mode == "Liquid Flow":
-                speed = 1.15 + bloom * 2.5 + peak * 0.65
+                speed = 1.15 + bloom * 2.5 + peak * 0.65 + e_boost * 0.9
                 phase_rad = (phase_rad + dt * speed) % (2.0 * math.pi)
-            elif anim_mode == "Beat Pulse" and audio_on:
+            elif anim_mode == "Beat Pulse" and (audio_on or e_boost > 0.05):
                 phase_rad = (phase_rad + dt * (0.30 + bloom * 2.4)) % (2.0 * math.pi)
 
             if rebuild_mask:
@@ -824,25 +839,25 @@ class AmbientGlowEngine:
                 force_pixels = True
 
             # Upload every frame during animation (~64 FPS) since 4 thin strip HWNDs cost only ~2.5ms total
-            need_upload = (not did_initial_draw) or force_pixels or color_lerping or animated or (audio_on and (bloom > 0.015 or peak > 0.03))
+            need_upload = (not did_initial_draw) or force_pixels or color_lerping or animated or e_boost > 0.04 or (audio_on and (bloom > 0.015 or peak > 0.03))
             if need_upload:
                 did_initial_draw = True
-                b_val = bloom if audio_on else 0.0
-                p_val = peak if audio_on else 0.0
+                b_val = min(1.0, (bloom if audio_on else 0.0) + e_boost * 0.36)
+                p_val = min(1.0, (peak if audio_on else 0.0) + e_boost * 0.22)
                 if anim_mode == "Water Drop":
-                    surge_mix = min(1.0, 0.18 + p_val * 0.22 + (b_val ** 0.72) * 0.84) if audio_on else (0.24 + 0.14 * math.sin(anim_time * 2.0))
+                    surge_mix = min(1.0, 0.18 + p_val * 0.22 + (b_val ** 0.72) * 0.84) if (audio_on or e_boost > 0.05) else (0.24 + 0.14 * math.sin(anim_time * 2.0))
                 elif anim_mode == "Neon Prism":
-                    surge_mix = min(1.0, 0.30 + p_val * 0.28 + (b_val ** 0.68) * 0.82) if audio_on else (0.42 + 0.24 * math.sin(anim_time * 2.8))
+                    surge_mix = min(1.0, 0.30 + p_val * 0.28 + (b_val ** 0.68) * 0.82) if (audio_on or e_boost > 0.05) else (0.42 + 0.24 * math.sin(anim_time * 2.8))
                 elif anim_mode == "Aurora Wave":
                     surge_mix = min(1.0, 0.26 + 0.22 * math.sin(anim_time * 1.35) + b_val * 0.78 + p_val * 0.25)
                 elif anim_mode == "Beat Pulse":
-                    surge_mix = min(1.0, (b_val ** 0.65) * 0.94 + p_val * 0.35) if audio_on else (0.5 + 0.5 * math.sin(anim_time * 3.0)) ** 4
+                    surge_mix = min(1.0, (b_val ** 0.65) * 0.94 + p_val * 0.35) if (audio_on or e_boost > 0.05) else (0.5 + 0.5 * math.sin(anim_time * 3.0)) ** 4
                 elif anim_mode == "Breathing":
-                    surge_mix = 0.48 + 0.46 * math.sin(anim_time * 1.8)
+                    surge_mix = min(1.0, 0.48 + 0.46 * math.sin(anim_time * 1.8) + e_boost * 0.32)
                 elif anim_mode == "Liquid Flow":
                     surge_mix = min(1.0, 0.16 + 0.14 * math.sin(anim_time * 1.9) + b_val * 0.88 + p_val * 0.28)
                 else:
-                    surge_mix = 0.0
+                    surge_mix = min(1.0, e_boost * 0.45)
 
                 for ov in overlays:
                     if ov["base_strips"] is None:
@@ -865,7 +880,7 @@ class AmbientGlowEngine:
                         rgb_s = rgb_lo.crop(st["lbox"]).resize(st["dst_wh"], Image.Resampling.BILINEAR)
                         st["surf"].upload_rgb_alpha(rgb_s, mask_s)
 
-            base_alpha = min(255, int(222 + min(1.0, glow_val / 2.5) * 33))
+            base_alpha = min(255, int(222 + min(1.0, (glow_val + e_boost * 0.45) / 2.5) * 33))
             if anim_mode == "Static":
                 mod = 1.0
             elif anim_mode == "Water Drop":

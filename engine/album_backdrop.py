@@ -344,6 +344,8 @@ class AlbumBackdropEngine:
         self.target_displays = "All Displays"
         self.show_over_fullscreen = True
         self.audio_reactive = True
+        self.chorus_boost = True
+        self.energy_boost = 0.0
 
         self._thumb_img = None
         self._colors = ["#6366F1", "#EC4899", "#8B5CF6"]
@@ -362,6 +364,16 @@ class AlbumBackdropEngine:
         self._mv_frame_lock = threading.Lock()
         self._mv_dir = os.path.join(get_app_data_dir(), "mv_cache")
 
+        # Smooth Track Crossfades & Transition Blur + Spinning Vinyl Turntable state
+        self._prev_frame = None
+        self._last_rendered_frame = None
+        self._xfer_u = 1.0
+        self._vinyl_disc = None
+        self._vinyl_sheen = self._build_vinyl_sheen()
+        self._vinyl_angle = 0.0
+        self._vinyl_omega = 0.0
+        self._tonearm_u = 0.0
+
         # Pre-baked animated cover art + 2 matching luminous blobs + Video Reel light-leak & grain
         self._base_bg = None
         self._cover_src = None
@@ -374,6 +386,17 @@ class AlbumBackdropEngine:
         self._vig_mul = self._build_vignette_mul()
 
         self.reload_from_config()
+
+    def _build_vinyl_sheen(self):
+        """Creates a soft studio diagonal light reflection for the turntable LP."""
+        sz = 312
+        img = Image.new("RGBA", (sz, sz), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        cx, cy = sz // 2, sz // 2
+        d.pieslice([10, 10, sz - 10, sz - 10], 215, 250, fill=(255, 255, 255, 34))
+        d.pieslice([10, 10, sz - 10, sz - 10], 35, 70, fill=(255, 255, 255, 30))
+        d.ellipse([cx - 66, cy - 66, cx + 66, cy + 66], fill=(0, 0, 0, 0))
+        return img.filter(ImageFilter.GaussianBlur(radius=6))
 
     def _download_mv_worker(self, url: str, gen: int):
         if not url:
@@ -450,6 +473,9 @@ class AlbumBackdropEngine:
             self._is_playing = bool(is_playing)
             self._has_media = bool(has_media)
             if art_changed:
+                if self._last_rendered_frame is not None:
+                    self._prev_frame = self._last_rendered_frame
+                    self._xfer_u = 0.0
                 self._dirty_art = True
             if mv_url != self._mv_url:
                 self._mv_url = mv_url
@@ -503,6 +529,7 @@ class AlbumBackdropEngine:
             self.target_displays = new_disp
             self.show_over_fullscreen = bool(a.get("show_over_fullscreen", True))
             self.audio_reactive = bool(a.get("audio_reactive", True))
+            self.chorus_boost = bool(a.get("chorus_boost", True))
 
     def set_mode(self, mode_str: str):
         with self._lock:
@@ -512,7 +539,11 @@ class AlbumBackdropEngine:
 
     def set_backdrop_style(self, style_str: str):
         with self._lock:
-            self.backdrop_style = style_str
+            if self.backdrop_style != style_str:
+                if self._last_rendered_frame is not None:
+                    self._prev_frame = self._last_rendered_frame
+                    self._xfer_u = 0.0
+                self.backdrop_style = style_str
 
     def set_darkness(self, val: float):
         with self._lock:
@@ -538,16 +569,13 @@ class AlbumBackdropEngine:
         with self._lock:
             self.audio_reactive = bool(enable)
 
-    def update_media_state(self, thumb_img, colors, is_playing: bool, has_media: bool):
+    def set_chorus_boost(self, enable: bool):
         with self._lock:
-            art_changed = (thumb_img is not self._thumb_img) or (list(colors or []) != self._colors)
-            self._thumb_img = thumb_img
-            if colors:
-                self._colors = list(colors)
-            self._is_playing = bool(is_playing)
-            self._has_media = bool(has_media)
-            if art_changed:
-                self._dirty_art = True
+            self.chorus_boost = bool(enable)
+
+    def set_energy_boost(self, val: float):
+        with self._lock:
+            self.energy_boost = max(0.0, min(1.0, float(val)))
 
     def start(self):
         if self.running:
@@ -631,6 +659,41 @@ class AlbumBackdropEngine:
         leak_rgb = _tune_blob_rgb(c1, max(0.14, min(0.42, darkness * 0.48)), 1.25)
         self._reel_leak = _make_radial_blob(420, 280, leak_rgb, power=2.3)
 
+        # Realistic Spinning Vinyl LP disc with grooved concentric rings & circular album center label
+        v_sz = 312
+        vinyl = Image.new("RGBA", (v_sz, v_sz), (0, 0, 0, 0))
+        vd = ImageDraw.Draw(vinyl)
+        vc = v_sz // 2
+        outer_r = 148
+        # Soft drop shadow halo + deep vinyl body
+        vd.ellipse([vc - outer_r - 4, vc - outer_r - 2, vc + outer_r + 4, vc + outer_r + 6], fill=(0, 0, 0, 125))
+        vd.ellipse([vc - outer_r, vc - outer_r, vc + outer_r, vc + outer_r], fill=(14, 15, 20, 255), outline=(65, 70, 86, 220), width=2)
+        for rg in range(62, outer_r - 6, 4):
+            g_col = (28, 30, 38, 210) if (rg % 8 == 0) else (20, 21, 28, 175)
+            vd.ellipse([vc - rg, vc - rg, vc + rg, vc + rg], outline=g_col, width=1)
+        # Accent rim lead-in groove & center album art label
+        vd.ellipse([vc - 58, vc - 58, vc + 58, vc + 58], fill=(22, 24, 30, 255), outline=(*rgb1, 210), width=2)
+        lbl_sz = 108
+        if thumb_img is not None:
+            try:
+                sq_src = thumb_img.convert("RGB")
+                sw_v, sh_v = sq_src.size
+                mn_v = min(sw_v, sh_v)
+                sq_src = sq_src.crop(((sw_v - mn_v) // 2, (sh_v - mn_v) // 2, (sw_v + mn_v) // 2, (sh_v + mn_v) // 2))
+                lbl = sq_src.resize((lbl_sz, lbl_sz), Image.Resampling.LANCZOS).convert("RGBA")
+            except Exception:
+                lbl = Image.new("RGBA", (lbl_sz, lbl_sz), (*rgb1, 255))
+        else:
+            lbl = Image.new("RGBA", (lbl_sz, lbl_sz), (*rgb1, 255))
+        lbl_mask = Image.new("L", (lbl_sz, lbl_sz), 0)
+        ImageDraw.Draw(lbl_mask).ellipse([0, 0, lbl_sz - 1, lbl_sz - 1], fill=255)
+        vinyl.paste(lbl, (vc - lbl_sz // 2, vc - lbl_sz // 2), lbl_mask)
+        vd = ImageDraw.Draw(vinyl)
+        # Center silver spindle ring & hole
+        vd.ellipse([vc - 11, vc - 11, vc + 11, vc + 11], fill=(225, 232, 244, 240), outline=(24, 26, 34, 255), width=2)
+        vd.ellipse([vc - 5, vc - 5, vc + 5, vc + 5], fill=(8, 9, 14, 255))
+        self._vinyl_disc = vinyl
+
     def _create_windows(self, monitors, mode_str):
         overlays = []
         hwnds = []
@@ -708,6 +771,40 @@ class AlbumBackdropEngine:
 
         if self._base_bg is None:
             return None
+
+        if style == "Spinning Vinyl":
+            scene = self._base_bg.copy()
+            if self._blob_1 is not None:
+                scale_v = 1.05 + min(0.14, bloom * 0.14)
+                b_w = int(self._blob_1.width * scale_v)
+                b_h = int(self._blob_1.height * scale_v)
+                b_spr = self._blob_1.resize((b_w, b_h), Image.Resampling.BILINEAR)
+                self._tmp_a.paste((0, 0, 0), (0, 0, self.SRC_W, self.SRC_H))
+                self._tmp_a.paste(b_spr, (self.SRC_W // 2 - b_w // 2, self.SRC_H // 2 - b_h // 2))
+                scene = ImageChops.screen(scene, self._tmp_a)
+            if self._vinyl_disc is not None:
+                deg = -math.degrees(self._vinyl_angle) % 360.0
+                rot_disc = self._vinyl_disc.rotate(deg, resample=Image.Resampling.BILINEAR)
+                rgba_sc = scene.convert("RGBA")
+                vx0 = (self.SRC_W - rot_disc.width) // 2
+                vy0 = (self.SRC_H - rot_disc.height) // 2
+                rgba_sc.alpha_composite(rot_disc, (vx0, vy0))
+                if self._vinyl_sheen is not None:
+                    rgba_sc.alpha_composite(self._vinyl_sheen, (vx0, vy0))
+                # Articulated sleek turntable tonearm pivoting onto the groove on play & lifting off on pause
+                td = ImageDraw.Draw(rgba_sc)
+                piv_x = vx0 + rot_disc.width - 14
+                piv_y = vy0 + 22
+                arm_ang = math.radians(118.0 + 18.0 * self._tonearm_u)
+                len_arm = 112.0
+                hx = int(piv_x + math.cos(arm_ang) * len_arm)
+                hy = int(piv_y + math.sin(arm_ang) * len_arm)
+                td.ellipse([piv_x - 12, piv_y - 12, piv_x + 12, piv_y + 12], fill=(42, 46, 58, 240), outline=(215, 222, 238, 190), width=2)
+                td.line([(piv_x, piv_y), (hx, hy)], fill=(215, 222, 236, 230), width=4)
+                td.line([(piv_x, piv_y), (hx, hy)], fill=(255, 255, 255, 200), width=1)
+                td.rounded_rectangle([hx - 6, hy - 4, hx + 6, hy + 8], radius=2, fill=(32, 36, 46, 250), outline=(235, 240, 250, 220), width=1)
+                scene = rgba_sc.convert("RGB")
+            return ImageChops.multiply(scene, self._vig_mul)
 
         is_reel = (style in ("Video Reel", "Music Video"))
 
@@ -852,6 +949,7 @@ class AlbumBackdropEngine:
                     has_media = self._has_media
                     is_playing = self._is_playing
                     audio_on = self.audio_reactive
+                    e_boost = self.energy_boost if self.chorus_boost else 0.0
                     if rebuild_mons:
                         new_mons = self._select_monitors()
 
@@ -895,12 +993,23 @@ class AlbumBackdropEngine:
                             ov["win"].set_role(role)
 
                 peak, bloom = audio.sample() if (audio_on and is_playing) else (0.0, 0.0)
-                anim_t += dt * ((1.0 + bloom * 0.9) if is_playing else 0.25)
+                if e_boost > 0.02 and is_playing:
+                    bloom = min(1.0, bloom + e_boost * 0.36)
+                anim_t += dt * ((1.0 + bloom * 0.9 + e_boost * 0.35) if is_playing else 0.25)
+
+                target_omega = (0.95 + bloom * 0.35) if (is_playing and style_str == "Spinning Vinyl") else 0.0
+                if target_omega > self._vinyl_omega:
+                    self._vinyl_omega = min(target_omega, self._vinyl_omega + dt * 2.2)
+                else:
+                    self._vinyl_omega = max(0.0, self._vinyl_omega * math.exp(-dt * 2.0))
+                self._vinyl_angle = (self._vinyl_angle + dt * self._vinyl_omega) % (2.0 * math.pi)
+                target_arm = 1.0 if (is_playing and style_str == "Spinning Vinyl") else 0.0
+                self._tonearm_u += (target_arm - self._tonearm_u) * min(1.0, dt * 5.0)
+
                 if style_str == "Music Video":
                     mv_step_ok = (now - getattr(self, "_mv_last_step", 0.0)) >= 0.041
                     if mv_step_ok:
                         self._mv_last_step = now
-                    # Reuse cached decoded frame between 24fps video ticks, advancing only on ticks
                     with self._mv_frame_lock:
                         has_dec = self._mv_decoder is not None
                     if not mv_step_ok and has_dec and self._mv_frame is not None:
@@ -917,6 +1026,21 @@ class AlbumBackdropEngine:
                         frame_rgb = (self._render_anim_frame(anim_t, peak, bloom, style_str, darkness, blur_r) or dark_bg) if has_media else dark_bg
                 else:
                     frame_rgb = (self._render_anim_frame(anim_t, peak, bloom, style_str, darkness, blur_r) or dark_bg) if has_media else dark_bg
+
+                if self._xfer_u < 1.0 and self._prev_frame is not None:
+                    self._xfer_u = min(1.0, self._xfer_u + dt * 1.35)
+                    su = self._xfer_u * self._xfer_u * (3.0 - 2.0 * self._xfer_u)
+                    trans_blur = math.sin(self._xfer_u * math.pi) * 4.2
+                    prev_im = self._prev_frame
+                    cur_im = frame_rgb
+                    if trans_blur > 0.65:
+                        r_b = min(3.8, trans_blur)
+                        prev_im = prev_im.filter(ImageFilter.GaussianBlur(radius=r_b))
+                        cur_im = cur_im.filter(ImageFilter.GaussianBlur(radius=r_b * 0.65))
+                    frame_rgb = Image.blend(prev_im, cur_im, su)
+                    if self._xfer_u >= 0.999:
+                        self._prev_frame = None
+                self._last_rendered_frame = frame_rgb
 
                 a_byte = max(0, min(255, int(round(fade_alpha))))
                 for ov in overlays:

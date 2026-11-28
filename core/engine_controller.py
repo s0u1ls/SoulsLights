@@ -14,7 +14,15 @@ class EngineController:
         self.ambient_engine = AmbientGlowEngine(config_manager)
         self.backdrop_engine = AlbumBackdropEngine(config_manager)
         self.lyrics_engine = SyncedLyricsOverlay(config_manager, media_monitor, backdrop_engine=self.backdrop_engine)
+        self.lyrics_engine.on_energy_update = self.apply_chorus_energy
         self.mobile_server = MobileCompanionServer(config_manager, self, media_monitor)
+
+    def apply_chorus_energy(self, level: float):
+        try:
+            self.ambient_engine.set_energy_boost(level)
+            self.backdrop_engine.set_energy_boost(level)
+        except Exception:
+            pass
 
     def start_ambient(self):
         self.ambient_engine.reload_from_config()

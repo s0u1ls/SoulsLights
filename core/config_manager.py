@@ -26,8 +26,9 @@ DEFAULT_CONFIG = {
         "target_displays": "All Displays",
         "show_over_fullscreen": True,
         "audio_reactive": True,
+        "chorus_boost": True,
         "album_backdrop": "Desktop Layer",  # Desktop Layer, Cinema Stage, Off
-        "backdrop_style": "2-Blob Aura",    # 2-Blob Aura, Video Reel, Music Video
+        "backdrop_style": "2-Blob Aura",    # 2-Blob Aura, Video Reel, Spinning Vinyl, Music Video
         "backdrop_darkness": 0.34,          # 0.15 to 1.0 (higher = richer brighter cover)
         "backdrop_blur": 7.5                # 0.0 (sharp) to 12.0 (ultra soft)
     },
@@ -37,6 +38,7 @@ DEFAULT_CONFIG = {
         "style": "Fisheye Visual",
         "fisheye_effect": "Auto Mix",        # Auto Mix, Prism Split, Vortex Spin, Elastic Dome, Hyperwave, Shockwave, 3D Vault
         "auto_sync_colors": True,
+        "duet_split": True,
         "custom_accent_color": "#EC4899",
         "custom_text_color": "#FFFFFF",
         "font": "Geometric",
@@ -61,7 +63,8 @@ DEFAULT_CONFIG = {
     # System Preferences
     "system": {
         "start_with_windows": False,
-        "minimize_to_tray": True
+        "minimize_to_tray": True,
+        "mini_player": False
     }
 }
 
